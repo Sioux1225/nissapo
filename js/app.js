@@ -17,7 +17,7 @@ import {
   KINDS, COLLISIONS, ROAD_TYPES, SLOPES, SHAPES, SURFACES
 } from './accident.js';
 
-export const APP_VERSION = '0.9.3';
+export const APP_VERSION = '0.9.4';
 
 const app = document.getElementById('app');
 const state = {
@@ -988,8 +988,8 @@ function salesCanvas() {
     head,
     rows,
     foot,
-    summary: thisMonth ? `${m}月1日〜${td}日の売上合計：${yen(t.amount)}` : `${m}月の売上合計：${yen(t.amount)}`,
-    request: advanceOf(s, y, m) != null ? `希望する前払い額：${yen(advanceOf(s, y, m))}` : '',
+    summary: { label: thisMonth ? `${m}月1日〜${td}日の売上合計` : `${m}月の売上合計`, value: yen(t.amount) },
+    request: advanceOf(s, y, m) != null ? { label: '希望する前払い額', value: yen(advanceOf(s, y, m)) } : null,
     note: [
       `作成日：${ty >= 2019 ? `令和${ty - 2018}年` : `${ty}年`}${tm}月${td}日`,
       `ドライバーズサポート株式会社`

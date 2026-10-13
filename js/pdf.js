@@ -339,7 +339,7 @@ export function renderPhotoPage({ title, sub, items }) {
 
 // 売上表（月報）：A4縦。紙の月報と同じ並び（日・曜日・開始・終了・宅配・商業・集荷・稼働距離・金額）
 // head：[{ text, w }]（w は幅の割合）、rows：31行分の文字の配列、foot：合計の行、info：右上・左上の文
-export function renderSalesSheet({ title, ym, name, sub, head, rows, foot, summary, request = '', note }) {
+export function renderSalesSheet({ title, ym, name, sub, head, rows, foot, summary, request = null, note }) {
   const W = 1654;
   const H = 2339;
   const canvas = document.createElement('canvas');
@@ -388,18 +388,26 @@ export function renderSalesSheet({ title, ym, name, sub, head, rows, foot, summa
   // 前払いの判断用のまとめ
   const sy = footY + rowH + 60;
   ctx.textAlign = 'left';
-  ctx.font = `700 34px ${FONT}`;
-  ctx.fillText(summary, m, sy);
-  let ny = sy + 52;
-  if (request) {
-    // 希望する前払い額（枠で囲んで目立たせる）
-    ctx.font = `700 34px ${FONT}`;
-    const w = ctx.measureText(request).width + 40;
+  // 売上合計（左）と希望する前払い額（右）を枠で並べる。上に項目名、下に大きく金額
+  // summary・request：{ label, value }
+  const boxes = [summary, ...(request ? [request] : [])];
+  const gap = 30;
+  const bw = (W - m * 2 - gap * (boxes.length - 1)) / boxes.length;
+  const bh = 130;
+  const by = sy - 30;
+  boxes.forEach((b, i) => {
+    const x = m + i * (bw + gap);
     ctx.lineWidth = 3;
-    ctx.strokeRect(m, ny - 6, w, 56);
-    ctx.fillText(request, m + 20, ny + 22);
-    ny += 84;
-  }
+    ctx.strokeRect(x, by, bw, bh);
+    ctx.textAlign = 'left';
+    ctx.font = `700 28px ${FONT}`;
+    ctx.fillText(b.label, x + 24, by + 34);
+    ctx.textAlign = 'right';
+    ctx.font = `800 56px ${FONT}`;
+    ctx.fillText(b.value, x + bw - 24, by + 88);
+  });
+  ctx.textAlign = 'left';
+  let ny = by + bh + 44;
   ctx.font = `400 24px ${FONT}`;
   note.forEach((t, i) => ctx.fillText(t, m, ny + i * 36));
   return canvas;
