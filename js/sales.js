@@ -18,12 +18,13 @@ export function defaultShuka(office) {
 
 // 佐川急便の営業所と宅配の単価（佐川単価表 2026年5月27日更新の「一般」）
 // 3つ目の数字は、乗務した日ごとに足す金額（川口（DRF）は個建＋1日10,000円の保障）
-// 4つ目は新人保証：稼働を開始した日から months か月のあいだ、乗務した日ごとに perDay 円を足す
+// 4つ目は新人保証：稼働を開始した日から months か月（または days 日）のあいだ、乗務した日ごとに perDay 円を足す
+// （三多摩は2週間・八王子は1か月。三多摩（山単価）は新人保証なし）
 // 三多摩B は三多摩と同じ営業所をエリアで分けたものなので、三多摩を選ぶ（以前の入力の「三多摩B」も三多摩に読み替える）
 export const PRICE_TABLE_DATE = '2026年5月27日';
 export const OFFICES = [
   ['東京', 173], ['江東', 173], ['台東', 173], ['世田谷', 176], ['墨田', 175], ['横浜', 176], ['湘南', 170],
-  ['千葉南', 170], ['千葉北', 170], ['城北', 177], ['三多摩（山単価）', 186], ['三多摩', 165], ['練馬', 180],
+  ['千葉南', 170], ['千葉北', 170], ['城北', 177], ['三多摩（山単価）', 186], ['三多摩', 165, 0, { perDay: 5000, days: 14 }], ['練馬', 180],
   ['越谷', 167], ['足立', 175], ['八王子', 178, 0, { perDay: 5000, months: 1 }], ['八王子（代走）', 190], ['川崎', 173], ['さいたま', 180], ['川口', 180], ['川口（DRF）', 167, 10000],
   ['所沢', 180], ['赤羽', 177], ['座間', 173], ['横須賀', 178], ['横浜北', 175], ['杉並', 177], ['木更津', 168],
   ['茂原', 168], ['横浜鶴見', 176], ['城南', 174], ['目黒', 173], ['横浜緑', 171], ['佐倉', 166], ['町田', 159],
@@ -50,10 +51,22 @@ export function newbiePeriod(settings) {
   const nb = officeEntry(settings.salesOffice)?.newbie;
   if (!nb || !isDate(settings.salesStartDate)) return null;
   const [y, m, d] = settings.salesStartDate.split('-').map(Number);
-  const last = new Date(y, m - 1 + nb.months + 1, 0).getDate(); // 期間の終わりの月の末日
-  const end = new Date(y, m - 1 + nb.months, Math.min(d, last));
-  end.setDate(end.getDate() - 1);
+  let end;
+  if (nb.days) {
+    end = new Date(y, m - 1, d + nb.days - 1); // 例：14日間なら開始日を含めて14日
+  } else {
+    const last = new Date(y, m - 1 + nb.months + 1, 0).getDate(); // 期間の終わりの月の末日
+    end = new Date(y, m - 1 + nb.months, Math.min(d, last));
+    end.setDate(end.getDate() - 1);
+  }
   return { from: settings.salesStartDate, to: `${end.getFullYear()}-${pad(end.getMonth() + 1)}-${pad(end.getDate())}`, perDay: nb.perDay };
+}
+
+// 新人保証の期間の書き方（「1か月間」「2週間」「10日間」）
+export function newbieSpan(nb) {
+  if (!nb) return '';
+  if (nb.days) return nb.days % 7 === 0 ? `${nb.days / 7}週間` : `${nb.days}日間`;
+  return `${nb.months}か月間`;
 }
 
 // その日に、個数の金額とは別に足す金額（1日の保障・新人保証）

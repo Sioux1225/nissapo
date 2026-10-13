@@ -341,3 +341,16 @@ test('八王子の新人保証（稼働開始から1か月は1日5,000円）と�
   assert.equal(monthSales(recs, 2026, 12, hj, null, '2027-01-01').hasNewbie, false);
   assert.equal(monthSales(recs, 2026, 11, dai, null, '2026-12-01').hasNewbie, false);
 });
+
+test('三多摩の新人保証は2週間・1日5,000円、山単価は保証なし', async () => {
+  const { newbiePeriod, dayBonus, newbieSpan, officeEntry } = await import('../js/sales.js');
+  const tm = { salesType: 'sagawa', salesOffice: '三多摩', salesStartDate: '2026-10-13' };
+  assert.deepEqual(newbiePeriod(tm), { from: '2026-10-13', to: '2026-10-26', perDay: 5000 });
+  assert.equal(dayBonus(tm, '2026-10-26'), 5000);
+  assert.equal(dayBonus(tm, '2026-10-27'), 0);
+  assert.equal(newbiePeriod({ ...tm, salesStartDate: '2026-12-25' }).to, '2027-01-07'); // 年をまたぐ
+  assert.equal(newbiePeriod({ ...tm, salesOffice: '三多摩（山単価）' }), null);
+  assert.equal(newbiePeriod({ ...tm, salesOffice: '三多摩B' }).to, '2026-10-26'); // 三多摩Bは三多摩として扱う
+  assert.equal(newbieSpan(officeEntry('三多摩').newbie), '2週間');
+  assert.equal(newbieSpan(officeEntry('八王子').newbie), '1か月間');
+});

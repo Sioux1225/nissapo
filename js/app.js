@@ -3,7 +3,7 @@
 
 import { db, requestPersist } from './db.js';
 import { shrinkImage, newPhoto, blobToDataUrl, dataUrlToBlob } from './photo.js';
-import { SALES_TYPES, COUNT_KEYS, unitPrices, salesReady, monthSales, yen, defaultShogyo, defaultShuka, advanceKey, advanceOf, OFFICES, OTHER_OFFICE, PRICE_TABLE_DATE, officeEntry, officeName, newbiePeriod } from './sales.js';
+import { SALES_TYPES, COUNT_KEYS, unitPrices, salesReady, monthSales, yen, defaultShogyo, defaultShuka, advanceKey, advanceOf, OFFICES, OTHER_OFFICE, PRICE_TABLE_DATE, officeEntry, officeName, newbiePeriod, newbieSpan } from './sales.js';
 import { EXPIRED, expiryStatus, expiryMessage, expiryAlertsToShow } from './expiry.js';
 import { OIL_LIMIT, OIL_STEPS, newOilChange, currentOdo, oilStatus, oilMessage, oilAlertToShow, sortOilChanges } from './oil.js';
 import {
@@ -17,7 +17,7 @@ import {
   KINDS, COLLISIONS, ROAD_TYPES, SLOPES, SHAPES, SURFACES
 } from './accident.js';
 
-export const APP_VERSION = '0.9.4';
+export const APP_VERSION = '0.9.5';
 
 const app = document.getElementById('app');
 const state = {
@@ -185,7 +185,7 @@ function sagawaFields(s, f) {
     `<option value="${OTHER_OFFICE}" ${selected === OTHER_OFFICE ? 'selected' : ''}>一覧にない営業所（単価を入力）</option>`].join('');
   return `
     ${field('営業所', `<select class="select" data-setting="salesOffice">${opts}</select>`)}
-    ${entry ? `<p class="field-note pad-note price-line">単価：<b>宅配 ${yen(p.takuhai)}・商業 ${yen(p.shogyo)}・集荷 ${yen(p.shuka)}${p.daily ? `＋1日 ${yen(p.daily)}` : ''}</b>${entry.newbie ? `<br>新人保証：<b>稼働を開始した日から${entry.newbie.months}か月間、1日 ${yen(entry.newbie.perDay)}をプラス</b>` : ''}<br>（佐川単価表 ${PRICE_TABLE_DATE}更新）</p>` : ''}
+    ${entry ? `<p class="field-note pad-note price-line">単価：<b>宅配 ${yen(p.takuhai)}・商業 ${yen(p.shogyo)}・集荷 ${yen(p.shuka)}${p.daily ? `＋1日 ${yen(p.daily)}` : ''}</b>${entry.newbie ? `<br>新人保証：<b>稼働を開始した日から${newbieSpan(entry.newbie)}、1日 ${yen(entry.newbie.perDay)}をプラス</b>` : ''}<br>（佐川単価表 ${PRICE_TABLE_DATE}更新）</p>` : ''}
     ${f('salesStartDate', '稼働を開始した日', 'type="date"', entry?.newbie ? (newbiePeriod(s) ? `新人保証は ${newbiePeriod(s).to.replace(/-/g, '/')} まで` : '新人保証の期間を数えるのに使います。入れてください') : '新人保証の期間を数えるのに使います')}
     ${selected === OTHER_OFFICE ? `
       ${f('salesOfficeName', '営業所名', 'placeholder="例：○○"')}
