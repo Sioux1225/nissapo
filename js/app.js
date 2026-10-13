@@ -17,7 +17,7 @@ import {
   KINDS, COLLISIONS, ROAD_TYPES, SLOPES, SHAPES, SURFACES
 } from './accident.js';
 
-export const APP_VERSION = '0.7.6';
+export const APP_VERSION = '0.7.7';
 
 const app = document.getElementById('app');
 const state = {
@@ -185,7 +185,7 @@ function sagawaFields(s, f) {
     `<option value="${OTHER_OFFICE}" ${selected === OTHER_OFFICE ? 'selected' : ''}>一覧にない営業所（単価を入力）</option>`].join('');
   return `
     ${field('営業所', `<select class="select" data-setting="salesOffice">${opts}</select>`)}
-    ${entry ? `<p class="field-note pad-note price-line">単価：<b>宅配 ${yen(p.takuhai)}・商業 ${yen(p.shogyo)}・集荷 ${yen(p.shuka)}</b><br>（佐川単価表 ${PRICE_TABLE_DATE}更新）</p>` : ''}
+    ${entry ? `<p class="field-note pad-note price-line">単価：<b>宅配 ${yen(p.takuhai)}・商業 ${yen(p.shogyo)}・集荷 ${yen(p.shuka)}${p.daily ? `＋1日 ${yen(p.daily)}` : ''}</b><br>（佐川単価表 ${PRICE_TABLE_DATE}更新）</p>` : ''}
     ${selected === OTHER_OFFICE ? `
       ${f('salesOfficeName', '営業所名', 'placeholder="例：○○"')}
       ${f('priceTakuhai', '単価：宅配（円/個）', 'type="number" inputmode="numeric" min="0" placeholder="例：170"')}
@@ -900,7 +900,7 @@ function salesContext() {
 function salesSub(s) {
   if (s.salesType === 'daily') return `所属：${s.salesProject || ''}　日当：${yen(s.dailyRate)}`;
   const p = unitPrices(s);
-  return `営業所：${officeName(s)}　単価：宅配 ${yen(p.takuhai)}・商業 ${yen(p.shogyo)}・集荷 ${yen(p.shuka)}`;
+  return `営業所：${officeName(s)}　単価：宅配 ${yen(p.takuhai)}・商業 ${yen(p.shogyo)}・集荷 ${yen(p.shuka)}${p.daily ? `＋1日 ${yen(p.daily)}` : ''}`;
 }
 
 function renderSales() {
@@ -915,7 +915,7 @@ function renderSales() {
         <span class="row-sub">${e(hm(r.start))} → ${e(hm(r.end) || '--:--')}　${r.km != null ? kmText(r.km) : ''}</span>
         ${sagawa ? `<span class="counts small-counts">${COUNT_KEYS.map(([k, tx]) => `<label><span>${tx}</span><input data-sales-date="${r.date}" data-sales-key="${k}" value="${r.counts[k] ?? ''}" type="number" inputmode="numeric" min="0"></label>`).join('')}</span>` : ''}
       </span>
-      <span class="row-km">${r.amount != null ? yen(r.amount) : '<span class="tag">個数まだ</span>'}</span>
+      <span class="row-km">${r.amount != null ? yen(r.amount) : ''}${r.missing ? '<span class="tag">個数まだ</span>' : ''}</span>
     </div>`).join('');
   app.innerHTML = `
     <main class="screen">
