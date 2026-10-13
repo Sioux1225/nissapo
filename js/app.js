@@ -13,7 +13,7 @@ import {
   KINDS, COLLISIONS, ROAD_TYPES, SLOPES, SHAPES, SURFACES
 } from './accident.js';
 
-export const APP_VERSION = '0.3.2';
+export const APP_VERSION = '0.3.3';
 
 const app = document.getElementById('app');
 const state = {
@@ -163,7 +163,7 @@ function renderSetup() {
         <p class="muted">はじめに、毎日同じになる内容を登録します。あとから設定でいつでも変えられます。</p>
       </div>
       ${settingsForm(state.settings)}
-      <p class="info">記録はこのスマホの中だけに保存されます。事務所へは、月末などに「書き出し・共有」から Excel・PDF・CSV を送ります。</p>
+      <p class="info">記録はこのスマホの中だけに保存されます。保管用のファイルや事務所に送るファイルは、「書き出し・共有」から Excel・PDF・CSV で作れます。</p>
       <button type="button" class="btn-primary" data-action="save-settings" data-next="home">はじめる</button>
     </main>`;
 }
@@ -428,7 +428,7 @@ function renderExport() {
       <button type="button" class="${canShare ? 'btn-outline' : 'btn-primary'}" data-action="export" data-how="save">このスマホに保存する</button>
       <button type="button" class="btn-text" data-action="preview">画面で確認する</button>
       <p class="info">${canShare ? '事務所に送るときは「共有する」を押して、LINEやメールを選んでください。' : '保存したファイルを、LINEやメールに添付して事務所に送ってください。'}</p>
-      <p class="info">${isAcc ? '事故の記録は<b>3年間</b>の保存が決まりです。事故があったら、すぐに事務所に送ってください。' : '運転日報・点呼記録簿は<b>1年間</b>の保存が決まりです。毎月送って、事務所で保管してください。'}<button type="button" class="link-btn inline" data-action="go" data-view="rules">記録の決まり</button></p>
+      <p class="info">${isAcc ? '事故の記録は<b>3年間</b>、自分で保管するのが決まりです。事務所にも送っておくと、会社でも控えを残せます。' : '運転日報・点呼記録簿は<b>1年間</b>、自分で保管するのが決まりです。毎月書き出して保存し、事務所にも送っておくと安心です。'}<button type="button" class="link-btn inline" data-action="go" data-view="rules">記録の決まり</button></p>
       <div id="preview" class="preview"></div>
     </main>`;
 }
@@ -462,7 +462,7 @@ function renderAccidents() {
       </section>
       <button type="button" class="btn-primary" data-action="new-accident">＋ 事故を記録する</button>
       <div class="card list">${rows || '<p class="empty">事故の記録はありません</p>'}</div>
-      <p class="info">事故の記録は<b>3年間</b>の保存が決まりです（事務所で保管）。「書き出し・共有」で「事故の記録」を選ぶと、まとめて送れます。</p>
+      <p class="info">事故の記録は<b>3年間</b>、自分で保管するのが決まりです。「書き出し・共有」で「事故の記録」を選ぶと、まとめて保存したり事務所に送ったりできます。</p>
     </main>`;
 }
 
@@ -641,7 +641,7 @@ function renderRules() {
   app.innerHTML = `
     <main class="screen">
       ${head('記録の決まり')}
-      <p class="small">軽貨物（貨物軽自動車運送事業）の運転日報と点呼記録簿には、国の決まり（貨物自動車運送事業輸送安全規則）があります。</p>
+      <p class="small">軽貨物（貨物軽自動車運送事業）の運転日報と点呼記録簿には、国の決まり（貨物自動車運送事業輸送安全規則）があります。記録を作って保管する義務があるのは、<b>自分の名前で事業を届け出ている本人（事業者）</b>です。</p>
 
       <h2 class="section-title">保存しておく期間</h2>
       <div class="card list rules">
@@ -674,16 +674,18 @@ function renderRules() {
       <h2 class="section-title">このアプリでの保存</h2>
       <div class="card pad">
         <ul class="rule-list">
-          <li>記録はこのスマホの中だけにあります。<b>毎月「書き出し・共有」で事務所に送ってください。</b></li>
-          <li>事務所は、受け取った Excel・PDF を<b>1年間</b>保管します。</li>
-          <li>アプリの記録は、自分で消さないかぎり残ります。1年たっていない記録は消さないでください。</li>
+          <li>記録は<b>自分で保管</b>します。会社への提出は、決まりでは求められていません。</li>
+          <li>記録はこのスマホの中だけにあります。スマホの故障・紛失で消えないよう、<b>毎月「書き出し・共有」で書き出して</b>、パソコンやクラウドなど別の場所にも保存してください。</li>
+          <li>事務所にも送っておくと、会社でも控えを残せて安心です。</li>
+          <li>運輸支局の監査などで求められたら、見せられるようにしておきます。事故の記録は、届け出た営業所（自宅など）で保管する決まりです。</li>
+          <li>アプリの記録は、自分で消さないかぎり残ります。保存期間（1年・事故は3年）がたっていない記録は消さないでください。</li>
           <li>スマホを替える・アプリを消す前に、設定から<b>バックアップ</b>を作ってください。</li>
         </ul>
       </div>
 
       <h2 class="section-title">事故が起きたら</h2>
       <div class="card pad">
-        <p class="small">すぐに事務所（運行管理者）に連絡してください。ホームの「事故の記録」から記録できます。事故の記録（概要・原因・再発防止対策など）は3年間保存します。死者・重傷者が出た事故や、転覆・転落・火災・踏切での事故、飲酒運転・健康状態が原因の事故など一定の事故は、30日以内に国への報告が必要です（事務所が行います）。</p>
+        <p class="small">すぐに事務所（運行管理者）に連絡してください。ホームの「事故の記録」から記録できます。事故の記録（概要・原因・再発防止対策など）は3年間保存します。死者・重傷者が出た事故や、転覆・転落・火災・踏切での事故、飲酒運転・健康状態が原因の事故など一定の事故は、30日以内に国への報告が必要です。報告するのは届け出ている本人（事業者）なので、事務所に相談しながら進めてください。</p>
       </div>
 
       <p class="info">決まりは法令の改正で変わることがあります。くわしくは事務所か運輸支局に確かめてください。<br>
