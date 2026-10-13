@@ -349,3 +349,7 @@ button:focus-visible { outline: 3px solid var(--blue); outline-offset: 2px; }
 .adv-add { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 8px; padding: 12px 16px 14px; border-top: 1px solid var(--line-soft); }
 .adv-add input { min-width: 0; max-width: 100%; min-height: 48px; height: 48px; border: 1px solid var(--line-strong); border-radius: 12px; background: var(--card); padding: 0 10px; font-size: 16px; font-weight: 600; -webkit-appearance: none; appearance: none; line-height: 46px; }
 .adv-add .btn-outline { grid-column: 1 / -1; }
+
+/* 記録の決まり：前払いのルール */
+.rules-h1 { font-size: 20px; font-weight: 800; margin: 18px 4px 0; padding-top: 16px; border-top: 2px solid var(--line); }
+.fee-ex { background: var(--orange-tint); border-radius: 12px; padding: 10px 12px; display: flex; flex-direction: column; gap: 4px; }

@@ -17,7 +17,7 @@ import {
   KINDS, COLLISIONS, ROAD_TYPES, SLOPES, SHAPES, SURFACES
 } from './accident.js';
 
-export const APP_VERSION = '0.10.0';
+export const APP_VERSION = '0.10.1';
 
 const app = document.getElementById('app');
 const state = {
@@ -1111,6 +1111,49 @@ function renderRules() {
 
       <p class="info">決まりは法令の改正で変わることがあります。くわしくは事務所か運輸支局に確かめてください。<br>
         出典：<a href="https://www.mlit.go.jp/report/press/jidosha02_hh_000665.html" target="_blank" rel="noopener">国土交通省「貨物軽自動車運送事業者に対する規制の適正化」</a></p>
+
+      <h1 class="rules-h1">前払いのルールと注意事項</h1>
+
+      <h2 class="section-title">前払いできる金額（対象額）</h2>
+      <div class="card pad">
+        <ul class="rule-list">
+          <li><b>リース車を利用している方</b>は、はじめての前払いに限り、まず売上のうち<b>10万円を留保</b>します。それを超えた売上の<b>50%</b>が前払いの対象額です。</li>
+          <li><b>翌月以降</b>は、その月の売上の<b>50%</b>が前払いの対象額です。</li>
+          <li>ただし、<b>前月の売上が40万円に届かなかった場合</b>は、<b>5万円の留保</b>が必要です。</li>
+          <li>前払いは<b>当月分を当月中にだけ</b>申請できます。月が変わるとリセットされ、元には戻せません。</li>
+        </ul>
+      </div>
+
+      <h2 class="section-title">申請のしかた</h2>
+      <div class="card pad">
+        <ul class="rule-list">
+          <li>受付は<b>平日の8時〜13時</b>です。13時以降に順に処理します。担当者が終日不在の日は、翌日の処理になります。</li>
+          <li><b>土日・祝日は申請できません。</b></li>
+          <li>月末の最後の申請は、<b>最終平日の12時まで</b>です。</li>
+          <li>申請は LINE で受け付けます。事務所で処理して振り込んだら、LINE で連絡します。</li>
+        </ul>
+      </div>
+
+      <h2 class="section-title">前払いのアプリ「PAYS」</h2>
+      <div class="card pad">
+        <ul class="rule-list">
+          <li>前払いは「<b>PAYS</b>」というアプリを使います。はじめに、ご自身で<b>銀行口座の情報</b>を登録してください。</li>
+          <li>口座の情報を間違えると、振り込みや前払いができなくなることがあります。PAYS 側の取り消しの手続きが終わるまで（2〜3営業日かかることがあります）は新しく申請できず、月をまたぐと前払いできる金額がリセットされてしまいます。<b>登録するときは、よく確かめてください。</b></li>
+        </ul>
+      </div>
+
+      <h2 class="section-title">手数料と振込金額</h2>
+      <div class="card pad">
+        <ul class="rule-list">
+          <li><b>利用手数料：6%（税抜）</b>　<b>振込手数料：330円（税込）</b></li>
+          <li>振込金額は、申請額から利用手数料と振込手数料を差し引き、100円未満を切り捨てた金額です。</li>
+        </ul>
+        <div class="fee-ex">
+          <p class="small"><b>例：10,000円を申請した場合</b></p>
+          <p class="small">振込金額：<b>9,000円</b></p>
+          <p class="small">委託料の支払いのときに差し引く金額：<br>9,000円 ＋ 利用手数料 594円 ＋ 振込手数料 330円 ＝ <b>9,924円</b></p>
+        </div>
+      </div>
     </main>`;
 }
 
