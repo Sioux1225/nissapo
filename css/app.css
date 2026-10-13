@@ -85,7 +85,7 @@ svg { flex: none; }
   width: 26px; height: 26px; border-radius: 13px; border: 2px solid var(--line-strong); background: var(--card);
   display: inline-flex; align-items: center; justify-content: center;
 }
-.status.done .status-mark { border-color: var(--green); background: var(--green); color: #FFF; }
+.status.done .status-mark { border-color: var(--orange); background: var(--orange); color: #FFF; }
 .status-label { flex: 1; font-weight: 600; }
 .status-time { font-size: 18px; font-weight: 700; font-variant-numeric: tabular-nums; }
 .status:not(.done) .status-time { font-size: 14px; font-weight: 400; color: var(--sub); }

@@ -9,7 +9,7 @@ import {
 import { buildXlsx } from './xlsx.js';
 import { specsToPdf, renderSheet } from './pdf.js';
 
-export const APP_VERSION = '0.1.2';
+export const APP_VERSION = '0.1.3';
 
 const app = document.getElementById('app');
 const state = {
