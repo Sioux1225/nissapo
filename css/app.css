@@ -319,6 +319,19 @@ button:focus-visible { outline: 3px solid var(--blue); outline-offset: 2px; }
   box-sizing: border-box;
   text-align: left;
 }
+/* 数字を上下の真ん中に（iPhone は上に寄るため、欄の高さと行の高さをそろえる） */
+.field input[type="date"], .field input[type="time"] {
+  height: 48px;
+  min-height: 48px;
+  line-height: 46px;
+  padding-top: 0;
+  padding-bottom: 0;
+}
 .field input[type="date"]::-webkit-date-and-time-value,
-.field input[type="time"]::-webkit-date-and-time-value { text-align: left; }
+.field input[type="time"]::-webkit-date-and-time-value {
+  text-align: left;
+  margin: 0;
+  line-height: 46px;
+  min-height: 0;
+}
 .field input { min-width: 0; max-width: 100%; }
