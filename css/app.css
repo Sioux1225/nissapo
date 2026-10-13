@@ -236,3 +236,4 @@ button:focus-visible { outline: 3px solid var(--blue); outline-offset: 2px; }
 .people input { width: 56px !important; min-height: 44px !important; text-align: center; padding: 0 4px !important; }
 .warn.block { margin: 0; }
 .tag.danger { color: var(--warn); background: var(--warn-bg); }
+.plan-btn { align-self: flex-start; margin: -6px 12px 6px; }

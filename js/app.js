@@ -13,7 +13,7 @@ import {
   KINDS, COLLISIONS, ROAD_TYPES, SLOPES, SHAPES, SURFACES
 } from './accident.js';
 
-export const APP_VERSION = '0.3.0';
+export const APP_VERSION = '0.3.1';
 
 const app = document.getElementById('app');
 const state = {
@@ -521,7 +521,8 @@ function renderAccidentForm() {
         ${accText('当時の状況', 'situation', EX.situation, 'いつ、どこで、だれが、どのような事故を起こし、結果どうなったか。けが人や物損があればその内容も', 8)}
         ${accText('事故の種類', 'kind', EX.kind, '物損・人身事故など。物損なら何とぶつかったか', 2)}
         ${accText('道路等の状況', 'road', EX.road, '道幅・坂道・カーブ・交差点・路面のぬれなど', 2)}
-        ${accText('当時の運行計画', 'plan', EX.plan, 'その日の運転日報があれば、そこから下書きを入れています', 3)}
+        ${accText('当時の運行計画', 'plan', EX.plan, '出発地・経由地・到着地と、それぞれの時刻を書きます', 3)}
+        ${!a.plan && planFromRecord(findRecord(a.date), state.settings.via) ? '<button type="button" class="link-btn plan-btn" data-action="plan-from-nippo">その日の運転日報から下書きを入れる</button>' : ''}
         ${accText('損害の程度', 'damage', EX.damage, 'けがは医師の診断にもとづいて書きます', 2)}
       </section>
 
@@ -580,11 +581,7 @@ function rerenderAccident(focusId) {
 function openAccident(id) {
   const found = state.accidents.find((a) => a.id === id);
   if (found) state.acc = structuredClone(found);
-  else {
-    const today = todayKey();
-    state.acc = newAccident(state.settings, today, nowTime());
-    state.acc.plan = planFromRecord(findRecord(today), state.settings.via);
-  }
+  else state.acc = newAccident(state.settings, todayKey(), nowTime());
   state.back = 'accidents';
   go('accident');
 }
@@ -969,6 +966,10 @@ app.addEventListener('click', async (ev) => {
   else if (action === 'new-accident') openAccident(null);
   else if (action === 'open-accident') openAccident(el.dataset.id);
   else if (action === 'save-accident') runBusy(saveAccident);
+  else if (action === 'plan-from-nippo') {
+    state.acc.plan = planFromRecord(findRecord(state.acc.date), state.settings.via);
+    rerenderAccident('acc-plan');
+  }
   else if (action === 'share-accident') {
     runBusy(async () => {
       const a = state.acc;
