@@ -3,7 +3,7 @@
 
 import { db, requestPersist } from './db.js';
 import { shrinkImage, newPhoto, blobToDataUrl, dataUrlToBlob } from './photo.js';
-import { OIL_LIMIT, OIL_STEPS, newOilChange, currentOdo, oilStatus, oilMessage, oilAlertToShow, sortOilChanges } from './oil.js';
+import { OIL_LIMIT, OIL_STEPS, ELEMENT_EVERY, newOilChange, currentOdo, oilStatus, oilMessage, oilAlertToShow, sortOilChanges } from './oil.js';
 import {
   DEFAULT_SETTINGS, METHODS, newStart, newEnd, todayKey, nowTime, isTime, num, distanceOf, prevOdo,
   monthSheets, yearSheets, hasMonth, toCsv, daysInMonth, dateKey, weekday, pad2
@@ -15,7 +15,7 @@ import {
   KINDS, COLLISIONS, ROAD_TYPES, SLOPES, SHAPES, SURFACES
 } from './accident.js';
 
-export const APP_VERSION = '0.5.0';
+export const APP_VERSION = '0.5.1';
 
 const app = document.getElementById('app');
 const state = {
@@ -739,7 +739,7 @@ function oilCard() {
   return `<button type="button" class="card pad oil-card ${st.level >= 4500 ? 'danger' : st.level >= 3000 ? 'caution' : ''}" data-action="go" data-view="oil">
     <span class="oil-head"><b>オイル交換</b><span class="oil-num">前回から <b>${kmText(st.since)}</b></span></span>
     ${oilBar(st)}
-    <span class="small">${msg ? `<b>${e(msg.title)}</b>　` : ''}${st.remaining > 0 ? `5,000km まで あと ${kmText(st.remaining)}` : `5,000km を ${kmText(-st.remaining)} 超えています`}</span>
+    <span class="small">${msg ? `<b>${e(msg.title)}</b>　` : ''}${st.remaining > 0 ? `5,000km まで あと ${kmText(st.remaining)}` : `5,000km を ${kmText(-st.remaining)} 超えています`}${st.element.dueNext ? '<br>次のオイル交換では<b>エレメントも交換</b>します' : ''}</span>
   </button>`;
 }
 
@@ -756,6 +756,9 @@ function renderOil() {
   const changes = sortOilChanges(s.oilChanges).reverse();
   const nowOdo = currentOdo(state.records, s);
   const msg = oilMessage(st);
+  const el = st.element;
+  // 今回エレメントも交換するか（初期値：3回に1回の回なら「交換した」）
+  if (state.oilElement == null) state.oilElement = el.dueNext ? '交換した' : '交換していない';
   app.innerHTML = `
     <main class="screen form">
       ${head('オイル交換')}
@@ -764,14 +767,18 @@ function renderOil() {
         <b class="oil-big">${kmText(st.since)}</b>
         ${oilBar(st)}
         <p class="small">${msg ? `<b>${e(msg.title)}</b><br>` : ''}${st.remaining > 0 ? `5,000km まで あと <b>${kmText(st.remaining)}</b>` : `5,000km を ${kmText(-st.remaining)} 超えています`}</p>
+        <p class="small elem-line">エレメント：${el.dueNext ? '<b>次のオイル交換で交換します</b>' : `次から数えて ${el.left} 回目のオイル交換で交換します`}${el.known ? `（前回のエレメント交換から オイル交換 ${el.since} 回）` : ''}</p>
       </section>` : ''}
-      <p class="info">前回の交換から <b>3,000km・3,500km・4,000km・4,500km</b> を超えるとお知らせします。<b>5,000km までに必ず</b>オイル交換をしてください。走った距離は、運転日報のメーターから計算します。</p>
+      <p class="info">前回の交換から <b>3,000km・3,500km・4,000km・4,500km</b> を超えるとお知らせします。<b>5,000km までに必ず</b>オイル交換をしてください。オイルエレメントは<b>オイル交換${ELEMENT_EVERY}回に1回</b>交換します。走った距離は、運転日報のメーターから計算します。</p>
 
       <h2 class="section-title">オイル交換をしたら記録する</h2>
       <section class="card fields">
         ${field('交換した日', `<input id="oil-date" type="date" value="${todayKey()}">`)}
         ${field('交換したときのメーター（km）', `<input id="oil-odo" type="number" inputmode="numeric" min="0" value="${nowOdo ?? ''}">`, '運転日報のいちばん新しいメーターが入っています。違うときは直してください')}
-        ${field('メモ（任意）', '<input id="oil-note" placeholder="例：○○カーショップ、エレメントも交換">')}
+        <div class="field"><span class="field-label">オイルエレメント</span>
+          <div class="seg">${['交換した', '交換していない'].map((v) => `<button type="button" data-oil-element="${v}" aria-pressed="${state.oilElement === v}">${v}</button>`).join('')}</div>
+          <span class="field-note">${el.dueNext ? '<b>今回はエレメントも交換する回です</b>（オイル交換3回に1回）' : st.last ? `エレメントは、次から数えて ${el.left} 回目のオイル交換で交換します` : 'はじめての記録です。そのときエレメントも交換したかを選んでください'}</span>
+        </div>
       </section>
       <button type="button" class="btn-primary" data-action="save-oil">オイル交換を記録する</button>
 
@@ -781,7 +788,7 @@ function renderOil() {
         return `<div class="row oil-row">
           <span class="row-main">
             <span class="row-title">${e(c.date.replace(/-/g, '/'))}　${kmText(c.odo)}</span>
-            <span class="row-text">${prev ? `前回から ${kmText(c.odo - prev.odo)}` : '最初の記録'}${c.note ? `　${e(c.note)}` : ''}</span>
+            <span class="row-text">${c.element ? '<span class="tag">エレメントも交換</span> ' : 'オイルのみ　'}${prev ? `前回から ${kmText(c.odo - prev.odo)}` : '最初の記録'}${c.note ? `　${e(c.note)}` : ''}</span>
           </span>
           <button type="button" class="btn-text danger" data-action="delete-oil" data-id="${e(c.id)}">消す</button>
         </div>`;
@@ -792,14 +799,15 @@ function renderOil() {
 async function saveOil() {
   const date = document.getElementById('oil-date').value;
   const odo = num(document.getElementById('oil-odo').value);
-  const note = document.getElementById('oil-note').value.trim();
   if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) { toast('交換した日を入れてください'); return; }
   if (odo == null) { toast('交換したときのメーターを入れてください'); return; }
   const s = state.settings;
-  s.oilChanges = [...(s.oilChanges || []), newOilChange(date, odo, note)];
+  const element = state.oilElement === '交換した';
+  s.oilChanges = [...(s.oilChanges || []), newOilChange(date, odo, element)];
   s.oilAck = null;
   await db.putSettings(s);
-  toast('オイル交換を記録しました');
+  state.oilElement = null;
+  toast(element ? 'オイルとエレメントの交換を記録しました' : 'オイル交換を記録しました');
   renderOil();
   window.scrollTo(0, 0);
 }
@@ -885,6 +893,7 @@ function render() {
 
 function go(view, { push = true } = {}) {
   state.view = view;
+  if (view === 'oil') state.oilElement = null; // エレメントの選択は、開くたびに初期値から
   if (view === 'list' && !state.month) {
     const n = new Date();
     state.month = { y: n.getFullYear(), m: n.getMonth() + 1 };
@@ -1136,6 +1145,12 @@ app.addEventListener('click', async (ev) => {
     rerenderAccident();
     return;
   }
+  const oilEl = ev.target.closest('[data-oil-element]');
+  if (oilEl) {
+    state.oilElement = oilEl.dataset.oilElement;
+    oilEl.parentElement.querySelectorAll('[data-oil-element]').forEach((b) => b.setAttribute('aria-pressed', b === oilEl));
+    return;
+  }
   const setSeg = ev.target.closest('[data-setting-seg]');
   if (setSeg) {
     state.settings[setSeg.dataset.settingSeg] = setSeg.dataset.value;
@@ -1167,6 +1182,7 @@ app.addEventListener('click', async (ev) => {
     if (!c || !(await ask(`${c.date.replace(/-/g, '/')}（${kmText(c.odo)}）のオイル交換の記録を消します。`, '消す', true))) return;
     state.settings.oilChanges = state.settings.oilChanges.filter((x) => x.id !== c.id);
     state.settings.oilAck = null;
+    state.oilElement = null;
     await db.putSettings(state.settings);
     renderOil();
   }

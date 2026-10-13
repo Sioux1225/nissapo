@@ -1,13 +1,15 @@
 // オイル交換：前回の交換からの走行距離で、交換の時期を知らせる。
 // 3,000km・3,500km・4,000km・4,500km でお知らせし、5,000km までに必ず交換する。
+// オイルエレメントは、オイル交換3回につき1回交換する。
 
 import { num } from './model.js';
 
 export const OIL_LIMIT = 5000;
 export const OIL_STEPS = [3000, 3500, 4000, 4500, OIL_LIMIT];
+export const ELEMENT_EVERY = 3; // エレメントはオイル交換3回に1回
 
-export function newOilChange(date, odo, note = '') {
-  return { id: `oil-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`, date, odo: num(odo), note };
+export function newOilChange(date, odo, element = false) {
+  return { id: `oil-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`, date, odo: num(odo), element: !!element };
 }
 
 // いまのメーターの距離（運転日報のいちばん新しい値。なければ設定の距離）
@@ -23,21 +25,40 @@ export function currentOdo(records, settings) {
 
 const sortChanges = (list) => [...(list || [])].sort((a, b) => (a.date === b.date ? a.odo - b.odo : a.date < b.date ? -1 : 1));
 
+// エレメントの状況
+//   since：前回エレメントを交換してからのオイル交換の回数（エレメントの記録がなければ、記録したオイル交換の回数）
+//   dueNext：次のオイル交換でエレメントも交換する回か
+//   left：エレメントを交換する回まで、あと何回オイル交換をするか（次が交換する回なら 1）
+export function elementStatus(changes) {
+  const list = sortChanges(changes);
+  const lastIdx = list.map((c) => !!c.element).lastIndexOf(true);
+  const since = lastIdx < 0 ? list.length : list.length - 1 - lastIdx;
+  const left = Math.max(1, ELEMENT_EVERY - since);
+  return { since, dueNext: since + 1 >= ELEMENT_EVERY, left, known: lastIdx >= 0 };
+}
+
 // 交換の状況。level はいま超えている目安（0・3000・3500・4000・4500・5000）
 export function oilStatus(settings, records) {
   const changes = sortChanges(settings.oilChanges);
   const last = changes[changes.length - 1] || null;
   const now = currentOdo(records, settings);
-  if (!last || last.odo == null || now == null) return { last, now, since: null, remaining: null, level: 0 };
+  const element = elementStatus(changes);
+  if (!last || last.odo == null || now == null) return { last, now, since: null, remaining: null, level: 0, element };
   const since = Math.max(0, now - last.odo);
   const level = [...OIL_STEPS].reverse().find((s) => since >= s) || 0;
-  return { last, now, since, remaining: OIL_LIMIT - since, level };
+  return { last, now, since, remaining: OIL_LIMIT - since, level, element };
 }
 
 const km = (v) => `${Number(v).toLocaleString('ja-JP')}km`;
 
-// お知らせの文
+// お知らせの文（次がエレメントも交換する回なら、そのことも書く）
 export function oilMessage(status) {
+  const msg = oilMessageBase(status);
+  if (msg && status.element?.dueNext) msg.text += '今回はオイルエレメントも交換してください（オイル交換3回に1回）。';
+  return msg;
+}
+
+function oilMessageBase(status) {
   const { level, since, remaining } = status;
   if (level >= OIL_LIMIT) return { title: 'すぐにオイル交換をしてください', text: `前回のオイル交換から ${km(since)} 走りました。5,000km を超えています。今日のうちにオイル交換をしてください。`, danger: true };
   if (level >= 4500) return { title: '5,000km までに必ずオイル交換を', text: `前回のオイル交換から ${km(since)} 走りました。あと ${km(remaining)} で 5,000km です。必ずオイル交換をしてください。`, danger: true };
