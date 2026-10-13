@@ -17,7 +17,7 @@ import {
   KINDS, COLLISIONS, ROAD_TYPES, SLOPES, SHAPES, SURFACES
 } from './accident.js';
 
-export const APP_VERSION = '0.9.2';
+export const APP_VERSION = '0.9.3';
 
 const app = document.getElementById('app');
 const state = {
@@ -923,7 +923,7 @@ function renderSales() {
         <span class="row-sub">${e(hm(r.start))} → ${e(hm(r.end) || '--:--')}　${r.km != null ? kmText(r.km) : ''}</span>
         ${sagawa ? `<span class="counts small-counts">${COUNT_KEYS.map(([k, tx]) => `<label><span>${tx}</span><input data-sales-date="${r.date}" data-sales-key="${k}" value="${r.counts[k] ?? ''}" type="number" inputmode="numeric" min="0"></label>`).join('')}</span>` : ''}
       </span>
-      <span class="row-km">${r.amount != null ? yen(r.amount) : ''}${r.missing ? '<span class="tag">個数まだ</span>' : ''}</span>
+      <span class="row-km">${r.amount != null ? yen(r.amount) : ''}${r.newbie ? `<span class="nb-line">新人保証 ${yen(r.newbie)}</span>` : ''}${r.missing ? '<span class="tag">個数まだ</span>' : ''}</span>
     </div>`).join('');
   app.innerHTML = `
     <main class="screen">
@@ -962,18 +962,23 @@ function salesCanvas() {
   const reiwa = y >= 2019 ? `令和${y - 2018}年 ${m}月` : `${y}年 ${m}月`;
   // 佐川急便は個数の列あり。日当の案件は個数の列を出さない
   const countHead = sagawa ? COUNT_KEYS.map(([, tx]) => ({ text: tx, w: 9 })) : [];
+  // 新人保証の期間がかかっている月は「新人保証」の列を足す（金額には新人保証を含む）
+  const nbCol = sagawa && data.hasNewbie;
   const head = [
     { text: '日', w: 5 }, { text: '曜日', w: 6 }, { text: '開始', w: 10 }, { text: '終了', w: 10 },
-    ...countHead, { text: '稼働距離', w: sagawa ? 13 : 20, align: 'right' }, { text: sagawa ? '金額' : '金額（日当）', w: sagawa ? 16 : 24, align: 'right' }
+    ...countHead, { text: '稼働距離', w: sagawa ? (nbCol ? 11 : 13) : 20, align: 'right' },
+    ...(nbCol ? [{ text: '新人保証', w: 12, align: 'right' }] : []),
+    { text: sagawa ? '金額' : '金額（日当）', w: sagawa ? (nbCol ? 15 : 16) : 24, align: 'right' }
   ];
-  const blank = Array(countHead.length + 2).fill('');
+  const blank = Array(head.length - 4).fill('');
   const rows = data.rows.map((r) => {
     if (r.off) return [r.day, r.week, '休み', '', ...blank];
     if (!r.worked || !r.inRange) return [r.day, r.week, '', '', ...blank];
-    return [r.day, r.week, hm(r.start), hm(r.end), ...(sagawa ? COUNT_KEYS.map(([k]) => r.counts[k] ?? '') : []), r.km != null ? kmText(r.km) : '', r.amount != null ? yen(r.amount) : ''];
+    return [r.day, r.week, hm(r.start), hm(r.end), ...(sagawa ? COUNT_KEYS.map(([k]) => r.counts[k] ?? '') : []), r.km != null ? kmText(r.km) : '',
+      ...(nbCol ? [r.newbie ? yen(r.newbie) : ''] : []), r.amount != null ? yen(r.amount) : ''];
   });
   const t = data.total;
-  const foot = ['合計', '', `${t.days}日`, '', ...(sagawa ? [`${t.takuhai}`, `${t.shogyo}`, `${t.shuka}`] : []), kmText(t.km), yen(t.amount)];
+  const foot = ['合計', '', `${t.days}日`, '', ...(sagawa ? [`${t.takuhai}`, `${t.shogyo}`, `${t.shuka}`] : []), kmText(t.km), ...(nbCol ? [yen(t.newbie)] : []), yen(t.amount)];
   const [ty, tm, td] = today.split('-').map(Number);
   return renderSalesSheet({
     title: sagawa ? `佐川急便　${officeTitle(officeName(s))}` : (s.salesProject || '売上表'),

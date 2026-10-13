@@ -333,4 +333,11 @@ test('八王子の新人保証（稼働開始から1か月は1日5,000円）と�
   assert.equal(rows[12].amount, 100 * 178);
   assert.equal(rows[10].amount, 5000);
   assert.equal(total.amount, 17800 * 2 + 10000);
+  // 新人保証の分（表の「新人保証」の列）
+  assert.equal(rows[11].newbie, 5000);
+  assert.equal(rows[12].newbie, 0);
+  assert.equal(total.newbie, 10000);
+  assert.equal(monthSales(recs, 2026, 11, hj, '2026-11-30', '2026-12-01').hasNewbie, true);
+  assert.equal(monthSales(recs, 2026, 12, hj, null, '2027-01-01').hasNewbie, false);
+  assert.equal(monthSales(recs, 2026, 11, dai, null, '2026-12-01').hasNewbie, false);
 });

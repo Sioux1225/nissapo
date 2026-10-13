@@ -120,7 +120,8 @@ export function monthSales(records, y, m, settings, upto = null, today = todayKe
   const byDate = new Map(records.map((r) => [r.date, r]));
   const days = daysInMonth(y, m);
   const rows = [];
-  const total = { days: 0, takuhai: 0, shogyo: 0, shuka: 0, km: 0, amount: 0, missing: 0 };
+  const total = { days: 0, takuhai: 0, shogyo: 0, shuka: 0, km: 0, amount: 0, missing: 0, newbie: 0 };
+  const nb = newbiePeriod(settings);
   for (let d = 1; d <= days; d++) {
     const key = dateKey(y, m, d);
     const rec = byDate.get(key);
@@ -129,7 +130,9 @@ export function monthSales(records, y, m, settings, upto = null, today = todayKe
     const counts = Object.fromEntries(COUNT_KEYS.map(([k]) => [k, num(rec?.sales?.[k])]));
     const km = distanceOf(rec);
     const missing = inRange && countsMissing(rec, settings);
-    rows.push({ date: key, day: d, week: weekday(key), rec, worked: worked(rec), off: isOffDay(rec, key, today), start: rec?.start?.time || '', end: rec?.end?.time || '', counts, km, amount, inRange, missing });
+    // 新人保証の分（金額に含まれている）
+    const newbie = inRange && worked(rec) && nb && key >= nb.from && key <= nb.to ? nb.perDay : 0;
+    rows.push({ newbie, date: key, day: d, week: weekday(key), rec, worked: worked(rec), off: isOffDay(rec, key, today), start: rec?.start?.time || '', end: rec?.end?.time || '', counts, km, amount, inRange, missing });
     if (inRange && worked(rec)) {
       total.days++;
       for (const [k] of COUNT_KEYS) total[k] += counts[k] || 0;
@@ -137,9 +140,14 @@ export function monthSales(records, y, m, settings, upto = null, today = todayKe
       total.amount += amount || 0;
       // 佐川急便で個数がまだ入っていない日
       if (missing) total.missing++;
+      total.newbie += newbie;
     }
   }
-  return { rows, total };
+  // その月に新人保証の期間がかかっているか（表に新人保証の列を出す）
+  const monthFrom = dateKey(y, m, 1);
+  const monthTo = dateKey(y, m, days);
+  const hasNewbie = !!nb && nb.from <= monthTo && nb.to >= monthFrom;
+  return { rows, total, hasNewbie };
 }
 
 export const yen = (v) => `${Number(v || 0).toLocaleString('ja-JP')}円`;
