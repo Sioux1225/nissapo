@@ -13,7 +13,7 @@ import {
   KINDS, COLLISIONS, ROAD_TYPES, SLOPES, SHAPES, SURFACES
 } from './accident.js';
 
-export const APP_VERSION = '0.3.1';
+export const APP_VERSION = '0.3.2';
 
 const app = document.getElementById('app');
 const state = {
@@ -532,7 +532,7 @@ function renderAccidentForm() {
       </section>
 
       <details class="card more annex" ${annexFilled ? 'open' : ''}>
-        <summary>別紙：事故の種類・道路・死傷者（選ぶだけ。書かなくてもOK）</summary>
+        <summary>別紙：事故の種類・道路・死傷者</summary>
         <div class="field"><span class="field-label">事故の種類（区分）　２つ以上なら起きた順に押す</span>
           <div class="seg wrap">${KINDS.map((k) => {
             const i = x.kinds.indexOf(k);
