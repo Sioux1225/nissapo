@@ -1,6 +1,6 @@
 // オフラインでも開けるようにアプリのファイルを保存する（確サポと同じ「ネット優先」）。
 // アプリを更新したら VERSION と js/app.js の APP_VERSION を上げること（sw.js が変わったことでブラウザが更新に気づき、画面に「新しいバージョンがあります」が出る）。
-const VERSION = 'nippo-v0.6.2';
+const VERSION = 'nippo-v0.7.0';
 const RUNTIME = 'nippo-runtime';
 // ロゴの文字のフォント（バージョン固定のファイルなので、保存した版を優先）
 const CDN_HOSTS = ['fonts.googleapis.com', 'fonts.gstatic.com'];
@@ -17,6 +17,7 @@ const SHELL = [
   './js/photo.js',
   './js/oil.js',
   './js/expiry.js',
+  './js/sales.js',
   './manifest.webmanifest',
   './icons/icon.svg',
   './icons/icon-192.png',

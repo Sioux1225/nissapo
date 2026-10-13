@@ -3,6 +3,7 @@
 
 import { db, requestPersist } from './db.js';
 import { shrinkImage, newPhoto, blobToDataUrl, dataUrlToBlob } from './photo.js';
+import { SALES_TYPES, COUNT_KEYS, unitPrices, salesReady, monthSales, yen } from './sales.js';
 import { EXPIRED, expiryStatus, expiryMessage, expiryAlertsToShow } from './expiry.js';
 import { OIL_LIMIT, OIL_STEPS, newOilChange, currentOdo, oilStatus, oilMessage, oilAlertToShow, sortOilChanges } from './oil.js';
 import {
@@ -10,13 +11,13 @@ import {
   monthSheets, yearSheets, hasMonth, toCsv, daysInMonth, dateKey, weekday, pad2, isOff
 } from './model.js';
 import { buildXlsx } from './xlsx.js';
-import { specsToPdf, renderSheet, renderAccident, renderAnnex, renderPhotoPage, canvasesToPdf } from './pdf.js';
+import { specsToPdf, renderSheet, renderAccident, renderAnnex, renderPhotoPage, renderSalesSheet, canvasesToPdf } from './pdf.js';
 import {
   newAccident, normalizeAccident, accidentWhen, wareki, annexLines, needsReport, planFromRecord, validateAccident, accidentSheet, accidentCsv,
   KINDS, COLLISIONS, ROAD_TYPES, SLOPES, SHAPES, SURFACES
 } from './accident.js';
 
-export const APP_VERSION = '0.6.2';
+export const APP_VERSION = '0.7.0';
 
 const app = document.getElementById('app');
 const state = {
@@ -162,6 +163,20 @@ function settingsForm(s) {
       ${f('shakenDate', '車検の満了日', 'type="date"', '車検証に書いてある「有効期間の満了する日」')}
       ${f('licenseDate', '運転免許証の有効期限', 'type="date"', '免許証に書いてある「○年○月○日まで有効」の日')}
       <p class="field-note pad-note">期限の60日前・30日前・14日前・7日前と、期限を過ぎたときにお知らせします。更新したら、新しい日付に入れ直してください。</p>
+    </div>
+    <h2 class="section-title">売上表・前払い（任意）</h2>
+    <div class="card fields">
+      <div class="field"><span class="field-label">案件</span>${SALES_TYPES.map(([v, t]) => `<button type="button" class="chip" data-setting-seg="salesType" data-value="${v}" aria-pressed="${s.salesType === v}">${t}</button>`).join('')}</div>
+      ${s.salesType === 'sagawa' ? `
+        ${f('salesOffice', '営業所名', 'placeholder="例：○○営業所"')}
+        ${f('priceTakuhai', '単価：宅配（円/個）', 'type="number" inputmode="numeric" min="0" placeholder="例：150"')}
+        ${f('priceShogyo', '単価：商業（円/個）', 'type="number" inputmode="numeric" min="0" placeholder="空なら宅配と同じ"')}
+        ${f('priceShuka', '単価：集荷（円/個）', 'type="number" inputmode="numeric" min="0" placeholder="空なら宅配と同じ"')}
+        <p class="field-note pad-note">毎日の配達個数を入れるだけで、売上の合計が出ます。</p>` : ''}
+      ${s.salesType === 'daily' ? `
+        ${f('salesProject', '所属（案件名）', 'placeholder="例：○○便"')}
+        ${f('dailyRate', '日当（円）', 'type="number" inputmode="numeric" min="0" placeholder="例：15000"')}
+        <p class="field-note pad-note">運転日報で乗務を記録した日を、日当1日分として数えます。</p>` : ''}
     </div>`;
 }
 
@@ -261,6 +276,7 @@ function renderHome() {
         <button type="button" class="btn-outline" data-action="go" data-view="list">記録の一覧</button>
         <button type="button" class="btn-outline" data-action="go" data-view="export">書き出し・共有</button>
       </div>
+      <button type="button" class="btn-outline" data-action="go" data-view="sales">売上表（前払い）</button>
       <button type="button" class="btn-outline" data-action="go" data-view="accidents">事故の記録${state.accidents.length ? `（${state.accidents.length}件）` : ''}</button>
       <button type="button" class="link-btn" data-action="go" data-view="rules">記録の決まり（保存期間・点呼で確かめること）</button>
       ${installHint()}
@@ -322,6 +338,7 @@ function endSection(full) {
       ${segField('酒気帯び', 'end.drunk', ['無', '有'])}
       ${segField('車両の異常', 'end.vehicle', ['無', '有'])}
       ${warn}
+      ${countFields()}
       <details class="more" ${full ? 'open' : ''}>
         <summary>そのほかの項目（ふだんは変更不要）</summary>
         ${field('運行状況の報告', input('end.report'))}
@@ -847,6 +864,108 @@ async function checkOil() {
   if (await ask(msg.text, 'オイル交換を記録する', msg.danger, 'あとで', msg.title)) go('oil');
 }
 
+// ---- 売上表（前払い） ----
+
+// 乗務後点呼の画面に出す配達個数の欄（佐川急便のとき）
+function countFields() {
+  if (state.settings.salesType !== 'sagawa') return '';
+  return `<div class="field"><span class="field-label">配達個数（売上表）</span>
+    <div class="counts">${COUNT_KEYS.map(([k, t]) => `<label><span>${t}</span>${input(`sales.${k}`, 'type="number" inputmode="numeric" min="0"')}</label>`).join('')}</div>
+  </div>`;
+}
+
+function salesContext() {
+  const s = state.settings;
+  const { y, m } = state.salesMonth;
+  const today = todayKey();
+  const thisMonth = today.startsWith(`${y}-${pad2(m)}-`);
+  const upto = thisMonth ? today : null;
+  return { s, y, m, today, thisMonth, upto, data: monthSales(state.records, y, m, s, upto) };
+}
+
+function salesSub(s) {
+  if (s.salesType === 'daily') return `所属：${s.salesProject || ''}　日当：${yen(s.dailyRate)}`;
+  const p = unitPrices(s);
+  return `営業所：${s.salesOffice || ''}　単価：宅配 ${yen(p.takuhai)}・商業 ${yen(p.shogyo)}・集荷 ${yen(p.shuka)}`;
+}
+
+function renderSales() {
+  const { s, y, m, today, thisMonth, upto, data } = salesContext();
+  const ready = salesReady(s);
+  const sagawa = s.salesType === 'sagawa';
+  const t = data.total;
+  const rows = data.rows.filter((r) => r.worked && r.inRange).reverse().map((r) => `
+    <div class="row sales-row">
+      <span class="row-day ${r.week === '日' ? 'sun' : r.week === '土' ? 'sat' : ''}"><b>${r.day}</b><span>${r.week}</span></span>
+      <span class="row-main">
+        <span class="row-sub">${e(hm(r.start))} → ${e(hm(r.end) || '--:--')}　${r.km != null ? kmText(r.km) : ''}</span>
+        ${sagawa ? `<span class="counts small-counts">${COUNT_KEYS.map(([k, tx]) => `<label><span>${tx}</span><input data-sales-date="${r.date}" data-sales-key="${k}" value="${r.counts[k] ?? ''}" type="number" inputmode="numeric" min="0"></label>`).join('')}</span>` : ''}
+      </span>
+      <span class="row-km">${r.amount != null ? yen(r.amount) : '<span class="tag">個数まだ</span>'}</span>
+    </div>`).join('');
+  app.innerHTML = `
+    <main class="screen">
+      ${head('売上表（前払い）')}
+      <div class="month-nav">
+        <button type="button" class="icon-btn" data-action="sales-month" data-step="-1" aria-label="前の月">${ICON.prev}</button>
+        <b>${y}年${m}月</b>
+        <button type="button" class="icon-btn" data-action="sales-month" data-step="1" aria-label="次の月">${ICON.next}</button>
+      </div>
+      ${!ready ? `<section class="card pad warn-card">
+        <p><b>はじめに、設定で案件と単価（または日当）を入れてください。</b></p>
+        <button type="button" class="btn-outline" data-action="go" data-view="settings">設定を開く</button>
+      </section>` : `
+      <section class="card pad sales-total">
+        <span class="muted">${thisMonth ? `${m}月1日〜今日（${Number(today.slice(8))}日）の売上` : `${m}月の売上`}</span>
+        <b class="oil-big">${yen(t.amount)}</b>
+        <span class="small">稼働 ${t.days}日${sagawa ? `・宅配 ${t.takuhai}個・商業 ${t.shogyo}個・集荷 ${t.shuka}個` : ''}・${kmText(t.km)}</span>
+        ${t.missing ? `<span class="small warn-text">配達個数がまだの日が ${t.missing}日あります</span>` : ''}
+        <span class="small muted">${e(salesSub(s))}</span>
+      </section>
+      <p class="info">前払いは<b>月初めからの売上</b>で計算します。前の月の売上は含めません。${sagawa ? '日ごとの配達個数は、乗務後点呼の画面か、下の一覧で入れられます。' : '運転日報で乗務を記録した日を、日当1日分として数えます。'}</p>
+      <button type="button" class="btn-primary" data-action="share-sales">PDFにして社長に送る</button>
+      <button type="button" class="btn-text" data-action="preview-sales">画面で確認する</button>
+      <div class="card list">${rows || '<p class="empty">この月はまだ乗務の記録がありません</p>'}</div>
+      <div id="preview" class="preview"></div>`}
+    </main>`;
+}
+
+function salesCanvas() {
+  const { s, y, m, today, thisMonth, data } = salesContext();
+  const sagawa = s.salesType === 'sagawa';
+  const reiwa = y >= 2019 ? `令和${y - 2018}年 ${m}月` : `${y}年 ${m}月`;
+  // 佐川急便は個数の列あり。日当の案件は個数の列を出さない
+  const countHead = sagawa ? COUNT_KEYS.map(([, tx]) => ({ text: tx, w: 9 })) : [];
+  const head = [
+    { text: '日', w: 5 }, { text: '曜日', w: 6 }, { text: '開始', w: 10 }, { text: '終了', w: 10 },
+    ...countHead, { text: '稼働距離', w: sagawa ? 13 : 20, align: 'right' }, { text: sagawa ? '金額' : '金額（日当）', w: sagawa ? 16 : 24, align: 'right' }
+  ];
+  const blank = Array(countHead.length + 2).fill('');
+  const rows = data.rows.map((r) => {
+    if (r.off) return [r.day, r.week, '休み', '', ...blank];
+    if (!r.worked || !r.inRange) return [r.day, r.week, '', '', ...blank];
+    return [r.day, r.week, hm(r.start), hm(r.end), ...(sagawa ? COUNT_KEYS.map(([k]) => r.counts[k] ?? '') : []), r.km != null ? kmText(r.km) : '', r.amount != null ? yen(r.amount) : ''];
+  });
+  const t = data.total;
+  const foot = ['合計', '', `${t.days}日`, '', ...(sagawa ? [`${t.takuhai}`, `${t.shogyo}`, `${t.shuka}`] : []), kmText(t.km), yen(t.amount)];
+  const [ty, tm, td] = today.split('-').map(Number);
+  return renderSalesSheet({
+    title: sagawa ? '佐川急便' : (s.salesProject || '売上表'),
+    ym: reiwa,
+    name: s.driverName,
+    sub: salesSub(s),
+    head,
+    rows,
+    foot,
+    summary: thisMonth ? `${m}月1日〜${td}日の売上合計：${yen(t.amount)}（前払い申請用）` : `${m}月の売上合計：${yen(t.amount)}`,
+    note: [
+      `作成日：${ty >= 2019 ? `令和${ty - 2018}年` : `${ty}年`}${tm}月${td}日　前払いは月初めからの売上で計算しています（前月分は含みません）。`,
+      ...(t.missing ? [`配達個数が入っていない日が ${t.missing}日あります（その日の金額は含まれていません）。`] : []),
+      `ドライバーズサポート株式会社`
+    ]
+  });
+}
+
 // ---- 車検・免許証の期限 ----
 
 // ホームに出す期限のカード（60日前から）
@@ -943,7 +1062,7 @@ function renderRules() {
 
 function render() {
   if (state.view !== 'setup' && !state.settings.driverName) state.view = 'setup';
-  const views = { oil: renderOil, accidents: renderAccidents, accident: renderAccidentForm, rules: renderRules, setup: renderSetup, settings: renderSettings, home: renderHome, entry: renderEntry, list: renderList, export: renderExport };
+  const views = { sales: renderSales, oil: renderOil, accidents: renderAccidents, accident: renderAccidentForm, rules: renderRules, setup: renderSetup, settings: renderSettings, home: renderHome, entry: renderEntry, list: renderList, export: renderExport };
   (views[state.view] || renderHome)();
 }
 
@@ -953,6 +1072,10 @@ function go(view, { push = true } = {}) {
   if (view === 'list' && !state.month) {
     const n = new Date();
     state.month = { y: n.getFullYear(), m: n.getMonth() + 1 };
+  }
+  if (view === 'sales' && !state.salesMonth) {
+    const n = new Date();
+    state.salesMonth = { y: n.getFullYear(), m: n.getMonth() + 1 };
   }
   if (view === 'export' && !state.exp.y) {
     const n = new Date();
@@ -1212,6 +1335,12 @@ app.addEventListener('click', async (ev) => {
   if (setSeg) {
     state.settings[setSeg.dataset.settingSeg] = setSeg.dataset.value;
     setSeg.parentElement.querySelectorAll('[data-setting-seg]').forEach((b) => b.setAttribute('aria-pressed', b === setSeg));
+    if (setSeg.dataset.settingSeg === 'salesType') {
+      // 案件の種類で入力欄が変わるので描き直す
+      const y = window.scrollY;
+      render();
+      window.scrollTo(0, y);
+    }
     return;
   }
   const expBtn = ev.target.closest('[data-exp]');
@@ -1234,6 +1363,25 @@ app.addEventListener('click', async (ev) => {
   else if (action === 'open-accident') openAccident(el.dataset.id);
   else if (action === 'save-accident') runBusy(saveAccident);
   else if (action === 'save-oil') runBusy(saveOil);
+  else if (action === 'sales-month') {
+    const d = new Date(state.salesMonth.y, state.salesMonth.m - 1 + Number(el.dataset.step), 1);
+    state.salesMonth = { y: d.getFullYear(), m: d.getMonth() + 1 };
+    renderSales();
+  } else if (action === 'preview-sales') {
+    const out = document.getElementById('preview');
+    out.innerHTML = '';
+    const img = new Image();
+    img.src = salesCanvas().toDataURL('image/jpeg', 0.85);
+    img.alt = '売上表';
+    out.append(img);
+    out.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  } else if (action === 'share-sales') {
+    runBusy(async () => {
+      const { y, m } = state.salesMonth;
+      const pdf = await canvasesToPdf([salesCanvas()]);
+      await deliver(new File([pdf], `${y}年${m}月_${safeName(state.settings.driverName)}_売上表.pdf`, { type: 'application/pdf' }), 'share');
+    });
+  }
   else if (action === 'set-off') {
     await db.putRecord({ date: el.dataset.date, off: true, start: null, end: null, rollcaller: '' });
     await reload();
@@ -1344,8 +1492,20 @@ app.addEventListener('input', (ev) => {
   }
 });
 
-app.addEventListener('change', (ev) => {
+app.addEventListener('change', async (ev) => {
   const t = ev.target;
+  if (t.dataset.salesDate) {
+    // 売上表の一覧で入れた配達個数を、その日の記録に保存する
+    const rec = findRecord(t.dataset.salesDate);
+    if (!rec) return;
+    rec.sales = { ...(rec.sales || {}), [t.dataset.salesKey]: t.value === '' ? '' : Number(t.value) };
+    await db.putRecord(rec);
+    await reload();
+    const y = window.scrollY;
+    renderSales();
+    window.scrollTo(0, y);
+    return;
+  }
   if (t.dataset.expSelect) {
     state.exp[t.dataset.expSelect] = Number(t.value);
     renderExport();

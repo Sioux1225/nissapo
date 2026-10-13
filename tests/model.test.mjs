@@ -219,3 +219,33 @@ test('車検・免許証の期限：60・30・14・7日前と期限切れ', asyn
   assert.equal(expiryMessage(a2[0]).danger, true);
   assert.match(expiryMessage({ ...expiryStatus({ licenseDate: '2026-10-01' }, '2026-10-13')[0] }).text, /無免許運転/);
 });
+
+test('売上表：佐川急便は個数×単価、日当は乗務した日×日当、月初めから今日まで', async () => {
+  const { monthSales, dayAmount, unitPrices, salesReady } = await import('../js/sales.js');
+  const sg = { ...settings, salesType: 'sagawa', priceTakuhai: '150', priceShogyo: '', priceShuka: '50' };
+  assert.deepEqual(unitPrices(sg), { takuhai: 150, shogyo: 150, shuka: 50 });
+  assert.equal(salesReady(sg), true);
+  assert.equal(salesReady({ ...settings, salesType: 'daily', dailyRate: '' }), false);
+  const recs = [
+    { date: '2026-09-30', start: { time: '7:00', odo: 100 }, end: { time: '19:00', odo: 200 }, sales: { takuhai: 100 } },
+    { date: '2026-10-01', start: { time: '7:00', odo: 200 }, end: { time: '19:00', odo: 300 }, sales: { takuhai: 100, shogyo: 10, shuka: 20 } },
+    { date: '2026-10-02', start: { time: '7:00', odo: 300 }, end: { time: '19:00', odo: 410 } },
+    { date: '2026-10-03', off: true, start: null, end: null },
+    { date: '2026-10-20', start: { time: '7:00', odo: 500 }, end: { time: '19:00', odo: 600 }, sales: { takuhai: 50 } }
+  ];
+  assert.equal(dayAmount(recs[1], sg), 100 * 150 + 10 * 150 + 20 * 50);
+  assert.equal(dayAmount(recs[2], sg), null); // 個数がまだ
+  // 10月13日まで：前月（9/30）と、今日より後（10/20）は含めない
+  const { total, rows } = monthSales(recs, 2026, 10, sg, '2026-10-13');
+  assert.equal(total.amount, 17500);
+  assert.equal(total.days, 2);
+  assert.equal(total.missing, 1);
+  assert.equal(total.km, 210);
+  assert.equal(rows.length, 31);
+  assert.equal(rows[2].off, true);
+  // 月全体なら 10/20 も含む
+  assert.equal(monthSales(recs, 2026, 10, sg).total.amount, 17500 + 7500);
+  // 日当
+  const dl = { ...settings, salesType: 'daily', dailyRate: '15000' };
+  assert.equal(monthSales(recs, 2026, 10, dl, '2026-10-13').total.amount, 30000);
+});

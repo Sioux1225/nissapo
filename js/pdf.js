@@ -80,7 +80,7 @@ function drawLines(ctx, text, x, y, w, h, { size, weight = 400, align = 'center'
   lines.forEach((line, i) => {
     const s = fitText(ctx, line, w - 12, size, weight);
     ctx.textAlign = align;
-    const tx = align === 'left' ? x + 8 : x + w / 2;
+    const tx = align === 'left' ? x + 8 : align === 'right' ? x + w - 12 : x + w / 2;
     ctx.fillText(s, tx, top + i * lh);
   });
 }
@@ -334,6 +334,64 @@ export function renderPhotoPage({ title, sub, items }) {
     ctx.fillStyle = '#000000';
     ctx.fillText(it.label, m, y + boxH + labelH / 2 + 6);
   });
+  return canvas;
+}
+
+// 売上表（月報）：A4縦。紙の月報と同じ並び（日・曜日・開始・終了・宅配・商業・集荷・稼働距離・金額）
+// head：[{ text, w }]（w は幅の割合）、rows：31行分の文字の配列、foot：合計の行、info：右上・左上の文
+export function renderSalesSheet({ title, ym, name, sub, head, rows, foot, summary, note }) {
+  const W = 1654;
+  const H = 2339;
+  const canvas = document.createElement('canvas');
+  canvas.width = W;
+  canvas.height = H;
+  const ctx = canvas.getContext('2d');
+  ctx.fillStyle = '#FFFFFF';
+  ctx.fillRect(0, 0, W, H);
+  ctx.fillStyle = '#000000';
+  ctx.strokeStyle = '#000000';
+  ctx.textBaseline = 'middle';
+  const m = 110;
+
+  ctx.font = `700 54px ${FONT}`;
+  ctx.textAlign = 'left';
+  ctx.fillText(title, m + 140, 150);
+  ctx.font = `400 34px ${FONT}`;
+  ctx.textAlign = 'right';
+  ctx.fillText(ym, W - m, 150);
+  ctx.fillText(`氏名：${name}`, W - m, 220);
+  ctx.font = `400 26px ${FONT}`;
+  ctx.textAlign = 'left';
+  ctx.fillText(sub, m, 220);
+
+  const total = head.reduce((t, h) => t + h.w, 0);
+  const xs = [m];
+  head.forEach((h) => xs.push(xs[xs.length - 1] + (h.w / total) * (W - m * 2)));
+  const top = 270;
+  const headH = 64;
+  const rowH = 52;
+  ctx.lineWidth = 2;
+  const cellRow = (cells, y, h, { bold = false, fill = null } = {}) => {
+    cells.forEach((v, i) => {
+      const x = xs[i];
+      const w = xs[i + 1] - x;
+      if (fill) { ctx.fillStyle = fill; ctx.fillRect(x, y, w, h); ctx.fillStyle = '#000000'; }
+      ctx.strokeRect(x, y, w, h);
+      if (v !== '' && v != null) drawLines(ctx, String(v), x, y, w, h, { size: 26, weight: bold ? 700 : 400, align: head[i].align || 'center' });
+    });
+  };
+  cellRow(head.map((h) => h.text), top, headH, { bold: true, fill: '#EFEFEF' });
+  rows.forEach((r, i) => cellRow(r, top + headH + i * rowH, rowH));
+  const footY = top + headH + 31 * rowH;
+  cellRow(foot, footY, rowH + 8, { bold: true, fill: '#FFF3E0' });
+
+  // 前払いの判断用のまとめ
+  const sy = footY + rowH + 60;
+  ctx.textAlign = 'left';
+  ctx.font = `700 34px ${FONT}`;
+  ctx.fillText(summary, m, sy);
+  ctx.font = `400 24px ${FONT}`;
+  note.forEach((t, i) => ctx.fillText(t, m, sy + 52 + i * 36));
   return canvas;
 }
 
