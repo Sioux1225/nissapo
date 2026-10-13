@@ -17,7 +17,7 @@ import {
   KINDS, COLLISIONS, ROAD_TYPES, SLOPES, SHAPES, SURFACES
 } from './accident.js';
 
-export const APP_VERSION = '0.11.1';
+export const APP_VERSION = '0.11.2';
 
 const app = document.getElementById('app');
 const state = {
@@ -291,8 +291,10 @@ function renderHome() {
       </div>
       <button type="button" class="btn-outline" data-action="go" data-view="sales">売上表（前払い）</button>
       <button type="button" class="btn-outline" data-action="go" data-view="accidents">事故の記録${state.accidents.length ? `（${state.accidents.length}件）` : ''}</button>
-      <button type="button" class="link-btn" data-action="go" data-view="rules">記録の決まり（保存期間・点呼で確かめること）</button>
-      <button type="button" class="link-btn" data-action="go" data-view="advrules">前払いのルールと注意事項</button>
+      <div class="link-stack">
+        <button type="button" class="link-btn" data-action="go" data-view="rules">記録の決まり（保存期間・点呼で確かめること）</button>
+        <button type="button" class="link-btn" data-action="go" data-view="advrules">前払いのルールと注意事項</button>
+      </div>
       ${installHint()}
     </main>`;
 }

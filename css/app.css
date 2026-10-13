@@ -215,6 +215,7 @@ button:focus-visible { outline: 3px solid var(--blue); outline-offset: 2px; }
 .preview img { width: 100%; border: 1px solid var(--line-strong); border-radius: 6px; background: #FFF; }
 
 /* 記録の決まり */
+.link-stack { display: flex; flex-direction: column; align-items: center; }
 .link-btn { border: none; background: transparent; color: var(--orange-text); font-size: 14px; font-weight: 600; text-decoration: underline; text-underline-offset: 3px; cursor: pointer; min-height: 44px; padding: 0 4px; }
 .link-btn.inline { min-height: 0; padding: 0; margin-left: 4px; font-size: 13px; }
 .rules { display: flex; flex-direction: column; }
