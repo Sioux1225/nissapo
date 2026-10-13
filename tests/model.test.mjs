@@ -313,7 +313,7 @@ test('八王子の新人保証（稼働開始から1か月は1日5,000円）と�
   assert.deepEqual(newbiePeriod(hj), { from: '2026-10-13', to: '2026-11-12', perDay: 5000 });
   assert.equal(newbiePeriod({ ...hj, salesStartDate: '2026-01-31' }).to, '2026-02-27'); // 月末をまたぐとき
   assert.equal(newbiePeriod({ ...hj, salesStartDate: '' }), null); // 開始日がなければ保証なし
-  assert.equal(newbiePeriod({ ...hj, salesOffice: '練馬' }), null); // 保証のない営業所
+  assert.equal(newbiePeriod({ ...hj, salesOffice: '湘南' }), null); // 保証のない営業所
   assert.equal(dayBonus(hj, '2026-10-12'), 0);
   assert.equal(dayBonus(hj, '2026-10-13'), 5000);
   assert.equal(dayBonus(hj, '2026-11-12'), 5000);
@@ -353,4 +353,20 @@ test('三多摩の新人保証は2週間・1日5,000円、山単価は保証な�
   assert.equal(newbiePeriod({ ...tm, salesOffice: '三多摩B' }).to, '2026-10-26'); // 三多摩Bは三多摩として扱う
   assert.equal(newbieSpan(officeEntry('三多摩').newbie), '2週間');
   assert.equal(newbieSpan(officeEntry('八王子').newbie), '1か月間');
+});
+
+test('各営業所の新人保証と代走', async () => {
+  const { newbiePeriod, unitPrices, dayBonus } = await import('../js/sales.js');
+  const nb = (office, start = '2026-10-13') => newbiePeriod({ salesType: 'sagawa', salesOffice: office, salesStartDate: start });
+  for (const o of ['世田谷', '城北', '赤羽']) assert.deepEqual(nb(o), { from: '2026-10-13', to: '2027-01-12', perDay: 3000 });
+  assert.deepEqual(nb('練馬'), { from: '2026-10-13', to: '2026-11-12', perDay: 5000 });
+  assert.deepEqual(nb('所沢'), { from: '2026-10-13', to: '2026-11-12', perDay: 3000 });
+  // 代走は新人保証なし。所沢（代走）は1日5,000円、戸田（代走）は1日10,000円をずっと足す
+  const so = { salesType: 'sagawa', salesOffice: '所沢（代走）', salesStartDate: '2026-10-13' };
+  assert.equal(nb('所沢（代走）'), null);
+  assert.deepEqual(unitPrices(so), { takuhai: 180, shogyo: 100, shuka: 100, daily: 5000 });
+  assert.equal(dayBonus(so, '2027-06-01'), 5000);
+  assert.deepEqual(unitPrices({ salesType: 'sagawa', salesOffice: '杉並（代走）' }), { takuhai: 191, shogyo: 100, shuka: 100, daily: 0 });
+  assert.deepEqual(unitPrices({ salesType: 'sagawa', salesOffice: '戸田（代走）' }), { takuhai: 167, shogyo: 100, shuka: 100, daily: 10000 });
+  assert.equal(unitPrices({ salesType: 'sagawa', salesOffice: '戸田' }).daily, 10000); // 以前の「戸田」も代走として扱う
 });
