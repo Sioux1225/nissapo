@@ -294,6 +294,49 @@ export function renderAnnex({ title, sub, rows }) {
   return canvas;
 }
 
+// 事故の写真：A4縦 1枚に2枚ずつ。items：[{ image（ImageBitmap など）, label }]
+export function renderPhotoPage({ title, sub, items }) {
+  const W = 1654;
+  const H = 2339;
+  const canvas = document.createElement('canvas');
+  canvas.width = W;
+  canvas.height = H;
+  const ctx = canvas.getContext('2d');
+  ctx.fillStyle = '#FFFFFF';
+  ctx.fillRect(0, 0, W, H);
+  ctx.fillStyle = '#000000';
+  ctx.strokeStyle = '#000000';
+  ctx.textBaseline = 'middle';
+  const m = 100;
+  ctx.font = `700 52px ${FONT}`;
+  ctx.textAlign = 'center';
+  ctx.fillText(title, W / 2, 130);
+  ctx.font = `400 26px ${FONT}`;
+  ctx.textAlign = 'right';
+  ctx.fillText(sub, W - m, 205);
+
+  const top = 250;
+  const labelH = 60;
+  const gap = 50;
+  const boxW = W - m * 2;
+  const boxH = (H - top - 120 - gap) / 2 - labelH;
+  items.forEach((it, i) => {
+    const y = top + i * (boxH + labelH + gap);
+    ctx.lineWidth = 2;
+    ctx.strokeRect(m, y, boxW, boxH);
+    // 枠に収まるように縮小（縦横の比はそのまま）
+    const r = Math.min((boxW - 20) / it.image.width, (boxH - 20) / it.image.height);
+    const w = it.image.width * r;
+    const h = it.image.height * r;
+    ctx.drawImage(it.image, m + (boxW - w) / 2, y + (boxH - h) / 2, w, h);
+    ctx.font = `700 28px ${FONT}`;
+    ctx.textAlign = 'left';
+    ctx.fillStyle = '#000000';
+    ctx.fillText(it.label, m, y + boxH + labelH / 2 + 6);
+  });
+  return canvas;
+}
+
 function canvasJpeg(canvas) {
   return new Promise((resolve, reject) => {
     canvas.toBlob(async (blob) => {

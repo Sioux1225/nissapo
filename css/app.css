@@ -237,3 +237,16 @@ button:focus-visible { outline: 3px solid var(--blue); outline-offset: 2px; }
 .warn.block { margin: 0; }
 .tag.danger { color: var(--warn); background: var(--warn-bg); }
 .plan-btn { align-self: flex-start; margin: -6px 12px 6px; }
+
+/* 事故の写真 */
+.photos { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.photo { position: relative; aspect-ratio: 1; max-width: 100%; }
+.photo-view { width: 100%; height: 100%; padding: 0; border: 1px solid var(--line); border-radius: 10px; overflow: hidden; background: var(--bg); cursor: pointer; }
+.photo-view img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.photo-del { position: absolute; top: -6px; right: -6px; width: 32px; height: 32px; border-radius: 16px; border: 2px solid #FFF; background: rgba(0, 0, 0, 0.65); color: #FFF; font-size: 18px; line-height: 1; cursor: pointer; }
+.photo-no { position: absolute; left: 6px; bottom: 6px; min-width: 22px; padding: 0 6px; border-radius: 11px; background: rgba(0, 0, 0, 0.6); color: #FFF; font-size: 12px; font-weight: 700; text-align: center; }
+.photo-add { aspect-ratio: 1; max-width: 100%; border: 2px dashed var(--orange); border-radius: 10px; background: var(--orange-tint); color: var(--orange-text); font-size: 13px; font-weight: 700; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; cursor: pointer; }
+.photo-add span { font-size: 28px; line-height: 1; }
+.viewer { position: fixed; inset: 0; background: rgba(0, 0, 0, 0.92); z-index: 60; display: flex; align-items: center; justify-content: center; padding: 16px; }
+.viewer img { max-width: 100%; max-height: calc(100% - 80px); object-fit: contain; }
+.viewer-close { position: absolute; bottom: calc(20px + var(--safe-bottom)); left: 50%; transform: translateX(-50%); min-height: 48px; padding: 0 28px; border: none; border-radius: 24px; background: #FFF; color: #222; font-size: 16px; font-weight: 700; cursor: pointer; }

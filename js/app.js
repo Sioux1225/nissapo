@@ -2,18 +2,19 @@
 // 画面：はじめての設定 → ホーム（乗務前・乗務後のボタン）→ 一覧 → 書き出し・共有
 
 import { db, requestPersist } from './db.js';
+import { shrinkImage, newPhoto, blobToDataUrl, dataUrlToBlob } from './photo.js';
 import {
   DEFAULT_SETTINGS, METHODS, newStart, newEnd, todayKey, nowTime, isTime, num, distanceOf, prevOdo,
   monthSheets, yearSheets, hasMonth, toCsv, daysInMonth, dateKey, weekday, pad2
 } from './model.js';
 import { buildXlsx } from './xlsx.js';
-import { specsToPdf, renderSheet, renderAccident, renderAnnex, canvasesToPdf } from './pdf.js';
+import { specsToPdf, renderSheet, renderAccident, renderAnnex, renderPhotoPage, canvasesToPdf } from './pdf.js';
 import {
   newAccident, normalizeAccident, accidentWhen, wareki, annexLines, needsReport, planFromRecord, validateAccident, accidentSheet, accidentCsv,
   KINDS, COLLISIONS, ROAD_TYPES, SLOPES, SHAPES, SURFACES
 } from './accident.js';
 
-export const APP_VERSION = '0.3.3';
+export const APP_VERSION = '0.4.0';
 
 const app = document.getElementById('app');
 const state = {
@@ -21,6 +22,7 @@ const state = {
   settings: { ...DEFAULT_SETTINGS },
   records: [],
   accidents: [],
+  accPhotos: [],      // 入力中の事故の写真 [{ id, blob, url }]
   acc: null,          // 入力中の事故の記録
   draft: null,        // 入力中の1日分 { date, start, end, rollcaller }
   mode: null,         // 'start' | 'end' | 'day'
@@ -531,6 +533,19 @@ function renderAccidentForm() {
         ${accText('再発防止対策', 'prevention', EX.prevention, '原因がまだ分からないときは「原因究明結果待ち」と書き、すぐにとった対策も書きます', 4)}
       </section>
 
+      <h2 class="section-title">写真</h2>
+      <section class="card pad">
+        <div class="photos">
+          ${state.accPhotos.map((ph, i) => `<div class="photo">
+            <button type="button" class="photo-view" data-action="view-photo" data-id="${ph.id}" aria-label="写真${i + 1}を大きく見る"><img src="${ph.url}" alt="写真${i + 1}"></button>
+            <button type="button" class="photo-del" data-action="delete-photo" data-id="${ph.id}" aria-label="写真${i + 1}を消す">×</button>
+            <span class="photo-no">${i + 1}</span>
+          </div>`).join('')}
+          <button type="button" class="photo-add" data-action="add-photo"><span>＋</span>写真を追加</button>
+        </div>
+        <p class="field-note">事故の現場・車の傷・相手の車・道路の様子など。場所を示す地図の画面写真でも大丈夫です。写真は追加したときにこのスマホに保存され、PDFにすると後ろのページに付きます。</p>
+      </section>
+
       <details class="card more annex" ${annexFilled ? 'open' : ''}>
         <summary>別紙：事故の種類・道路・死傷者</summary>
         <div class="field"><span class="field-label">事故の種類（区分）　２つ以上なら起きた順に押す</span>
@@ -578,12 +593,60 @@ function rerenderAccident(focusId) {
   }
 }
 
-function openAccident(id) {
+async function openAccident(id) {
   const found = state.accidents.find((a) => a.id === id);
   if (found) state.acc = structuredClone(found);
   else state.acc = newAccident(state.settings, todayKey(), nowTime());
+  setAccPhotos(found ? await loadPhotos(found.id) : []);
   state.back = 'accidents';
   go('accident');
+}
+
+// ---- 事故の写真 ----
+
+async function loadPhotos(accidentId) {
+  return (await db.photosOf(accidentId)).sort((a, b) => (a.createdAt < b.createdAt ? -1 : 1));
+}
+
+// 画面に出す写真を入れ替える（前の写真の表示用URLは片づける）
+function setAccPhotos(list) {
+  for (const ph of state.accPhotos) URL.revokeObjectURL(ph.url);
+  state.accPhotos = list.map((ph) => ({ ...ph, url: URL.createObjectURL(ph.blob) }));
+}
+
+async function addPhotos(files) {
+  let added = 0;
+  for (const file of files) {
+    try {
+      const ph = newPhoto(state.acc.id, await shrinkImage(file));
+      await db.putPhoto(ph);
+      state.accPhotos.push({ ...ph, url: URL.createObjectURL(ph.blob) });
+      added++;
+    } catch (err) {
+      console.error(err);
+    }
+  }
+  rerenderAccident();
+  toast(added === files.length ? `写真を${added}枚追加しました` : `${files.length - added}枚の写真を読み込めませんでした`);
+}
+
+function viewPhoto(id) {
+  const ph = state.accPhotos.find((p) => p.id === id);
+  if (!ph) return;
+  const box = document.createElement('div');
+  box.className = 'viewer';
+  box.innerHTML = `<img src="${ph.url}" alt="事故の写真"><button type="button" class="viewer-close">閉じる</button>`;
+  box.addEventListener('click', () => box.remove());
+  document.body.append(box);
+}
+
+// 保存されていない事故の写真（入力をやめたときに残ったもの）を片づける
+async function cleanupPhotos() {
+  try {
+    const ids = new Set(state.accidents.map((a) => a.id));
+    const orphans = (await db.photoIndex()).filter((p) => !ids.has(p.accidentId)).map((p) => p.id);
+    if (orphans.length) await db.deletePhotos(orphans);
+  } catch (err) { console.error(err); }
 }
 
 async function saveAccident() {
@@ -604,8 +667,8 @@ async function saveAccident() {
   history.back();
 }
 
-// PDF のページ（事故の記録、別紙を書いていれば別紙も）
-function accidentCanvases(a) {
+// PDF のページ（事故の記録、別紙を書いていれば別紙、写真があれば写真のページも）
+async function accidentCanvases(a) {
   const s = state.settings;
   const sub = `事業者名：${s.company || ''}　営業所：${s.office || ''}`;
   const pages = [renderAccident({
@@ -630,6 +693,15 @@ function accidentCanvases(a) {
   })];
   const rows = annexLines(a);
   if (rows.length) pages.push(renderAnnex({ title: '別紙', sub: `${accidentWhen(a)}　${a.driverName}`, rows }));
+  const photos = await loadPhotos(a.id);
+  for (let i = 0; i < photos.length; i += 2) {
+    const items = [];
+    for (const [k, ph] of photos.slice(i, i + 2).entries()) {
+      items.push({ image: await createImageBitmap(ph.blob), label: `写真${i + k + 1}` });
+    }
+    pages.push(renderPhotoPage({ title: '写真', sub: `${accidentWhen(a)}　${a.driverName}`, items }));
+    items.forEach((it) => it.image.close?.());
+  }
   return pages;
 }
 
@@ -816,7 +888,7 @@ async function showPreview() {
   out.innerHTML = '';
   if (state.exp.doc === 'accident') {
     for (const a of periodAccidents()) {
-      for (const c of accidentCanvases(a)) {
+      for (const c of await accidentCanvases(a)) {
         const img = new Image();
         img.src = c.toDataURL('image/jpeg', 0.85);
         img.alt = `事故の記録（${accidentWhen(a)}）`;
@@ -846,7 +918,7 @@ async function makeExport() {
     const list = periodAccidents();
     const accBase = `${period === 'year' ? `${y}年` : `${y}年${m}月`}_${name}_事故の記録`;
     if (format === 'xlsx') return new File([buildXlsx([accidentSheet(list, s)])], `${accBase}.xlsx`, { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
-    if (format === 'pdf') return new File([await canvasesToPdf(list.flatMap(accidentCanvases))], `${accBase}.pdf`, { type: 'application/pdf' });
+    if (format === 'pdf') return new File([await canvasesToPdf((await Promise.all(list.map(accidentCanvases))).flat())], `${accBase}.pdf`, { type: 'application/pdf' });
     return new File([accidentCsv(list)], `${accBase}.csv`, { type: 'text/csv' });
   }
   const base = period === 'year' ? `${y}${name}` : `${y}年${m}月_${name}_運転日報・点呼記録簿`;
@@ -894,7 +966,9 @@ async function runBusy(fn) {
 // ---- バックアップ ----
 
 async function backup() {
-  const data = { app: 'nippo-sapo', version: 1, exportedAt: new Date().toISOString(), settings: state.settings, records: state.records, accidents: state.accidents };
+  const photos = [];
+  for (const ph of await db.allPhotos()) photos.push({ id: ph.id, accidentId: ph.accidentId, createdAt: ph.createdAt, data: await blobToDataUrl(ph.blob) });
+  const data = { app: 'nippo-sapo', version: 1, exportedAt: new Date().toISOString(), settings: state.settings, records: state.records, accidents: state.accidents, photos };
   const d = new Date();
   const file = new File([JSON.stringify(data)], `日報サポート_バックアップ_${d.getFullYear()}${pad2(d.getMonth() + 1)}${pad2(d.getDate())}.json`, { type: 'application/json' });
   await deliver(file, 'share');
@@ -906,6 +980,14 @@ async function restore(file) {
   if (!(await ask(`${data.records.length}日分の記録を戻します。同じ日の記録は、バックアップの内容に置きかわります。`, '戻す'))) return;
   await db.putRecords(data.records.filter((r) => /^\d{4}-\d{2}-\d{2}$/.test(r?.date)));
   if (Array.isArray(data.accidents)) await db.putAccidents(data.accidents.filter((a) => a?.id && /^\d{4}-\d{2}-\d{2}$/.test(a.date)));
+  if (Array.isArray(data.photos)) {
+    const photos = [];
+    for (const ph of data.photos) {
+      if (!ph?.id || !ph.accidentId || !String(ph.data).startsWith('data:image/')) continue;
+      photos.push({ id: ph.id, accidentId: ph.accidentId, createdAt: ph.createdAt, blob: await dataUrlToBlob(ph.data) });
+    }
+    await db.putPhotos(photos);
+  }
   if (data.settings) await db.putSettings({ ...DEFAULT_SETTINGS, ...data.settings });
   state.settings = await db.getSettings();
   await reload();
@@ -968,6 +1050,14 @@ app.addEventListener('click', async (ev) => {
   else if (action === 'new-accident') openAccident(null);
   else if (action === 'open-accident') openAccident(el.dataset.id);
   else if (action === 'save-accident') runBusy(saveAccident);
+  else if (action === 'add-photo') photoInput.click();
+  else if (action === 'view-photo') viewPhoto(el.dataset.id);
+  else if (action === 'delete-photo') {
+    if (!(await ask('この写真を消します。', '消す', true))) return;
+    await db.deletePhoto(el.dataset.id);
+    setAccPhotos(state.accPhotos.filter((p) => p.id !== el.dataset.id));
+    rerenderAccident();
+  }
   else if (action === 'plan-from-nippo') {
     state.acc.plan = planFromRecord(findRecord(state.acc.date), state.settings.via);
     rerenderAccident('acc-plan');
@@ -975,11 +1065,13 @@ app.addEventListener('click', async (ev) => {
   else if (action === 'share-accident') {
     runBusy(async () => {
       const a = state.acc;
-      deliver(new File([await canvasesToPdf(accidentCanvases(a))], `${accFileName(a)}.pdf`, { type: 'application/pdf' }), 'share');
+      deliver(new File([await canvasesToPdf(await accidentCanvases(a))], `${accFileName(a)}.pdf`, { type: 'application/pdf' }), 'share');
     });
   } else if (action === 'delete-accident') {
     if (!(await ask(`${accidentWhen(state.acc)} の事故の記録を消します。事故の記録は3年間の保存が決まりです。本当に消しますか？`, '消す', true))) return;
     await db.deleteAccident(state.acc.id);
+    await db.deletePhotos(state.accPhotos.map((p) => p.id));
+    setAccPhotos([]);
     await reload();
     toast('事故の記録を消しました');
     history.back();
@@ -1096,9 +1188,19 @@ document.addEventListener('visibilitychange', () => {
   if (!document.hidden && state.view === 'home') renderHome();
 });
 
+// 写真を撮る・選ぶ（スマホでは「写真を撮る」「写真ライブラリ」を選べる）
+const photoInput = Object.assign(document.createElement('input'), { type: 'file', accept: 'image/*', multiple: true, hidden: true });
+document.body.append(photoInput);
+photoInput.addEventListener('change', () => {
+  const files = [...photoInput.files];
+  photoInput.value = '';
+  if (files.length) runBusy(() => addPhotos(files));
+});
+
 async function start() {
   state.settings = await db.getSettings();
   await reload();
+  cleanupPhotos();
   state.view = state.settings.driverName ? 'home' : 'setup';
   history.replaceState({ view: 'home' }, '');
   render();
