@@ -17,7 +17,7 @@ import {
   KINDS, COLLISIONS, ROAD_TYPES, SLOPES, SHAPES, SURFACES
 } from './accident.js';
 
-export const APP_VERSION = '0.7.5';
+export const APP_VERSION = '0.7.6';
 
 const app = document.getElementById('app');
 const state = {
@@ -169,7 +169,7 @@ function settingsForm(s) {
       <div class="field"><span class="field-label">案件</span>${SALES_TYPES.map(([v, t]) => `<button type="button" class="chip" data-setting-seg="salesType" data-value="${v}" aria-pressed="${s.salesType === v}">${t}</button>`).join('')}</div>
       ${s.salesType === 'sagawa' ? sagawaFields(s, f) : ''}
       ${s.salesType === 'daily' ? `
-        ${f('salesProject', '所属（案件名）', 'placeholder="例：○○便"')}
+        ${f('salesProject', '所属（案件名）', 'placeholder="例：Amazon"')}
         ${f('dailyRate', '日当（円）', 'type="number" inputmode="numeric" min="0" placeholder="例：15000"')}
         <p class="field-note pad-note">運転日報で乗務を記録した日を、日当1日分として数えます。</p>` : ''}
     </div>`;
