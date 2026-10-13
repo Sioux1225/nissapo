@@ -1,4 +1,4 @@
-// 日報サポ：運転日報と点呼記録簿をスマホで簡単に記録するアプリ
+// 日報サポート：運転日報と点呼記録簿をスマホで簡単に記録するアプリ
 // 画面：はじめての設定 → ホーム（乗務前・乗務後のボタン）→ 一覧 → 書き出し・共有
 
 import { db, requestPersist } from './db.js';
@@ -9,7 +9,7 @@ import {
 import { buildXlsx } from './xlsx.js';
 import { specsToPdf, renderSheet } from './pdf.js';
 
-export const APP_VERSION = '0.1.0';
+export const APP_VERSION = '0.1.1';
 
 const app = document.getElementById('app');
 const state = {
@@ -76,6 +76,21 @@ function ask(message, okLabel, danger = false) {
   });
 }
 
+// アプリのロゴ（ホーム画面のアイコンと同じ絵。確サポの LOGO と同じ作り）
+const LOGO = (size) => `<svg width="${size}" height="${size}" viewBox="0 0 160 160" aria-hidden="true">
+  <rect x="2" y="2" width="156" height="156" rx="34" fill="#FFFFFF" stroke="#E6E6E6" stroke-width="4"/>
+  <rect x="48" y="26" width="66" height="98" rx="7" fill="none" stroke="#F39801" stroke-width="11" stroke-linejoin="round"/>
+  <rect x="37" y="43" width="22" height="10" rx="5" fill="#7D7D7D"/>
+  <rect x="37" y="70" width="22" height="10" rx="5" fill="#7D7D7D"/>
+  <rect x="37" y="97" width="22" height="10" rx="5" fill="#7D7D7D"/>
+  <circle cx="70" cy="62" r="7" fill="#7D7D7D"/><circle cx="94" cy="62" r="7" fill="#7D7D7D"/>
+  <path d="M68 83 Q82 97 96 83" fill="none" stroke="#7D7D7D" stroke-width="8" stroke-linecap="round"/>
+  <circle cx="118" cy="116" r="23" fill="#F39801" stroke="#FFFFFF" stroke-width="6"/>
+  <path d="M108 116 L115.5 123.5 L129 109" fill="none" stroke="#FFFFFF" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>`;
+
+const WORDMARK = '<span class="wordmark" aria-label="日報サポート"><span class="g">日報</span><span class="o">サポート</span></span>';
+
 const ICON = {
   gear: '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>',
   back: '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg>',
@@ -137,7 +152,7 @@ function renderSetup() {
   app.innerHTML = `
     <main class="screen form">
       <div class="hero">
-        <div class="wordmark"><span class="g">日報</span><span class="o">サポ</span></div>
+        <div class="brand">${LOGO(56)}${WORDMARK}</div>
         <p class="lead">運転日報と点呼記録簿を、スマホで簡単に。</p>
         <p class="muted">はじめに、毎日同じになる内容を登録します。あとから設定でいつでも変えられます。</p>
       </div>
@@ -159,7 +174,7 @@ function renderSettings() {
         <button type="button" class="btn-outline" data-action="backup">バックアップを作る</button>
         <button type="button" class="btn-outline" data-action="restore">バックアップから戻す</button>
       </div>
-      <p class="info center">日報サポ v${APP_VERSION}</p>
+      <p class="info center">日報サポート v${APP_VERSION}</p>
     </main>`;
 }
 
@@ -200,7 +215,7 @@ function renderHome() {
   app.innerHTML = `
     <main class="screen">
       <div class="home-head">
-        <div class="wordmark"><span class="g">日報</span><span class="o">サポ</span></div>
+        <div class="brand">${LOGO(40)}${WORDMARK}</div>
         <button type="button" class="icon-btn" data-action="go" data-view="settings" aria-label="設定">${ICON.gear}</button>
       </div>
       ${open ? `<div class="card pad warn-card">
@@ -570,13 +585,13 @@ async function runBusy(fn) {
 async function backup() {
   const data = { app: 'nippo-sapo', version: 1, exportedAt: new Date().toISOString(), settings: state.settings, records: state.records };
   const d = new Date();
-  const file = new File([JSON.stringify(data)], `日報サポ_バックアップ_${d.getFullYear()}${pad2(d.getMonth() + 1)}${pad2(d.getDate())}.json`, { type: 'application/json' });
+  const file = new File([JSON.stringify(data)], `日報サポート_バックアップ_${d.getFullYear()}${pad2(d.getMonth() + 1)}${pad2(d.getDate())}.json`, { type: 'application/json' });
   await deliver(file, 'share');
 }
 
 async function restore(file) {
   const data = JSON.parse(await file.text());
-  if (data?.app !== 'nippo-sapo' || !Array.isArray(data.records)) throw new Error('日報サポのバックアップではありません');
+  if (data?.app !== 'nippo-sapo' || !Array.isArray(data.records)) throw new Error('日報サポートのバックアップではありません');
   if (!(await ask(`${data.records.length}日分の記録を戻します。同じ日の記録は、バックアップの内容に置きかわります。`, '戻す'))) return;
   await db.putRecords(data.records.filter((r) => /^\d{4}-\d{2}-\d{2}$/.test(r?.date)));
   if (data.settings) await db.putSettings({ ...DEFAULT_SETTINGS, ...data.settings });

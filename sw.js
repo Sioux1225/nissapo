@@ -1,6 +1,9 @@
 // オフラインでも開けるようにアプリのファイルを保存する（確サポと同じ「ネット優先」）。
 // アプリを更新したら VERSION と js/app.js の APP_VERSION を上げること。
-const VERSION = 'nippo-v0.1.0';
+const VERSION = 'nippo-v0.1.1';
+const RUNTIME = 'nippo-runtime';
+// ロゴの文字のフォント（バージョン固定のファイルなので、保存した版を優先）
+const CDN_HOSTS = ['fonts.googleapis.com', 'fonts.gstatic.com'];
 const SHELL = [
   './',
   './index.html',
@@ -28,7 +31,7 @@ self.addEventListener('message', (event) => {
 self.addEventListener('activate', (event) => {
   event.waitUntil(
     caches.keys()
-      .then((keys) => Promise.all(keys.filter((k) => k !== VERSION).map((k) => caches.delete(k))))
+      .then((keys) => Promise.all(keys.filter((k) => k !== VERSION && k !== RUNTIME).map((k) => caches.delete(k))))
       .then(() => self.clients.claim())
   );
 });
@@ -54,6 +57,21 @@ async function networkFirst(req) {
 
 self.addEventListener('fetch', (event) => {
   const req = event.request;
-  if (req.method !== 'GET' || new URL(req.url).origin !== self.location.origin) return;
-  event.respondWith(networkFirst(req));
+  if (req.method !== 'GET') return;
+  const url = new URL(req.url);
+  if (url.origin === self.location.origin) {
+    event.respondWith(networkFirst(req));
+    return;
+  }
+  if (CDN_HOSTS.includes(url.hostname)) {
+    event.respondWith(
+      caches.match(req).then((hit) => hit || fetch(req).then((res) => {
+        if (res.ok || res.type === 'opaque') {
+          const copy = res.clone();
+          caches.open(RUNTIME).then((c) => c.put(req, copy));
+        }
+        return res;
+      }))
+    );
+  }
 });

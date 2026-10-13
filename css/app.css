@@ -1,4 +1,4 @@
-/* 日報サポ　配色は確サポと同じ系統（オレンジ×グレー） */
+/* 日報サポート　配色は確サポと同じ系統（オレンジ×グレー） */
 :root {
   --orange: #F39801;
   --orange-text: #9A5700;
@@ -19,7 +19,7 @@
   --warn-bg: #FCEDEA;
   --radius: 16px;
   --font: 'Hiragino Sans', 'Hiragino Kaku Gothic ProN', 'Noto Sans JP', 'Yu Gothic', sans-serif;
-  --round: 'Hiragino Maru Gothic ProN', var(--font);
+  --round: 'M PLUS Rounded 1c', 'Hiragino Maru Gothic ProN', var(--font);
   --safe-bottom: env(safe-area-inset-bottom, 0px);
   color-scheme: light;
 }
@@ -62,7 +62,9 @@ svg { flex: none; }
 
 /* ヘッダー */
 .home-head { display: flex; justify-content: space-between; align-items: center; }
-.wordmark { font-family: var(--round); font-size: 26px; font-weight: 800; letter-spacing: 0.02em; }
+.brand { display: flex; align-items: center; gap: 10px; }
+.brand svg { flex: none; }
+.wordmark { font-family: var(--round); font-size: 24px; font-weight: 800; letter-spacing: 0.02em; }
 .wordmark .g { color: var(--gray-brand); }
 .wordmark .o { color: var(--orange); }
 .hero { display: flex; flex-direction: column; gap: 6px; padding: 4px 4px 0; }
