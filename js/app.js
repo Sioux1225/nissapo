@@ -17,7 +17,7 @@ import {
   KINDS, COLLISIONS, ROAD_TYPES, SLOPES, SHAPES, SURFACES
 } from './accident.js';
 
-export const APP_VERSION = '0.9.12';
+export const APP_VERSION = '0.9.13';
 
 const app = document.getElementById('app');
 const state = {
@@ -959,7 +959,6 @@ function renderSales() {
 function salesCanvas() {
   const { s, y, m, today, thisMonth, data } = salesContext();
   const sagawa = s.salesType === 'sagawa';
-  const reiwa = y >= 2019 ? `令和${y - 2018}年 ${m}月` : `${y}年 ${m}月`;
   // 佐川急便は個数の列あり。日当の案件は個数の列を出さない
   const countHead = sagawa ? COUNT_KEYS.map(([, tx]) => ({ text: tx, w: 9 })) : [];
   // 新人保証の期間がかかっている月は「新人保証」の列を足す（金額には新人保証を含む）
@@ -982,7 +981,7 @@ function salesCanvas() {
   const [ty, tm, td] = today.split('-').map(Number);
   return renderSalesSheet({
     title: sagawa ? `佐川急便　${officeTitle(officeName(s))}` : (s.salesProject || '売上表'),
-    ym: reiwa,
+    ym: `${y}年 ${m}月`,
     name: s.driverName,
     sub: salesSub(s, y, m, !sagawa),
     head,
@@ -992,7 +991,7 @@ function salesCanvas() {
     request: advanceOf(s, y, m) != null ? { label: '希望する前払い額', value: yen(advanceOf(s, y, m)) } : null,
     note: [
       ...(sagawa ? ['＊大型貨物料金は省略とさせていただきます'] : []),
-      `作成日：${ty >= 2019 ? `令和${ty - 2018}年` : `${ty}年`}${tm}月${td}日`,
+      `作成日：${ty}年${tm}月${td}日`,
       `ドライバーズサポート株式会社`
     ]
   });
