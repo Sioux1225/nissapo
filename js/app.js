@@ -17,7 +17,7 @@ import {
   KINDS, COLLISIONS, ROAD_TYPES, SLOPES, SHAPES, SURFACES
 } from './accident.js';
 
-export const APP_VERSION = '0.9.9';
+export const APP_VERSION = '0.9.10';
 
 const app = document.getElementById('app');
 const state = {
@@ -144,7 +144,7 @@ function settingsForm(s) {
   return `
     <div class="card fields">
       ${f('driverName', '運転者名 <b class="req">必須</b>', 'autocomplete="name" placeholder="例：配送 太郎"')}
-      ${f('office', '営業所', 'placeholder="例：○○"')}
+      ${f('office', '営業所（勤務先）', 'placeholder="例：○○"')}
       ${f('vehicleNo', '車両番号', 'placeholder="例：品川 000 あ 1234"')}
       ${f('company', '事業者名')}
     </div>
