@@ -17,7 +17,7 @@ import {
   KINDS, COLLISIONS, ROAD_TYPES, SLOPES, SHAPES, SURFACES
 } from './accident.js';
 
-export const APP_VERSION = '0.11.0';
+export const APP_VERSION = '0.11.1';
 
 const app = document.getElementById('app');
 const state = {
@@ -292,7 +292,7 @@ function renderHome() {
       <button type="button" class="btn-outline" data-action="go" data-view="sales">売上表（前払い）</button>
       <button type="button" class="btn-outline" data-action="go" data-view="accidents">事故の記録${state.accidents.length ? `（${state.accidents.length}件）` : ''}</button>
       <button type="button" class="link-btn" data-action="go" data-view="rules">記録の決まり（保存期間・点呼で確かめること）</button>
-      <button type="button" class="link-btn" data-action="go" data-view="rules" data-anchor="advance-rules">前払いのルールと注意事項</button>
+      <button type="button" class="link-btn" data-action="go" data-view="advrules">前払いのルールと注意事項</button>
       ${installHint()}
     </main>`;
 }
@@ -1134,9 +1134,15 @@ function renderRules() {
 
       <p class="info">決まりは法令の改正で変わることがあります。くわしくは事務所か運輸支局に確かめてください。<br>
         出典：<a href="https://www.mlit.go.jp/report/press/jidosha02_hh_000665.html" target="_blank" rel="noopener">国土交通省「貨物軽自動車運送事業者に対する規制の適正化」</a></p>
+    </main>`;
+}
 
-      <h1 class="rules-h1" id="advance-rules">前払いのルールと注意事項</h1>
+// ---- 画面：前払いのルールと注意事項 ----
 
+function renderAdvanceRules() {
+  app.innerHTML = `
+    <main class="screen">
+      ${head('前払いのルールと注意事項')}
       <h2 class="section-title">前払いできる金額（対象額）</h2>
       <div class="card pad">
         <ul class="rule-list">
@@ -1185,11 +1191,11 @@ function renderRules() {
 
 function render() {
   if (state.view !== 'setup' && !state.settings.driverName) state.view = 'setup';
-  const views = { sales: renderSales, oil: renderOil, accidents: renderAccidents, accident: renderAccidentForm, rules: renderRules, setup: renderSetup, settings: renderSettings, home: renderHome, entry: renderEntry, list: renderList, export: renderExport };
+  const views = { sales: renderSales, oil: renderOil, accidents: renderAccidents, accident: renderAccidentForm, rules: renderRules, advrules: renderAdvanceRules, setup: renderSetup, settings: renderSettings, home: renderHome, entry: renderEntry, list: renderList, export: renderExport };
   (views[state.view] || renderHome)();
 }
 
-function go(view, { push = true, anchor = '' } = {}) {
+function go(view, { push = true } = {}) {
   state.view = view;
   if (view === 'oil') state.oilElement = null; // エレメントの選択は、開くたびに初期値から
   if (view === 'list' && !state.month) {
@@ -1208,9 +1214,7 @@ function go(view, { push = true, anchor = '' } = {}) {
   // スマホの「戻る」でホームに戻れるようにする
   if (push && view !== 'home') history.pushState({ view }, '');
   render();
-  const target = anchor && document.getElementById(anchor);
-  if (target) target.scrollIntoView();
-  else window.scrollTo(0, 0);
+  window.scrollTo(0, 0);
 }
 
 window.addEventListener('popstate', () => {
@@ -1480,7 +1484,7 @@ app.addEventListener('click', async (ev) => {
   const { action } = el.dataset;
   if (action === 'go') {
     if (el.dataset.view === 'home' || el.dataset.view === state.back) history.back();
-    else go(el.dataset.view, { anchor: el.dataset.anchor || '' });
+    else go(el.dataset.view);
   } else if (action === 'open-start') openEntry(el.dataset.date, 'start');
   else if (action === 'open-end') openEntry(el.dataset.date, 'end');
   else if (action === 'open-day') openEntry(el.dataset.date, 'day', el.dataset.back || 'home');
