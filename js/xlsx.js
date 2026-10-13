@@ -151,7 +151,7 @@ export function sheetXml(spec) {
   const rowsXml = [...cells.keys()].sort((a, b) => a - b).map((r) => {
     const cs = cells.get(r);
     const body = [...cs.keys()].sort((a, b) => a - b).map((c) => cs.get(c)).join('');
-    return `<row r="${r}" ht="${heights[r] || 22}" customHeight="1">${body}</row>`;
+    return `<row r="${r}" ht="${heights[r] || (r >= first && spec.rowHeight) || 22}" customHeight="1">${body}</row>`;
   }).join('');
 
   const cols = spec.widths.map((w, i) => `<col min="${i + 1}" max="${i + 1}" width="${w}" customWidth="1"/>`).join('');

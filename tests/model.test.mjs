@@ -85,3 +85,18 @@ test('PDF：ページ数と終わりの印', () => {
   const start = Number(pdf.match(/startxref\n(\d+)/)[1]);
   assert.equal(pdf.slice(start, start + 4), 'xref');
 });
+
+test('事故の記録：Excel・CSV・入力チェック', async () => {
+  const { newAccident, accidentSheet, accidentCsv, validateAccident } = await import('../js/accident.js');
+  const a = { ...newAccident(settings, '2026-10-13', '14:05'), place: '八王子市中野町', summary: '右折時に対向車と接触, けが人なし', cause: '確認不足', prevention: '一時停止して確認' };
+  assert.equal(validateAccident({ ...a, summary: '' }), '事故の概要を入れてください');
+  assert.equal(validateAccident(a), null);
+  const sheet = accidentSheet([a], settings);
+  assert.equal(sheet.rows[0][0], '2026/10/13');
+  assert.deepEqual(sheet.rows[0][1], { time: '14:05' });
+  assert.equal(sheet.rows[0].length, sheet.widths.length);
+  assert.match(sheetXml(sheet), /ht="72"/);
+  const csv = accidentCsv([a]).trim().split('\r\n');
+  assert.equal(csv.length, 2);
+  assert.ok(csv[1].includes('"右折時に対向車と接触, けが人なし"'));
+});

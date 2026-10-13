@@ -7,20 +7,23 @@ import {
   monthSheets, yearSheets, hasMonth, toCsv, daysInMonth, dateKey, weekday, pad2
 } from './model.js';
 import { buildXlsx } from './xlsx.js';
-import { specsToPdf, renderSheet } from './pdf.js';
+import { specsToPdf, renderSheet, renderAccident, canvasesToPdf } from './pdf.js';
+import { newAccident, ACCIDENT_FIELDS, accidentValue, accidentWhen, validateAccident, accidentSheet, accidentCsv } from './accident.js';
 
-export const APP_VERSION = '0.1.3';
+export const APP_VERSION = '0.2.0';
 
 const app = document.getElementById('app');
 const state = {
   view: 'home',
   settings: { ...DEFAULT_SETTINGS },
   records: [],
+  accidents: [],
+  acc: null,          // 入力中の事故の記録
   draft: null,        // 入力中の1日分 { date, start, end, rollcaller }
   mode: null,         // 'start' | 'end' | 'day'
   back: 'home',
   month: null,        // 一覧で表示している月 { y, m }
-  exp: { period: 'month', y: 0, m: 0, format: 'xlsx' },
+  exp: { doc: 'nippo', period: 'month', y: 0, m: 0, format: 'xlsx' },
   busy: false
 };
 
@@ -237,6 +240,7 @@ function renderHome() {
         <button type="button" class="btn-outline" data-action="go" data-view="list">記録の一覧</button>
         <button type="button" class="btn-outline" data-action="go" data-view="export">書き出し・共有</button>
       </div>
+      <button type="button" class="btn-outline" data-action="go" data-view="accidents">事故の記録${state.accidents.length ? `（${state.accidents.length}件）` : ''}</button>
       <button type="button" class="link-btn" data-action="go" data-view="rules">記録の決まり（保存期間・点呼で確かめること）</button>
       ${installHint()}
     </main>`;
@@ -381,10 +385,16 @@ function renderList() {
 
 function renderExport() {
   const x = state.exp;
-  const years = new Set([new Date().getFullYear(), ...state.records.map((r) => Number(r.date.slice(0, 4)))]);
+  const isAcc = x.doc === 'accident';
+  const dates = isAcc ? state.accidents.map((a) => a.date) : state.records.map((r) => r.date);
+  const years = new Set([new Date().getFullYear(), ...dates.map((d) => Number(d.slice(0, 4)))]);
   const yearOpts = [...years].sort((a, b) => b - a).map((y) => `<option value="${y}" ${y === x.y ? 'selected' : ''}>${y}年</option>`).join('');
   const monthOpts = Array.from({ length: 12 }, (_, i) => i + 1).map((m) => `<option value="${m}" ${m === x.m ? 'selected' : ''}>${m}月</option>`).join('');
-  const notes = {
+  const notes = isAcc ? {
+    xlsx: '事故1件を1行にした「事故の記録」のシートです。',
+    pdf: '事故1件を A4縦 1枚にします。そのまま印刷して保管できます。',
+    csv: '事故1件を1行にした表です。'
+  } : {
     xlsx: '事務所の年間ブックと同じ形（運転日報・点呼記録簿のシート）です。「1年分」にすると1月〜12月の24シートになります。',
     pdf: 'A4横で、運転日報と点呼記録簿を1か月1枚ずつにします。印刷やそのまま提出するときに。',
     csv: '記録のある日を1日1行にした表です。ほかのソフトに取り込むときに。'
@@ -394,6 +404,9 @@ function renderExport() {
     <main class="screen form">
       ${head('書き出し・共有')}
       <section class="card fields">
+        <div class="field"><span class="field-label">書類</span>
+          <div class="seg">${[['nippo', '運転日報・点呼記録簿'], ['accident', '事故の記録']].map(([v, t]) => `<button type="button" data-exp="doc" data-value="${v}" aria-pressed="${x.doc === v}">${t}</button>`).join('')}</div>
+        </div>
         <div class="field"><span class="field-label">期間</span>
           <div class="seg">${[['month', '1か月分'], ['year', '1年分']].map(([v, t]) => `<button type="button" data-exp="period" data-value="${v}" aria-pressed="${x.period === v}">${t}</button>`).join('')}</div>
         </div>
@@ -412,10 +425,123 @@ function renderExport() {
       <button type="button" class="${canShare ? 'btn-outline' : 'btn-primary'}" data-action="export" data-how="save">このスマホに保存する</button>
       <button type="button" class="btn-text" data-action="preview">画面で確認する</button>
       <p class="info">${canShare ? '事務所に送るときは「共有する」を押して、LINEやメールを選んでください。' : '保存したファイルを、LINEやメールに添付して事務所に送ってください。'}</p>
-      <p class="info">運転日報・点呼記録簿は<b>1年間</b>の保存が決まりです。毎月送って、事務所で保管してください。<button type="button" class="link-btn inline" data-action="go" data-view="rules">記録の決まり</button></p>
+      <p class="info">${isAcc ? '事故の記録は<b>3年間</b>の保存が決まりです。事故があったら、すぐに事務所に送ってください。' : '運転日報・点呼記録簿は<b>1年間</b>の保存が決まりです。毎月送って、事務所で保管してください。'}<button type="button" class="link-btn inline" data-action="go" data-view="rules">記録の決まり</button></p>
       <div id="preview" class="preview"></div>
     </main>`;
 }
+
+// ---- 画面：事故の記録 ----
+
+function renderAccidents() {
+  const list = [...state.accidents].sort((a, b) => (`${a.date} ${a.time}` < `${b.date} ${b.time}` ? 1 : -1));
+  const rows = list.map((a) => {
+    const todo = [a.police === 'まだ' ? '警察まだ' : '', a.office === 'まだ' ? '事務所まだ' : ''].filter(Boolean);
+    return `<button type="button" class="row" data-action="open-accident" data-id="${e(a.id)}">
+      <span class="row-main">
+        <span class="row-title">${e(accidentWhen(a))}</span>
+        <span class="row-text">${e(a.place)}　${e(a.summary)}</span>
+        ${todo.length ? `<span class="row-sub">${todo.map((t) => `<span class="tag">${t}</span>`).join('')}</span>` : ''}
+      </span>
+    </button>`;
+  }).join('');
+  app.innerHTML = `
+    <main class="screen">
+      ${head('事故の記録')}
+      <section class="card pad warn-card">
+        <p><b>事故が起きたら、まず</b></p>
+        <ol class="rule-list">
+          <li>けが人がいれば救護する（救急は119番）</li>
+          <li>ハザードランプ・三角表示板で、続けて事故が起きないようにする</li>
+          <li>警察に連絡する（110番）</li>
+          <li>事務所（運行管理者）に連絡する</li>
+        </ol>
+        <p class="small">落ち着いてから、このアプリに記録してください。</p>
+      </section>
+      <button type="button" class="btn-primary" data-action="new-accident">＋ 事故を記録する</button>
+      <div class="card list">${rows || '<p class="empty">事故の記録はありません</p>'}</div>
+      <p class="info">事故の記録は<b>3年間</b>の保存が決まりです（事務所で保管）。「書き出し・共有」で「事故の記録」を選ぶと、まとめて送れます。</p>
+    </main>`;
+}
+
+function accField(labelText, key, attrs = '', note = '') {
+  return field(labelText, `<input id="acc-${key}" data-acc="${key}" value="${e(state.acc[key])}" ${attrs}>`, note);
+}
+function accText(labelText, key, placeholder) {
+  return field(labelText, `<textarea id="acc-${key}" data-acc="${key}" rows="3" placeholder="${e(placeholder)}">${e(state.acc[key])}</textarea>`);
+}
+function accSeg(labelText, key, options) {
+  return `<div class="field"><span class="field-label">${labelText}</span><div class="seg">${options.map((v) =>
+    `<button type="button" data-acc-seg="${key}" data-value="${e(v)}" aria-pressed="${state.acc[key] === v}">${e(v)}</button>`).join('')}</div></div>`;
+}
+
+function renderAccidentForm() {
+  const a = state.acc;
+  const saved = state.accidents.some((x) => x.id === a.id);
+  app.innerHTML = `
+    <main class="screen form">
+      ${head(saved ? '事故の記録を直す' : '事故を記録する', 'accidents')}
+      <section class="card fields">
+        <div class="ym-field">
+          ${accField('発生した日', 'date', 'type="date" required')}
+          ${accField('時刻', 'time', 'type="time"')}
+        </div>
+        ${accField('発生場所', 'place', 'placeholder="例：八王子市中野町 中野交差点"')}
+        ${accField('事故の当事者の氏名', 'parties', 'placeholder="例：山田 一郎"', '相手の方の名前（自分は書かない）。単独の事故なら「なし」')}
+        ${accText('事故の概要（損害の程度を含む）', 'summary', '例：右折しようとしたとき、対向車の左前に接触。相手の車のバンパーに擦り傷。けが人なし')}
+        ${accText('事故の原因', 'cause', '例：対向車の確認が不十分だった')}
+        ${accText('再発防止対策', 'prevention', '例：右折のときは一度止まり、対向車が来ないことを確かめてから曲がる')}
+        ${accSeg('けが人', 'injury', ['なし', 'あり'])}
+        ${a.injury === 'あり' ? '<p class="warn">けが人がいる事故は、国への報告が必要です。必ず事務所に連絡してください。</p>' : ''}
+        ${accSeg('警察への届出', 'police', ['届け出た', 'まだ'])}
+        ${accSeg('事務所への連絡', 'office', ['連絡した', 'まだ'])}
+        <details class="more">
+          <summary>乗務員・車両（ふだんは変更不要）</summary>
+          ${accField('乗務員等の氏名', 'driverName')}
+          ${accField('車両番号', 'vehicleNo')}
+        </details>
+      </section>
+      <button type="button" class="btn-primary" data-action="save-accident">この内容で記録する</button>
+      ${saved ? `<button type="button" class="btn-outline" data-action="share-accident">PDFにして事務所に送る</button>
+        <button type="button" class="btn-text danger" data-action="delete-accident">この事故の記録を消す</button>` : ''}
+    </main>`;
+}
+
+function openAccident(id) {
+  const found = state.accidents.find((a) => a.id === id);
+  state.acc = found ? structuredClone(found) : newAccident(state.settings, todayKey(), nowTime());
+  state.back = 'accidents';
+  go('accident');
+}
+
+async function saveAccident() {
+  const a = state.acc;
+  const err = validateAccident(a);
+  if (err) { toast(err); return; }
+  await db.putAccident(a);
+  // その日の運転日報の「事故・異常の概要」が「無」なら、概要を書き写す
+  const rec = findRecord(a.date);
+  let copied = false;
+  if (rec?.end && (!rec.end.accident || rec.end.accident === '無')) {
+    rec.end.accident = a.summary.replace(/\s+/g, ' ').slice(0, 60);
+    await db.putRecord(rec);
+    copied = true;
+  }
+  await reload();
+  toast(copied ? '記録しました。運転日報の「事故・異常」にも書き写しました' : '事故を記録しました');
+  history.back();
+}
+
+function accidentCanvas(a) {
+  const s = state.settings;
+  return renderAccident({
+    title: '事故の記録',
+    sub: `事業者名：${s.company || ''}　営業所：${s.office || ''}　保存期間：3年間`,
+    fields: ACCIDENT_FIELDS.map((f) => ({ label: f.label, value: accidentValue(a, f.key), tall: ['summary', 'cause', 'prevention'].includes(f.key) })),
+    footer: '貨物自動車運送事業輸送安全規則 第九条の二による記録'
+  });
+}
+
+const accFileName = (a) => `事故の記録_${a.date.replace(/-/g, '')}_${safeName(a.driverName)}`;
 
 // ---- 画面：記録の決まり ----
 
@@ -427,7 +553,7 @@ function renderRules() {
 
       <h2 class="section-title">保存しておく期間</h2>
       <div class="card list rules">
-        <div class="rule"><span class="rule-name">点呼記録簿</span><span class="rule-term">1年間</span></div>
+        <div class="rule"><span class="rule-name">点呼記録簿<small>以前から義務（アルコール検知器は2011年4月から）</small></span><span class="rule-term">1年間</span></div>
         <div class="rule"><span class="rule-name">運転日報（業務記録）<small>2025年4月から義務</small></span><span class="rule-term">1年間</span></div>
         <div class="rule"><span class="rule-name">事故の記録<small>2025年4月から義務</small></span><span class="rule-term">3年間</span></div>
       </div>
@@ -465,7 +591,7 @@ function renderRules() {
 
       <h2 class="section-title">事故が起きたら</h2>
       <div class="card pad">
-        <p class="small">すぐに事務所（運行管理者）に連絡してください。事故の記録（概要・原因・再発防止策）は3年間保存します。けが人が出た事故など一定の事故は、国への報告が必要です（事務所が行います）。</p>
+        <p class="small">すぐに事務所（運行管理者）に連絡してください。ホームの「事故の記録」から記録できます。事故の記録（概要・原因・再発防止対策など）は3年間保存します。けが人が出た事故など一定の事故は、国への報告が必要です（事務所が行います）。</p>
       </div>
 
       <p class="info">決まりは法令の改正で変わることがあります。くわしくは事務所か運輸支局に確かめてください。<br>
@@ -477,7 +603,7 @@ function renderRules() {
 
 function render() {
   if (state.view !== 'setup' && !state.settings.driverName) state.view = 'setup';
-  const views = { rules: renderRules, setup: renderSetup, settings: renderSettings, home: renderHome, entry: renderEntry, list: renderList, export: renderExport };
+  const views = { accidents: renderAccidents, accident: renderAccidentForm, rules: renderRules, setup: renderSetup, settings: renderSettings, home: renderHome, entry: renderEntry, list: renderList, export: renderExport };
   (views[state.view] || renderHome)();
 }
 
@@ -500,6 +626,7 @@ function go(view, { push = true } = {}) {
 
 window.addEventListener('popstate', () => {
   if (state.view === 'entry' && state.back === 'list') go('list', { push: false });
+  else if (state.view === 'accident') go('accidents', { push: false });
   else if (state.view !== 'home' && state.view !== 'setup') go('home', { push: false });
 });
 
@@ -553,14 +680,26 @@ async function saveEntry() {
 
 async function reload() {
   state.records = (await db.allRecords()).sort((a, b) => (a.date < b.date ? -1 : 1));
+  state.accidents = await db.allAccidents();
 }
 
 // ---- 書き出し ----
 
 const safeName = (s) => String(s || '').replace(/[\s　]/g, '').replace(/[\\/:*?"<>|]/g, '');
 
+// 書き出す期間の事故の記録
+function periodAccidents() {
+  const { period, y, m } = state.exp;
+  const prefix = period === 'year' ? `${y}-` : `${y}-${pad2(m)}-`;
+  return state.accidents.filter((a) => a.date.startsWith(prefix));
+}
+
 function checkPeriod() {
   const { period, y, m } = state.exp;
+  if (state.exp.doc === 'accident') {
+    if (!periodAccidents().length) throw new Error(period === 'year' ? `${y}年の事故の記録はありません` : `${y}年${m}月の事故の記録はありません`);
+    return;
+  }
   const recs = state.records;
   if (period === 'month' && !hasMonth(recs, y, m)) throw new Error(`${y}年${m}月の記録がありません`);
   if (period === 'year' && !recs.some((r) => r.date.startsWith(`${y}-`))) throw new Error(`${y}年の記録がありません`);
@@ -581,6 +720,16 @@ async function showPreview() {
   checkPeriod();
   const out = document.getElementById('preview');
   out.innerHTML = '';
+  if (state.exp.doc === 'accident') {
+    for (const a of periodAccidents()) {
+      const img = new Image();
+      img.src = accidentCanvas(a).toDataURL('image/jpeg', 0.85);
+      img.alt = `事故の記録（${accidentWhen(a)}）`;
+      out.append(img);
+    }
+    out.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    return;
+  }
   for (const spec of pageSpecs()) {
     const img = new Image();
     img.src = renderSheet(spec).toDataURL('image/jpeg', 0.85);
@@ -597,6 +746,13 @@ async function makeExport() {
   const name = safeName(s.driverName);
   const recs = state.records;
   checkPeriod();
+  if (state.exp.doc === 'accident') {
+    const list = periodAccidents();
+    const accBase = `${period === 'year' ? `${y}年` : `${y}年${m}月`}_${name}_事故の記録`;
+    if (format === 'xlsx') return new File([buildXlsx([accidentSheet(list, s)])], `${accBase}.xlsx`, { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+    if (format === 'pdf') return new File([await canvasesToPdf(list.map(accidentCanvas))], `${accBase}.pdf`, { type: 'application/pdf' });
+    return new File([accidentCsv(list)], `${accBase}.csv`, { type: 'text/csv' });
+  }
   const base = period === 'year' ? `${y}${name}` : `${y}年${m}月_${name}_運転日報・点呼記録簿`;
 
   if (format === 'xlsx') {
@@ -642,7 +798,7 @@ async function runBusy(fn) {
 // ---- バックアップ ----
 
 async function backup() {
-  const data = { app: 'nippo-sapo', version: 1, exportedAt: new Date().toISOString(), settings: state.settings, records: state.records };
+  const data = { app: 'nippo-sapo', version: 1, exportedAt: new Date().toISOString(), settings: state.settings, records: state.records, accidents: state.accidents };
   const d = new Date();
   const file = new File([JSON.stringify(data)], `日報サポート_バックアップ_${d.getFullYear()}${pad2(d.getMonth() + 1)}${pad2(d.getDate())}.json`, { type: 'application/json' });
   await deliver(file, 'share');
@@ -653,6 +809,7 @@ async function restore(file) {
   if (data?.app !== 'nippo-sapo' || !Array.isArray(data.records)) throw new Error('日報サポートのバックアップではありません');
   if (!(await ask(`${data.records.length}日分の記録を戻します。同じ日の記録は、バックアップの内容に置きかわります。`, '戻す'))) return;
   await db.putRecords(data.records.filter((r) => /^\d{4}-\d{2}-\d{2}$/.test(r?.date)));
+  if (Array.isArray(data.accidents)) await db.putAccidents(data.accidents.filter((a) => a?.id && /^\d{4}-\d{2}-\d{2}$/.test(a.date)));
   if (data.settings) await db.putSettings({ ...DEFAULT_SETTINGS, ...data.settings });
   state.settings = await db.getSettings();
   await reload();
@@ -671,6 +828,16 @@ app.addEventListener('click', async (ev) => {
     const y = window.scrollY;
     renderEntry();
     app.querySelectorAll('details').forEach((d, i) => { if (opened[i]) d.open = true; });
+    window.scrollTo(0, y);
+    return;
+  }
+  const accSegBtn = ev.target.closest('[data-acc-seg]');
+  if (accSegBtn) {
+    state.acc[accSegBtn.dataset.accSeg] = accSegBtn.dataset.value;
+    const open = app.querySelector('details')?.open;
+    const y = window.scrollY;
+    renderAccidentForm();
+    if (open) app.querySelector('details').open = true;
     window.scrollTo(0, y);
     return;
   }
@@ -696,6 +863,21 @@ app.addEventListener('click', async (ev) => {
   } else if (action === 'open-start') openEntry(el.dataset.date, 'start');
   else if (action === 'open-end') openEntry(el.dataset.date, 'end');
   else if (action === 'open-day') openEntry(el.dataset.date, 'day', el.dataset.back || 'home');
+  else if (action === 'new-accident') openAccident(null);
+  else if (action === 'open-accident') openAccident(el.dataset.id);
+  else if (action === 'save-accident') runBusy(saveAccident);
+  else if (action === 'share-accident') {
+    runBusy(async () => {
+      const a = state.acc;
+      deliver(new File([await canvasesToPdf([accidentCanvas(a)])], `${accFileName(a)}.pdf`, { type: 'application/pdf' }), 'share');
+    });
+  } else if (action === 'delete-accident') {
+    if (!(await ask(`${accidentWhen(state.acc)} の事故の記録を消します。事故の記録は3年間の保存が決まりです。本当に消しますか？`, '消す', true))) return;
+    await db.deleteAccident(state.acc.id);
+    await reload();
+    toast('事故の記録を消しました');
+    history.back();
+  }
   else if (action === 'add-part') {
     const s = state.settings;
     if (el.dataset.part === 'start') state.draft.start = newStart(s, prevOdo(state.records, state.draft.date, s), '');
@@ -741,6 +923,8 @@ app.addEventListener('input', (ev) => {
       const out = app.querySelector('[data-dist]');
       if (out) out.value = distanceOf(state.draft) ?? '';
     }
+  } else if (t.dataset.acc) {
+    state.acc[t.dataset.acc] = t.value;
   } else if ('dist' in t.dataset) {
     const a = num(state.draft.start?.odo);
     const dist = num(t.value);

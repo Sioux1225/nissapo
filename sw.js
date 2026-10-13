@@ -1,6 +1,6 @@
 // オフラインでも開けるようにアプリのファイルを保存する（確サポと同じ「ネット優先」）。
 // アプリを更新したら VERSION と js/app.js の APP_VERSION を上げること。
-const VERSION = 'nippo-v0.1.3';
+const VERSION = 'nippo-v0.2.0';
 const RUNTIME = 'nippo-runtime';
 // ロゴの文字のフォント（バージョン固定のファイルなので、保存した版を優先）
 const CDN_HOSTS = ['fonts.googleapis.com', 'fonts.gstatic.com'];
@@ -13,6 +13,7 @@ const SHELL = [
   './js/model.js',
   './js/xlsx.js',
   './js/pdf.js',
+  './js/accident.js',
   './manifest.webmanifest',
   './icons/icon.svg',
   './icons/icon-192.png',

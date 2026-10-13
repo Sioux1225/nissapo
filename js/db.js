@@ -1,10 +1,10 @@
 // 端末内データベース（IndexedDB）。外部には一切送信しない。
-// records: 1日1件（キーは日付 'YYYY-MM-DD'） / settings: 設定（1件）
+// records: 1日1件（キーは日付 'YYYY-MM-DD'） / settings: 設定（1件） / accidents: 事故の記録
 
 import { DEFAULT_SETTINGS } from './model.js';
 
 const DB_NAME = 'nippo';
-const DB_VERSION = 1;
+const DB_VERSION = 2;
 let dbPromise = null;
 
 function openDb() {
@@ -15,6 +15,8 @@ function openDb() {
       const db = req.result;
       if (!db.objectStoreNames.contains('records')) db.createObjectStore('records', { keyPath: 'date' });
       if (!db.objectStoreNames.contains('settings')) db.createObjectStore('settings');
+      // v2：事故の記録
+      if (!db.objectStoreNames.contains('accidents')) db.createObjectStore('accidents', { keyPath: 'id' });
     };
     req.onsuccess = () => resolve(req.result);
     req.onerror = () => reject(req.error);
@@ -42,6 +44,14 @@ export const db = {
   putRecords: (list) => run('records', 'readwrite', (tx) => {
     const store = tx.objectStore('records');
     for (const r of list) store.put(r);
+  }),
+
+  allAccidents: () => run('accidents', 'readonly', (tx) => tx.objectStore('accidents').getAll()),
+  putAccident: (a) => run('accidents', 'readwrite', (tx) => tx.objectStore('accidents').put({ ...a, updatedAt: new Date().toISOString() })),
+  deleteAccident: (id) => run('accidents', 'readwrite', (tx) => tx.objectStore('accidents').delete(id)),
+  putAccidents: (list) => run('accidents', 'readwrite', (tx) => {
+    const store = tx.objectStore('accidents');
+    for (const a of list) store.put(a);
   }),
 
   async getSettings() {

@@ -6,9 +6,9 @@ import { concat } from './xlsx.js';
 
 const enc = new TextEncoder();
 
-// A4横（pt）
-const PAGE_W = 841.89;
-const PAGE_H = 595.28;
+// A4（pt）。画像が縦長なら縦、横長なら横のページにする
+const A4_LONG = 841.89;
+const A4_SHORT = 595.28;
 
 // pages：[{ jpeg: Uint8Array, width, height }]
 export function buildPdf(pages) {
@@ -33,8 +33,9 @@ export function buildPdf(pages) {
   obj(2, [`<< /Type /Pages /Kids [${pageIds.map((id) => `${id} 0 R`).join(' ')}] /Count ${pages.length} >>`]);
   pages.forEach((p, i) => {
     const id = pageIds[i];
-    const content = `q ${PAGE_W} 0 0 ${PAGE_H} 0 0 cm /Im1 Do Q`;
-    obj(id, [`<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ${PAGE_W} ${PAGE_H}] /Resources << /XObject << /Im1 ${id + 2} 0 R >> >> /Contents ${id + 1} 0 R >>`]);
+    const [pw, ph] = p.height > p.width ? [A4_SHORT, A4_LONG] : [A4_LONG, A4_SHORT];
+    const content = `q ${pw} 0 0 ${ph} 0 0 cm /Im1 Do Q`;
+    obj(id, [`<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ${pw} ${ph}] /Resources << /XObject << /Im1 ${id + 2} 0 R >> >> /Contents ${id + 1} 0 R >>`]);
     obj(id + 1, [`<< /Length ${content.length} >>\nstream\n${content}\nendstream`]);
     obj(id + 2, [
       `<< /Type /XObject /Subtype /Image /Width ${p.width} /Height ${p.height} /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length ${p.jpeg.length} >>\nstream\n`,
@@ -145,6 +146,72 @@ export function renderSheet(spec) {
   return canvas;
 }
 
+// 文字を枠の幅で折り返す（日本語は1文字ずつ区切れる）
+function wrapLines(ctx, text, maxW) {
+  const out = [];
+  for (const para of String(text || '').split('\n')) {
+    let line = '';
+    for (const ch of para) {
+      if (ctx.measureText(line + ch).width > maxW && line) { out.push(line); line = ch; } else line += ch;
+    }
+    out.push(line);
+  }
+  return out;
+}
+
+// 事故の記録：1件を A4縦 1枚に描く
+// fields：[{ label, value, tall }]（tall は文章が長くなる欄）
+export function renderAccident({ title, sub, fields, footer }) {
+  const W = 1654;
+  const H = 2339;
+  const canvas = document.createElement('canvas');
+  canvas.width = W;
+  canvas.height = H;
+  const ctx = canvas.getContext('2d');
+  ctx.fillStyle = '#FFFFFF';
+  ctx.fillRect(0, 0, W, H);
+  ctx.fillStyle = '#000000';
+  ctx.strokeStyle = '#000000';
+  ctx.textBaseline = 'middle';
+
+  const m = 110;
+  ctx.font = `700 56px ${FONT}`;
+  ctx.textAlign = 'center';
+  ctx.fillText(title, W / 2, 150);
+  ctx.font = `400 28px ${FONT}`;
+  ctx.textAlign = 'right';
+  ctx.fillText(sub, W - m, 230);
+
+  const labelW = 400;
+  const top = 270;
+  const bottom = H - 160;
+  const shortH = 100;
+  const talls = fields.filter((f) => f.tall).length;
+  const tallH = (bottom - top - shortH * (fields.length - talls)) / Math.max(talls, 1);
+  let y = top;
+  ctx.lineWidth = 2;
+  for (const f of fields) {
+    const h = f.tall ? tallH : shortH;
+    ctx.fillStyle = '#EFEFEF';
+    ctx.fillRect(m, y, labelW, h);
+    ctx.fillStyle = '#000000';
+    ctx.strokeRect(m, y, labelW, h);
+    ctx.strokeRect(m + labelW, y, W - m * 2 - labelW, h);
+    drawLines(ctx, f.label.replace('（', '\n（'), m, y, labelW, h, { size: 28, weight: 700 });
+    ctx.font = `400 30px ${FONT}`;
+    ctx.textAlign = 'left';
+    const lines = wrapLines(ctx, f.value, W - m * 2 - labelW - 40);
+    const lh = 44;
+    const startY = f.tall ? y + 40 : y + h / 2 - ((lines.length - 1) * lh) / 2;
+    lines.slice(0, Math.floor((h - 20) / lh)).forEach((line, i) => ctx.fillText(line, m + labelW + 20, startY + i * lh));
+    y += h;
+  }
+  ctx.font = `400 24px ${FONT}`;
+  ctx.textAlign = 'left';
+  ctx.fillText(footer, m, H - 110);
+  return canvas;
+}
+
 function canvasJpeg(canvas) {
   return new Promise((resolve, reject) => {
     canvas.toBlob(async (blob) => {
@@ -152,6 +219,12 @@ function canvasJpeg(canvas) {
       resolve(new Uint8Array(await blob.arrayBuffer()));
     }, 'image/jpeg', 0.9);
   });
+}
+
+export async function canvasesToPdf(canvases) {
+  const pages = [];
+  for (const canvas of canvases) pages.push({ jpeg: await canvasJpeg(canvas), width: canvas.width, height: canvas.height });
+  return buildPdf(pages);
 }
 
 export async function specsToPdf(specs) {

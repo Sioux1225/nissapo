@@ -20,6 +20,7 @@
 | `js/app.js` | 画面（はじめての設定・ホーム・入力・一覧・書き出し・設定） |
 | `js/model.js` | 記録の形・初期値・走行距離の引き継ぎ・帳票の行の組み立て・CSV |
 | `js/xlsx.js` | Excel（.xlsx）を作る（zip も自前） |
+| `js/accident.js` | 事故の記録（輸送安全規則 第九条の二の8項目・3年保存）と、その Excel・CSV |
 | `js/pdf.js` | 帳票を画像に描いて A4横の PDF にする |
 | `js/db.js` | 端末内データベース（IndexedDB） |
 | `sw.js` / `manifest.webmanifest` | オフライン対応・ホーム画面への追加 |

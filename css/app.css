@@ -130,6 +130,9 @@ svg { flex: none; }
 .field-label { font-size: 13px; color: var(--sub); font-weight: 600; }
 .field-note { font-size: 12px; color: var(--sub); }
 .req { font-size: 11px; color: var(--warn); margin-left: 4px; }
+.field textarea { width: 100%; border: 1px solid var(--line-strong); border-radius: 12px; background: var(--card); padding: 10px 12px; font-size: 16px; line-height: 1.6; resize: vertical; }
+.field textarea::placeholder { color: #B5B5B5; }
+.field textarea:focus { outline: 2px solid var(--orange); outline-offset: 0; border-color: transparent; }
 .field input, .select {
   width: 100%; min-height: 48px; border: 1px solid var(--line-strong); border-radius: 12px; background: var(--card);
   padding: 0 12px; font-size: 18px; font-weight: 600;
@@ -218,3 +221,9 @@ button:focus-visible { outline: 3px solid var(--blue); outline-offset: 2px; }
 .rule-term { font-size: 20px; font-weight: 800; color: var(--orange-text); white-space: nowrap; }
 .rule-list { margin: 0; padding-left: 1.3em; display: flex; flex-direction: column; gap: 6px; font-size: 14px; line-height: 1.6; }
 .info a { color: var(--orange-text); }
+
+/* 事故の記録 */
+.ym-field { display: flex; flex-direction: column; }
+.row-title { font-size: 16px; font-weight: 700; }
+.row-text { font-size: 14px; color: var(--sub); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.row-main { display: flex; flex-direction: column; gap: 4px; }
