@@ -1,6 +1,6 @@
 // オフラインでも開けるようにアプリのファイルを保存する（確サポと同じ「ネット優先」）。
-// アプリを更新したら VERSION と js/app.js の APP_VERSION を上げること。
-const VERSION = 'nippo-v0.4.0';
+// アプリを更新したら VERSION と js/app.js の APP_VERSION を上げること（sw.js が変わったことでブラウザが更新に気づき、画面に「新しいバージョンがあります」が出る）。
+const VERSION = 'nippo-v0.4.1';
 const RUNTIME = 'nippo-runtime';
 // ロゴの文字のフォント（バージョン固定のファイルなので、保存した版を優先）
 const CDN_HOSTS = ['fonts.googleapis.com', 'fonts.gstatic.com'];
@@ -23,11 +23,12 @@ const SHELL = [
 ];
 
 self.addEventListener('install', (event) => {
-  event.waitUntil(caches.open(VERSION).then((c) => c.addAll(SHELL.map((url) => new Request(url, { cache: 'reload' })))));
-});
-
-self.addEventListener('message', (event) => {
-  if (event.data === 'skipWaiting') self.skipWaiting();
+  // ブラウザのキャッシュを通さず、必ずサーバーから最新のファイルを取得して保存する
+  event.waitUntil(
+    caches.open(VERSION)
+      .then((c) => c.addAll(SHELL.map((url) => new Request(url, { cache: 'reload' }))))
+      .then(() => self.skipWaiting())
+  );
 });
 
 self.addEventListener('activate', (event) => {

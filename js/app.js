@@ -14,7 +14,7 @@ import {
   KINDS, COLLISIONS, ROAD_TYPES, SLOPES, SHAPES, SURFACES
 } from './accident.js';
 
-export const APP_VERSION = '0.4.0';
+export const APP_VERSION = '0.4.1';
 
 const app = document.getElementById('app');
 const state = {
@@ -1154,32 +1154,27 @@ document.getElementById('import-input').addEventListener('change', (ev) => {
   if (file) runBusy(() => restore(file));
 });
 
-// ---- 更新のお知らせ（確サポと同じ仕組み） ----
+// ---- アップデートの確認と通知（確サポと同じ仕組み） ----
 
-function setupServiceWorker() {
-  if (!('serviceWorker' in navigator) || location.hostname === 'localhost' && location.search.includes('nosw')) return;
-  navigator.serviceWorker.register('./sw.js').then((reg) => {
-    const show = () => { document.getElementById('update-banner').hidden = false; };
-    if (reg.waiting && navigator.serviceWorker.controller) show();
-    reg.addEventListener('updatefound', () => {
-      const w = reg.installing;
-      w?.addEventListener('statechange', () => {
-        if (w.state === 'installed' && navigator.serviceWorker.controller) show();
-      });
-    });
-    document.addEventListener('visibilitychange', () => { if (!document.hidden) reg.update().catch(() => {}); });
-  }).catch(() => {});
-  let reloaded = false;
+function setupUpdates() {
+  if (!('serviceWorker' in navigator) || location.protocol === 'file:') return;
+  if (location.hostname === 'localhost' && location.search.includes('nosw')) return; // 開発中は使わない
+  // 初めて開いたとき（まだ何も保存されていないとき）は通知しない
+  const hadController = Boolean(navigator.serviceWorker.controller);
   navigator.serviceWorker.addEventListener('controllerchange', () => {
-    if (reloaded) return;
-    reloaded = true;
-    location.reload();
+    if (hadController) document.getElementById('update-banner').hidden = false;
   });
+  navigator.serviceWorker.register('./sw.js').then((reg) => {
+    const check = () => reg.update().catch(() => {});
+    // ホーム画面のアプリは閉じずに再開されることが多いので、画面に戻ってきたときにも確認する
+    document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') check(); });
+    setInterval(check, 30 * 60 * 1000);
+  }).catch(() => {});
   document.getElementById('update-banner').addEventListener('click', async (ev) => {
     if (!ev.target.closest('[data-action="apply-update"]')) return;
-    const reg = await navigator.serviceWorker.getRegistration();
-    if (reg?.waiting) reg.waiting.postMessage('skipWaiting');
-    else location.reload();
+    const editing = state.view === 'entry' || state.view === 'accident';
+    if (editing && !(await ask('入力中の内容は消えます。更新しますか？（先に保存してから更新するのがおすすめです）', '更新する'))) return;
+    location.reload();
   });
 }
 
@@ -1204,7 +1199,7 @@ async function start() {
   state.view = state.settings.driverName ? 'home' : 'setup';
   history.replaceState({ view: 'home' }, '');
   render();
-  setupServiceWorker();
+  setupUpdates();
 }
 
 start();
