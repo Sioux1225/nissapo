@@ -4,7 +4,7 @@
 
 import { num, daysInMonth, dateKey, weekday, distanceOf, isOff } from './model.js';
 
-export const SALES_TYPES = [['sagawa', '佐川急便'], ['daily', '日当の案件']];
+export const SALES_TYPES = [['sagawa', '佐川急便'], ['daily', 'その他']];
 export const COUNT_KEYS = [['takuhai', '宅配'], ['shogyo', '商業'], ['shuka', '集荷']];
 
 // 佐川急便の商業・集荷の決まった単価（営業所で変わる）
