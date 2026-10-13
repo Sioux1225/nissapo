@@ -339,7 +339,7 @@ export function renderPhotoPage({ title, sub, items }) {
 
 // 売上表（月報）：A4縦。紙の月報と同じ並び（日・曜日・開始・終了・宅配・商業・集荷・稼働距離・金額）
 // head：[{ text, w }]（w は幅の割合）、rows：31行分の文字の配列、foot：合計の行、info：右上・左上の文
-export function renderSalesSheet({ title, ym, name, sub, head, rows, foot, summary, note }) {
+export function renderSalesSheet({ title, ym, name, sub, head, rows, foot, summary, request = '', note }) {
   const W = 1654;
   const H = 2339;
   const canvas = document.createElement('canvas');
@@ -390,8 +390,18 @@ export function renderSalesSheet({ title, ym, name, sub, head, rows, foot, summa
   ctx.textAlign = 'left';
   ctx.font = `700 34px ${FONT}`;
   ctx.fillText(summary, m, sy);
+  let ny = sy + 52;
+  if (request) {
+    // 希望する前払い額（枠で囲んで目立たせる）
+    ctx.font = `700 34px ${FONT}`;
+    const w = ctx.measureText(request).width + 40;
+    ctx.lineWidth = 3;
+    ctx.strokeRect(m, ny - 6, w, 56);
+    ctx.fillText(request, m + 20, ny + 22);
+    ny += 84;
+  }
   ctx.font = `400 24px ${FONT}`;
-  note.forEach((t, i) => ctx.fillText(t, m, sy + 52 + i * 36));
+  note.forEach((t, i) => ctx.fillText(t, m, ny + i * 36));
   return canvas;
 }
 

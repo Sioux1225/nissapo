@@ -3,7 +3,7 @@
 
 import { db, requestPersist } from './db.js';
 import { shrinkImage, newPhoto, blobToDataUrl, dataUrlToBlob } from './photo.js';
-import { SALES_TYPES, COUNT_KEYS, unitPrices, salesReady, monthSales, yen } from './sales.js';
+import { SALES_TYPES, COUNT_KEYS, unitPrices, salesReady, monthSales, yen, defaultShogyo, defaultShuka, advanceKey, advanceOf } from './sales.js';
 import { EXPIRED, expiryStatus, expiryMessage, expiryAlertsToShow } from './expiry.js';
 import { OIL_LIMIT, OIL_STEPS, newOilChange, currentOdo, oilStatus, oilMessage, oilAlertToShow, sortOilChanges } from './oil.js';
 import {
@@ -17,7 +17,7 @@ import {
   KINDS, COLLISIONS, ROAD_TYPES, SLOPES, SHAPES, SURFACES
 } from './accident.js';
 
-export const APP_VERSION = '0.7.0';
+export const APP_VERSION = '0.7.1';
 
 const app = document.getElementById('app');
 const state = {
@@ -170,8 +170,8 @@ function settingsForm(s) {
       ${s.salesType === 'sagawa' ? `
         ${f('salesOffice', '営業所名', 'placeholder="例：○○営業所"')}
         ${f('priceTakuhai', '単価：宅配（円/個）', 'type="number" inputmode="numeric" min="0" placeholder="例：150"')}
-        ${f('priceShogyo', '単価：商業（円/個）', 'type="number" inputmode="numeric" min="0" placeholder="空なら宅配と同じ"')}
-        ${f('priceShuka', '単価：集荷（円/個）', 'type="number" inputmode="numeric" min="0" placeholder="空なら宅配と同じ"')}
+        ${f('priceShogyo', '単価：商業（円/個）', `type="number" inputmode="numeric" min="0" placeholder="空なら ${defaultShogyo(s.salesOffice)}円"`, '入れなければ 100円（三多摩・八王子は 80円）')}
+        ${f('priceShuka', '単価：集荷（円/個）', `type="number" inputmode="numeric" min="0" placeholder="空なら ${defaultShuka(s.salesOffice)}円"`, '入れなければ 100円（台東は 70円）')}
         <p class="field-note pad-note">毎日の配達個数を入れるだけで、売上の合計が出ます。</p>` : ''}
       ${s.salesType === 'daily' ? `
         ${f('salesProject', '所属（案件名）', 'placeholder="例：○○便"')}
@@ -922,6 +922,10 @@ function renderSales() {
         ${t.missing ? `<span class="small warn-text">配達個数がまだの日が ${t.missing}日あります</span>` : ''}
         <span class="small muted">${e(salesSub(s))}</span>
       </section>
+      <section class="card fields">
+        ${field('希望する前払い額（円）', `<input id="advance" data-advance="${advanceKey(y, m)}" value="${advanceOf(s, y, m) ?? ''}" type="number" inputmode="numeric" min="0" placeholder="例：50000">`,
+          advanceOf(s, y, m) != null && advanceOf(s, y, m) > t.amount ? '<span class="warn-text">売上の合計より多い額です</span>' : '社長が売上表を見て、前払いできるかを判断します')}
+      </section>
       <p class="info">前払いは<b>月初めからの売上</b>で計算します。前の月の売上は含めません。${sagawa ? '日ごとの配達個数は、乗務後点呼の画面か、下の一覧で入れられます。' : '運転日報で乗務を記録した日を、日当1日分として数えます。'}</p>
       <button type="button" class="btn-primary" data-action="share-sales">PDFにして社長に送る</button>
       <button type="button" class="btn-text" data-action="preview-sales">画面で確認する</button>
@@ -958,6 +962,7 @@ function salesCanvas() {
     rows,
     foot,
     summary: thisMonth ? `${m}月1日〜${td}日の売上合計：${yen(t.amount)}（前払い申請用）` : `${m}月の売上合計：${yen(t.amount)}`,
+    request: advanceOf(s, y, m) != null ? `希望する前払い額：${yen(advanceOf(s, y, m))}` : '',
     note: [
       `作成日：${ty >= 2019 ? `令和${ty - 2018}年` : `${ty}年`}${tm}月${td}日　前払いは月初めからの売上で計算しています（前月分は含みません）。`,
       ...(t.missing ? [`配達個数が入っていない日が ${t.missing}日あります（その日の金額は含まれていません）。`] : []),
@@ -1489,11 +1494,29 @@ app.addEventListener('input', (ev) => {
     if (out) out.value = odo;
   } else if (t.dataset.setting) {
     state.settings[t.dataset.setting] = t.value;
+    // 営業所名で決まる商業・集荷の単価を、入力欄の例に出す
+    if (t.dataset.setting === 'salesOffice') {
+      const sh = app.querySelector('[data-setting="priceShogyo"]');
+      const sk = app.querySelector('[data-setting="priceShuka"]');
+      if (sh) sh.placeholder = `空なら ${defaultShogyo(t.value)}円`;
+      if (sk) sk.placeholder = `空なら ${defaultShuka(t.value)}円`;
+    }
   }
 });
 
 app.addEventListener('change', async (ev) => {
   const t = ev.target;
+  if (t.dataset.advance) {
+    // 希望する前払い額（月ごと）
+    const s = state.settings;
+    s.advance = { ...(s.advance || {}), [t.dataset.advance]: t.value === '' ? '' : Number(t.value) };
+    await db.putSettings(s);
+    const y = window.scrollY;
+    renderSales();
+    window.scrollTo(0, y);
+    toast('希望する前払い額を保存しました');
+    return;
+  }
   if (t.dataset.salesDate) {
     // 売上表の一覧で入れた配達個数を、その日の記録に保存する
     const rec = findRecord(t.dataset.salesDate);

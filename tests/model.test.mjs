@@ -222,8 +222,15 @@ test('車検・免許証の期限：60・30・14・7日前と期限切れ', asyn
 
 test('売上表：佐川急便は個数×単価、日当は乗務した日×日当、月初めから今日まで', async () => {
   const { monthSales, dayAmount, unitPrices, salesReady } = await import('../js/sales.js');
-  const sg = { ...settings, salesType: 'sagawa', priceTakuhai: '150', priceShogyo: '', priceShuka: '50' };
+  const sg = { ...settings, salesType: 'sagawa', salesOffice: '○○営業所', priceTakuhai: '150', priceShogyo: '150', priceShuka: '50' };
   assert.deepEqual(unitPrices(sg), { takuhai: 150, shogyo: 150, shuka: 50 });
+  // 商業・集荷の決まった単価：商業100円（三多摩・八王子80円）、集荷100円（台東70円）
+  const base = { salesType: 'sagawa', priceTakuhai: '150', priceShogyo: '', priceShuka: '' };
+  assert.deepEqual(unitPrices({ ...base, salesOffice: '練馬営業所' }), { takuhai: 150, shogyo: 100, shuka: 100 });
+  assert.deepEqual(unitPrices({ ...base, salesOffice: '八王子営業所' }), { takuhai: 150, shogyo: 80, shuka: 100 });
+  assert.deepEqual(unitPrices({ ...base, salesOffice: '三多摩' }), { takuhai: 150, shogyo: 80, shuka: 100 });
+  assert.deepEqual(unitPrices({ ...base, salesOffice: '台東営業所' }), { takuhai: 150, shogyo: 100, shuka: 70 });
+  assert.deepEqual(unitPrices({ ...base, salesOffice: '台東営業所', priceShuka: '90' }).shuka, 90);
   assert.equal(salesReady(sg), true);
   assert.equal(salesReady({ ...settings, salesType: 'daily', dailyRate: '' }), false);
   const recs = [
@@ -248,4 +255,13 @@ test('売上表：佐川急便は個数×単価、日当は乗務した日×日�
   // 日当
   const dl = { ...settings, salesType: 'daily', dailyRate: '15000' };
   assert.equal(monthSales(recs, 2026, 10, dl, '2026-10-13').total.amount, 30000);
+});
+
+test('希望する前払い額は月ごと', async () => {
+  const { advanceOf, advanceKey } = await import('../js/sales.js');
+  assert.equal(advanceKey(2026, 9), '2026-09');
+  const s = { advance: { '2026-10': 50000, '2026-09': '' } };
+  assert.equal(advanceOf(s, 2026, 10), 50000);
+  assert.equal(advanceOf(s, 2026, 9), null);
+  assert.equal(advanceOf({}, 2026, 10), null);
 });

@@ -7,14 +7,28 @@ import { num, daysInMonth, dateKey, weekday, distanceOf, isOff } from './model.j
 export const SALES_TYPES = [['sagawa', '佐川急便'], ['daily', '日当の案件']];
 export const COUNT_KEYS = [['takuhai', '宅配'], ['shogyo', '商業'], ['shuka', '集荷']];
 
-// 単価（商業・集荷が空なら宅配と同じ）
+// 佐川急便の商業・集荷の決まった単価（営業所で変わる）
+//   商業：100円（三多摩・八王子は80円）　集荷：100円（台東は70円）
+export function defaultShogyo(office) {
+  return /三多摩|八王子/.test(office || '') ? 80 : 100;
+}
+export function defaultShuka(office) {
+  return /台東/.test(office || '') ? 70 : 100;
+}
+
+// 単価（商業・集荷は、入力がなければ営業所で決まった単価）
 export function unitPrices(settings) {
-  const t = num(settings.priceTakuhai);
   return {
-    takuhai: t,
-    shogyo: num(settings.priceShogyo) ?? t,
-    shuka: num(settings.priceShuka) ?? t
+    takuhai: num(settings.priceTakuhai),
+    shogyo: num(settings.priceShogyo) ?? defaultShogyo(settings.salesOffice),
+    shuka: num(settings.priceShuka) ?? defaultShuka(settings.salesOffice)
   };
+}
+
+// 希望する前払い額（月ごと。キーは 'YYYY-MM'）
+export const advanceKey = (y, m) => `${y}-${String(m).padStart(2, '0')}`;
+export function advanceOf(settings, y, m) {
+  return num((settings.advance || {})[advanceKey(y, m)]);
 }
 
 export function salesReady(settings) {
