@@ -29,6 +29,8 @@ export const DEFAULT_SETTINGS = {
   dailyRate: '',       // 日極（円）
   advance: {},         // 希望する前払い額 { 'YYYY-MM': 円 }
   advanceHistory: {},  // 受けた前払いの履歴 { 'YYYY-MM': [{ id, date, amount }] }
+  leaseCar: '',        // リース車両を利用しているか（'yes'・'no'）
+  advanceBefore: '',   // このアプリを使う前に前払いを使ったことがあるか（'yes'・'no'）
   lastVersion: '',     // 最後に開いたアプリの版（アップデートのお知らせ用）
   retention: '1年間'
 };

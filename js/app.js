@@ -3,7 +3,7 @@
 
 import { db, requestPersist } from './db.js';
 import { shrinkImage, newPhoto, blobToDataUrl, dataUrlToBlob } from './photo.js';
-import { SALES_TYPES, COUNT_KEYS, unitPrices, salesReady, monthSales, yen, defaultShogyo, defaultShuka, advanceKey, advanceOf, advanceHistory, advanceTotal, OFFICES, OTHER_OFFICE, PRICE_TABLE_DATE, officeEntry, officeName, newbiePeriod, newbieSpan } from './sales.js';
+import { SALES_TYPES, COUNT_KEYS, unitPrices, salesReady, monthSales, yen, defaultShogyo, defaultShuka, advanceKey, advanceOf, advanceHistory, advanceTotal, advanceLimit, isFirstAdvanceMonth, OFFICES, OTHER_OFFICE, PRICE_TABLE_DATE, officeEntry, officeName, newbiePeriod, newbieSpan } from './sales.js';
 import { EXPIRED, expiryStatus, expiryMessage, expiryAlertsToShow } from './expiry.js';
 import { OIL_LIMIT, OIL_STEPS, newOilChange, currentOdo, oilStatus, oilMessage, oilAlertToShow, sortOilChanges } from './oil.js';
 import {
@@ -17,7 +17,7 @@ import {
   KINDS, COLLISIONS, ROAD_TYPES, SLOPES, SHAPES, SURFACES
 } from './accident.js';
 
-export const APP_VERSION = '0.10.1';
+export const APP_VERSION = '0.11.0';
 
 const app = document.getElementById('app');
 const state = {
@@ -172,6 +172,10 @@ function settingsForm(s) {
         ${f('salesProject', '所属（案件名）', 'placeholder="例：Amazon"')}
         ${f('dailyRate', '日極（円）', 'type="number" inputmode="numeric" min="0" placeholder="例：15000"')}
         <p class="field-note pad-note">運転日報で乗務を記録した日を、日極1日分として数えます。</p>` : ''}
+      ${s.salesType ? `
+      <div class="field"><span class="field-label">リース車両</span>${[['yes', '利用している'], ['no', '利用していない']].map(([v, t]) => `<button type="button" class="chip" data-setting-seg="leaseCar" data-value="${v}" aria-pressed="${s.leaseCar === v}">${t}</button>`).join('')}</div>
+      <div class="field"><span class="field-label">このアプリを使う前に、前払いを使ったこと</span>${[['yes', 'ある'], ['no', 'ない']].map(([v, t]) => `<button type="button" class="chip" data-setting-seg="advanceBefore" data-value="${v}" aria-pressed="${s.advanceBefore === v}">${t}</button>`).join('')}</div>
+      <p class="field-note pad-note">前払いの対象額の計算に使います（はじめての前払いは、リース車両なら10万円、それ以外は5万円を留保）。</p>` : ''}
     </div>`;
 }
 
@@ -288,6 +292,7 @@ function renderHome() {
       <button type="button" class="btn-outline" data-action="go" data-view="sales">売上表（前払い）</button>
       <button type="button" class="btn-outline" data-action="go" data-view="accidents">事故の記録${state.accidents.length ? `（${state.accidents.length}件）` : ''}</button>
       <button type="button" class="link-btn" data-action="go" data-view="rules">記録の決まり（保存期間・点呼で確かめること）</button>
+      <button type="button" class="link-btn" data-action="go" data-view="rules" data-anchor="advance-rules">前払いのルールと注意事項</button>
       ${installHint()}
     </main>`;
 }
@@ -912,9 +917,22 @@ function salesSub(s, y, m, withOffice = true) {
 }
 
 // その月に受けた前払いの履歴・合計・残り（希望する前払い額の欄の上）
+// 前払いの対象額（前月の売上はアプリの記録から）
+function advanceInfo(s, y, m, salesAmount) {
+  const pd = new Date(y, m - 2, 1);
+  const py = pd.getFullYear();
+  const pm = pd.getMonth() + 1;
+  const prevSales = hasMonth(state.records, py, pm) ? monthSales(state.records, py, pm, s).total.amount : null;
+  const first = isFirstAdvanceMonth(s, y, m);
+  const lim = advanceLimit({ sales: salesAmount, prevSales, first, lease: s.leaseCar === 'yes' });
+  const total = advanceTotal(s, y, m);
+  return { ...lim, first, prevSales, pm, total, remaining: Math.max(0, lim.target - total) };
+}
+
 function advanceSection(s, y, m, salesAmount, today) {
   const list = advanceHistory(s, y, m);
-  const total = advanceTotal(s, y, m);
+  const info = advanceInfo(s, y, m, salesAmount);
+  const total = info.total;
   const def = today.startsWith(`${y}-${pad2(m)}-`) ? today : dateKey(y, m, 1);
   return `<section class="card adv">
     <h2 class="card-title">${m}月の前払い</h2>
@@ -922,9 +940,14 @@ function advanceSection(s, y, m, salesAmount, today) {
         <span>${Number(a.date.slice(5, 7))}/${Number(a.date.slice(8))}</span><b>${yen(a.amount)}</b>
         <button type="button" class="btn-text danger" data-action="delete-advance" data-id="${e(a.id)}">消す</button>
       </div>`).join('') || '<p class="empty">まだ前払いの記録はありません</p>'}</div>
+    <div class="adv-target">
+      <span class="muted">前払いの対象額</span>
+      <b>${yen(info.target)}</b>
+      <span class="small">（売上 ${yen(salesAmount)}${info.reserve ? ` − 留保 ${yen(info.reserve)}` : ''}）× 50%${info.reason ? `<br>留保：${info.reason}${info.prevSales != null && !info.first ? `（${info.pm}月の売上 ${yen(info.prevSales)}）` : ''}` : info.prevSales != null ? `<br>${info.pm}月の売上 ${yen(info.prevSales)}（40万円以上のため留保なし）` : ''}</span>
+    </div>
     <div class="adv-sum">
       <div><span class="muted">前払いの合計</span><b>${yen(total)}</b></div>
-      <div><span class="muted">前払いできる残り</span><b class="${salesAmount - total < 0 ? 'warn-text' : ''}">${yen(salesAmount - total)}</b></div>
+      <div class="adv-rest"><span class="muted">前払いできる残り</span><b class="${info.target - total < 0 ? 'warn-text' : ''}">${yen(info.remaining)}</b></div>
     </div>
     <div class="adv-add">
       <input id="adv-date" type="date" value="${def}" aria-label="前払いを受けた日">
@@ -970,8 +993,8 @@ function renderSales() {
       ${advanceSection(s, y, m, t.amount, today)}
       <section class="card fields">
         ${field('希望する前払い額（円）', `<input id="advance" data-advance="${advanceKey(y, m)}" value="${advanceOf(s, y, m) ?? ''}" type="number" inputmode="numeric" min="0" placeholder="例：50000">`,
-          advanceOf(s, y, m) != null && advanceOf(s, y, m) > t.amount - advanceTotal(s, y, m)
-            ? `<span class="warn-text">${advanceTotal(s, y, m) ? '前払いできる残り' : '売上の合計'}より多い額です</span>` : '')}
+          advanceOf(s, y, m) != null && advanceOf(s, y, m) > advanceInfo(s, y, m, t.amount).remaining
+            ? '<span class="warn-text">前払いできる残りより多い額です</span>' : '')}
       </section>
       <p class="info">前払いは<b>月初めからの売上</b>で計算します。${sagawa ? '日ごとの配達個数は、乗務後点呼の画面か、下の一覧で入れられます。' : '運転日報で乗務を記録した日を、日極1日分として数えます。'}</p>
       <button type="button" class="btn-primary" data-action="share-sales">PDFにしてLINEで送る</button>
@@ -1112,15 +1135,16 @@ function renderRules() {
       <p class="info">決まりは法令の改正で変わることがあります。くわしくは事務所か運輸支局に確かめてください。<br>
         出典：<a href="https://www.mlit.go.jp/report/press/jidosha02_hh_000665.html" target="_blank" rel="noopener">国土交通省「貨物軽自動車運送事業者に対する規制の適正化」</a></p>
 
-      <h1 class="rules-h1">前払いのルールと注意事項</h1>
+      <h1 class="rules-h1" id="advance-rules">前払いのルールと注意事項</h1>
 
       <h2 class="section-title">前払いできる金額（対象額）</h2>
       <div class="card pad">
         <ul class="rule-list">
-          <li><b>リース車を利用している方</b>は、はじめての前払いに限り、まず売上のうち<b>10万円を留保</b>します。それを超えた売上の<b>50%</b>が前払いの対象額です。</li>
+          <li><b>はじめての前払い</b>は、まず売上のうち<b>留保額</b>を差し引きます。留保額は、<b>リース車両を利用している方は10万円</b>、<b>車両持ち込みの方は5万円</b>です。それを超えた売上の<b>50%</b>が前払いの対象額です。</li>
           <li><b>翌月以降</b>は、その月の売上の<b>50%</b>が前払いの対象額です。</li>
           <li>ただし、<b>前月の売上が40万円に届かなかった場合</b>は、<b>5万円の留保</b>が必要です。</li>
           <li>前払いは<b>当月分を当月中にだけ</b>申請できます。月が変わるとリセットされ、元には戻せません。</li>
+          <li>このアプリでは、<b>売上表（前払い）</b>の画面で、前払いの対象額と前払いできる残りを自動で計算します（リース車両かどうかは設定で選びます）。</li>
         </ul>
       </div>
 
@@ -1165,7 +1189,7 @@ function render() {
   (views[state.view] || renderHome)();
 }
 
-function go(view, { push = true } = {}) {
+function go(view, { push = true, anchor = '' } = {}) {
   state.view = view;
   if (view === 'oil') state.oilElement = null; // エレメントの選択は、開くたびに初期値から
   if (view === 'list' && !state.month) {
@@ -1184,7 +1208,9 @@ function go(view, { push = true } = {}) {
   // スマホの「戻る」でホームに戻れるようにする
   if (push && view !== 'home') history.pushState({ view }, '');
   render();
-  window.scrollTo(0, 0);
+  const target = anchor && document.getElementById(anchor);
+  if (target) target.scrollIntoView();
+  else window.scrollTo(0, 0);
 }
 
 window.addEventListener('popstate', () => {
@@ -1454,7 +1480,7 @@ app.addEventListener('click', async (ev) => {
   const { action } = el.dataset;
   if (action === 'go') {
     if (el.dataset.view === 'home' || el.dataset.view === state.back) history.back();
-    else go(el.dataset.view);
+    else go(el.dataset.view, { anchor: el.dataset.anchor || '' });
   } else if (action === 'open-start') openEntry(el.dataset.date, 'start');
   else if (action === 'open-end') openEntry(el.dataset.date, 'end');
   else if (action === 'open-day') openEntry(el.dataset.date, 'day', el.dataset.back || 'home');

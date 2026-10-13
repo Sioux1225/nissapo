@@ -380,3 +380,23 @@ test('前払いの履歴と合計（月ごと）', async () => {
   assert.equal(advanceTotal(s, 2026, 11), 0);
   assert.equal(advanceTotal({}, 2026, 10), 0);
 });
+
+test('前払いの対象額：留保額と50%', async () => {
+  const { advanceLimit, isFirstAdvanceMonth } = await import('../js/sales.js');
+  // はじめて：リース車両は10万円、それ以外は5万円を留保
+  assert.deepEqual(advanceLimit({ sales: 300000, prevSales: null, first: true, lease: true }), { reserve: 100000, reason: 'はじめての前払い（リース車両）', base: 200000, target: 100000 });
+  assert.equal(advanceLimit({ sales: 300000, prevSales: null, first: true, lease: false }).target, 125000);
+  // 2回目以降：前月40万円以上は留保なし、未満・記録なしは5万円
+  assert.equal(advanceLimit({ sales: 300000, prevSales: 400000, first: false }).target, 150000);
+  assert.equal(advanceLimit({ sales: 300000, prevSales: 399999, first: false }).target, 125000);
+  assert.equal(advanceLimit({ sales: 300000, prevSales: null, first: false }).reserve, 50000);
+  // 売上が留保額より少なければ0
+  assert.equal(advanceLimit({ sales: 40000, prevSales: null, first: true, lease: false }).target, 0);
+  assert.equal(advanceLimit({ sales: 100001, prevSales: 500000, first: false }).target, 50000); // 円未満は切り捨て
+  // はじめての月の判断
+  const h = { advanceHistory: { '2026-09': [{ id: 'a', date: '2026-09-10', amount: 10000 }] } };
+  assert.equal(isFirstAdvanceMonth(h, 2026, 9), true); // 9月が最初の前払いの月
+  assert.equal(isFirstAdvanceMonth(h, 2026, 10), false);
+  assert.equal(isFirstAdvanceMonth({}, 2026, 10), true);
+  assert.equal(isFirstAdvanceMonth({ advanceBefore: 'yes' }, 2026, 10), false);
+});

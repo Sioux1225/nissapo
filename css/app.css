@@ -344,8 +344,9 @@ button:focus-visible { outline: 3px solid var(--blue); outline-offset: 2px; }
 .adv-row .btn-text { min-height: 40px; }
 .adv-sum { display: grid; grid-template-columns: 1fr 1fr; border-top: 1px solid var(--line-soft); }
 .adv-sum > div { padding: 10px 16px; display: flex; flex-direction: column; }
-.adv-sum > div + div { border-left: 1px solid var(--line-soft); }
+.adv-sum > div + div:not(.adv-rest) { border-left: 1px solid var(--line-soft); }
 .adv-sum b { font-size: 20px; font-variant-numeric: tabular-nums; }
+.adv-sum > .adv-rest { border: 2px solid var(--warn); border-radius: 12px; margin: 6px 8px 8px 0; padding: 6px 12px; }
 .adv-add { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 8px; padding: 12px 16px 14px; border-top: 1px solid var(--line-soft); }
 .adv-add input { min-width: 0; max-width: 100%; min-height: 48px; height: 48px; border: 1px solid var(--line-strong); border-radius: 12px; background: var(--card); padding: 0 10px; font-size: 16px; font-weight: 600; -webkit-appearance: none; appearance: none; line-height: 46px; }
 .adv-add .btn-outline { grid-column: 1 / -1; }
@@ -353,3 +354,5 @@ button:focus-visible { outline: 3px solid var(--blue); outline-offset: 2px; }
 /* 記録の決まり：前払いのルール */
 .rules-h1 { font-size: 20px; font-weight: 800; margin: 18px 4px 0; padding-top: 16px; border-top: 2px solid var(--line); }
 .fee-ex { background: var(--orange-tint); border-radius: 12px; padding: 10px 12px; display: flex; flex-direction: column; gap: 4px; }
+.adv-target { display: flex; flex-direction: column; gap: 2px; padding: 10px 16px; border-top: 1px solid var(--line-soft); background: var(--orange-tint); }
+.adv-target b { font-size: 24px; font-variant-numeric: tabular-nums; }

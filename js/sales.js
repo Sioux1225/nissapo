@@ -112,6 +112,37 @@ export function advanceTotal(settings, y, m) {
   return advanceHistory(settings, y, m).reduce((t, a) => t + (num(a.amount) || 0), 0);
 }
 
+// ---- 前払いの対象額 ----
+// 対象額 ＝（その月の売上 − 留保額）× 50%
+//   はじめての前払いの月：リース車両を利用している方は10万円、それ以外の方は5万円を留保
+//   2回目以降の月：前月の売上が40万円未満なら5万円を留保（前月の記録がないときも念のため5万円）
+export const ADVANCE_RATE = 0.5;
+
+// はじめての前払いの月か（このアプリを使う前に前払いを使ったことがあれば、はじめてではない）
+export function isFirstAdvanceMonth(settings, y, m) {
+  if (settings.advanceBefore === 'yes') return false;
+  const key = advanceKey(y, m);
+  return !Object.entries(settings.advanceHistory || {}).some(([k, list]) => k < key && (list || []).length > 0);
+}
+
+// sales：その月の売上、prevSales：前月の売上（記録がなければ null）
+export function advanceLimit({ sales, prevSales, first, lease }) {
+  let reserve = 0;
+  let reason = '';
+  if (first) {
+    reserve = lease ? 100000 : 50000;
+    reason = lease ? 'はじめての前払い（リース車両）' : 'はじめての前払い（車両持ち込み）';
+  } else if (prevSales == null) {
+    reserve = 50000;
+    reason = '前月の記録がないため';
+  } else if (prevSales < 400000) {
+    reserve = 50000;
+    reason = '前月の売上が40万円未満';
+  }
+  const base = Math.max(0, sales - reserve);
+  return { reserve, reason, base, target: Math.floor(base * ADVANCE_RATE) };
+}
+
 export function salesReady(settings) {
   if (settings.salesType === 'sagawa') return unitPrices(settings).takuhai != null;
   if (settings.salesType === 'daily') return num(settings.dailyRate) != null;
