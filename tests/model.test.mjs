@@ -119,3 +119,35 @@ test('事故の記録：様式の項目・別紙・報告が必要な事故・Ex
   assert.ok(csv[1].includes('"右折時に対向車と接触, けが人なし"'));
   assert.ok(csv[1].includes(',14:05,'));
 });
+
+test('オイル交換：走行距離・お知らせの目安・5,000kmを超えたら毎回', async () => {
+  const { oilStatus, oilAlertToShow, oilMessage, currentOdo, newOilChange } = await import('../js/oil.js');
+  const recs = (odo) => [{ date: '2026-10-01', start: { odo: odo - 100 }, end: { odo } }];
+  const change = { ...newOilChange('2026-09-01', 10000), id: 'oil-1' };
+  const s = { ...settings, oilChanges: [change], oilAck: null };
+  assert.equal(currentOdo(recs(12999), s), 12999);
+  assert.equal(currentOdo([], { initialOdo: 5000 }), 5000);
+
+  // 3,000km 未満はお知らせなし
+  assert.equal(oilStatus(s, recs(12999)).level, 0);
+  assert.equal(oilAlertToShow(s, oilStatus(s, recs(12999))), null);
+  // 3,000km・3,500km・4,000km・4,500km・5,000km
+  for (const [odo, level] of [[13000, 3000], [13600, 3500], [14000, 4000], [14500, 4500], [15000, 5000]]) {
+    assert.equal(oilStatus(s, recs(odo)).level, level);
+  }
+  assert.equal(oilStatus(s, recs(14600)).remaining, 400);
+  // 一度見せた目安は、次の目安を超えるまで見せない
+  const st = oilStatus(s, recs(13100));
+  assert.ok(oilAlertToShow(s, st));
+  const acked = { ...s, oilAck: { changeId: 'oil-1', level: 3000 } };
+  assert.equal(oilAlertToShow(acked, st), null);
+  assert.ok(oilAlertToShow(acked, oilStatus(acked, recs(13500))));
+  // 5,000km を超えたら毎回見せる
+  const over = { ...s, oilAck: { changeId: 'oil-1', level: 5000 } };
+  assert.equal(oilAlertToShow(over, oilStatus(over, recs(15200))).danger, true);
+  assert.match(oilMessage(oilStatus(s, recs(14600))).text, /あと 400km/);
+  // 交換を記録したら距離は0から
+  const s2 = { ...s, oilChanges: [change, { ...newOilChange('2026-10-01', 15200), id: 'oil-2' }] };
+  assert.equal(oilStatus(s2, recs(15300)).since, 100);
+  assert.equal(oilStatus({ ...settings, oilChanges: [] }, recs(15300)).last, null);
+});

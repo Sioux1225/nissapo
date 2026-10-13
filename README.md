@@ -22,6 +22,7 @@
 | `js/xlsx.js` | Excel（.xlsx）を作る（zip も自前） |
 | `js/accident.js` | 事故の記録（輸送安全規則 第九条の二の8項目・3年保存）と、その Excel・CSV |
 | `js/photo.js` | 事故の写真（縮小して端末内に保存・バックアップ用の変換） |
+| `js/oil.js` | オイル交換（前回からの走行距離・3,000〜4,500km のお知らせ・5,000km までに交換） |
 | `js/pdf.js` | 帳票を画像に描いて A4横の PDF にする |
 | `js/db.js` | 端末内データベース（IndexedDB） |
 | `sw.js` / `manifest.webmanifest` | オフライン対応・ホーム画面への追加 |

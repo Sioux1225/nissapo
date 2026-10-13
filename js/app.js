@@ -3,6 +3,7 @@
 
 import { db, requestPersist } from './db.js';
 import { shrinkImage, newPhoto, blobToDataUrl, dataUrlToBlob } from './photo.js';
+import { OIL_LIMIT, OIL_STEPS, newOilChange, currentOdo, oilStatus, oilMessage, oilAlertToShow, sortOilChanges } from './oil.js';
 import {
   DEFAULT_SETTINGS, METHODS, newStart, newEnd, todayKey, nowTime, isTime, num, distanceOf, prevOdo,
   monthSheets, yearSheets, hasMonth, toCsv, daysInMonth, dateKey, weekday, pad2
@@ -14,7 +15,7 @@ import {
   KINDS, COLLISIONS, ROAD_TYPES, SLOPES, SHAPES, SURFACES
 } from './accident.js';
 
-export const APP_VERSION = '0.4.4';
+export const APP_VERSION = '0.5.0';
 
 const app = document.getElementById('app');
 const state = {
@@ -63,14 +64,15 @@ function toast(msg) {
 }
 
 // 確認の画面（ブラウザの confirm は使えない環境があるので、画面の中に出す）
-function ask(message, okLabel, danger = false) {
+function ask(message, okLabel, danger = false, cancelLabel = 'やめる', title = '') {
   return new Promise((resolve) => {
     const box = document.createElement('div');
     box.className = 'dialog';
     box.innerHTML = `<div class="dialog-box" role="alertdialog" aria-modal="true">
+      ${title ? `<h2 class="dialog-title ${danger ? 'danger' : ''}">${e(title)}</h2>` : ''}
       <p>${e(message)}</p>
       <div class="btn-row two">
-        <button type="button" class="btn-outline" data-answer="no">やめる</button>
+        <button type="button" class="btn-outline" data-answer="no">${e(cancelLabel)}</button>
         <button type="button" class="${danger ? 'btn-danger' : 'btn-primary'}" data-answer="yes">${e(okLabel)}</button>
       </div></div>`;
     box.addEventListener('click', (ev) => {
@@ -182,6 +184,7 @@ function renderSettings() {
         <button type="button" class="btn-outline" data-action="backup">バックアップを作る</button>
         <button type="button" class="btn-outline" data-action="restore">バックアップから戻す</button>
       </div>
+      <button type="button" class="btn-outline" data-action="go" data-view="oil">オイル交換の記録</button>
       <button type="button" class="btn-outline" data-action="go" data-view="rules">記録の決まり（保存期間など）</button>
       <p class="info center">日報サポート v${APP_VERSION}</p>
     </main>`;
@@ -237,6 +240,7 @@ function renderHome() {
         ${status(!!rec?.end, '乗務後点呼', rec?.end?.time)}
       </section>
       ${main}
+      ${oilCard()}
       <section class="card month-sum">
         <div><span class="muted">${m}月の出勤</span><b>${workDays}<small>日</small></b></div>
         <div><span class="muted">${m}月の走行</span><b>${km.toLocaleString('ja-JP')}<small>km</small></b></div>
@@ -277,6 +281,7 @@ function startSection(full) {
       ${segField('健康状態', 'start.health', ['良好', '不良'])}
       ${segField('日常点検', 'start.inspection', ['良好', '不良'])}
       ${warn}
+      ${oilWarnInEntry()}
       ${field('出発時のメーター（km）', input('start.odo', 'type="number" inputmode="numeric" min="0"'), '前の日の終了距離が入っています')}
       <details class="more" ${full ? 'open' : ''}>
         <summary>そのほかの項目（ふだんは変更不要）</summary>
@@ -707,6 +712,111 @@ async function accidentCanvases(a) {
 
 const accFileName = (a) => `事故の記録_${a.date.replace(/-/g, '')}_${safeName(a.driverName)}`;
 
+// ---- オイル交換 ----
+
+const kmText = (v) => `${Number(v).toLocaleString('ja-JP')}km`;
+
+// 0〜5,000km のバー（3,000km からの目安に目盛り）
+function oilBar(st) {
+  const pct = Math.min(100, (st.since / OIL_LIMIT) * 100);
+  const cls = st.level >= 4500 ? 'danger' : st.level >= 3000 ? 'caution' : '';
+  return `<div class="oil-bar ${cls}" role="img" aria-label="前回の交換から${kmText(st.since)}（5,000kmまで）">
+    <div class="oil-fill" style="width:${pct}%"></div>
+    ${OIL_STEPS.map((s) => `<span class="oil-tick" style="left:${(s / OIL_LIMIT) * 100}%"></span>`).join('')}
+  </div>
+  <div class="oil-scale"><span>0</span><span style="left:60%">3,000</span><span style="left:100%">5,000km</span></div>`;
+}
+
+function oilCard() {
+  const st = oilStatus(state.settings, state.records);
+  if (!st.last) {
+    return `<button type="button" class="card pad oil-card empty-oil" data-action="go" data-view="oil">
+      <span class="oil-head"><b>オイル交換</b><span class="muted">まだ記録がありません</span></span>
+      <span class="small">前回オイル交換をした日とメーターを記録すると、3,000km から交換の時期をお知らせします。</span>
+    </button>`;
+  }
+  const msg = oilMessage(st);
+  return `<button type="button" class="card pad oil-card ${st.level >= 4500 ? 'danger' : st.level >= 3000 ? 'caution' : ''}" data-action="go" data-view="oil">
+    <span class="oil-head"><b>オイル交換</b><span class="oil-num">前回から <b>${kmText(st.since)}</b></span></span>
+    ${oilBar(st)}
+    <span class="small">${msg ? `<b>${e(msg.title)}</b>　` : ''}${st.remaining > 0 ? `5,000km まで あと ${kmText(st.remaining)}` : `5,000km を ${kmText(-st.remaining)} 超えています`}</span>
+  </button>`;
+}
+
+function oilWarnInEntry() {
+  if (state.mode !== 'start') return '';
+  const st = oilStatus(state.settings, state.records);
+  if (st.level < 4500) return '';
+  return `<p class="warn">オイル交換：前回から ${kmText(st.since)}。${st.level >= OIL_LIMIT ? '5,000km を超えています。すぐに交換してください。' : `5,000km まで あと ${kmText(st.remaining)}。必ず交換してください。`}</p>`;
+}
+
+function renderOil() {
+  const s = state.settings;
+  const st = oilStatus(s, state.records);
+  const changes = sortOilChanges(s.oilChanges).reverse();
+  const nowOdo = currentOdo(state.records, s);
+  const msg = oilMessage(st);
+  app.innerHTML = `
+    <main class="screen form">
+      ${head('オイル交換')}
+      ${st.last ? `<section class="card pad oil-status ${st.level >= 4500 ? 'danger' : st.level >= 3000 ? 'caution' : ''}">
+        <span class="muted">前回のオイル交換から</span>
+        <b class="oil-big">${kmText(st.since)}</b>
+        ${oilBar(st)}
+        <p class="small">${msg ? `<b>${e(msg.title)}</b><br>` : ''}${st.remaining > 0 ? `5,000km まで あと <b>${kmText(st.remaining)}</b>` : `5,000km を ${kmText(-st.remaining)} 超えています`}</p>
+      </section>` : ''}
+      <p class="info">前回の交換から <b>3,000km・3,500km・4,000km・4,500km</b> を超えるとお知らせします。<b>5,000km までに必ず</b>オイル交換をしてください。走った距離は、運転日報のメーターから計算します。</p>
+
+      <h2 class="section-title">オイル交換をしたら記録する</h2>
+      <section class="card fields">
+        ${field('交換した日', `<input id="oil-date" type="date" value="${todayKey()}">`)}
+        ${field('交換したときのメーター（km）', `<input id="oil-odo" type="number" inputmode="numeric" min="0" value="${nowOdo ?? ''}">`, '運転日報のいちばん新しいメーターが入っています。違うときは直してください')}
+        ${field('メモ（任意）', '<input id="oil-note" placeholder="例：○○カーショップ、エレメントも交換">')}
+      </section>
+      <button type="button" class="btn-primary" data-action="save-oil">オイル交換を記録する</button>
+
+      <h2 class="section-title">これまでの記録</h2>
+      <div class="card list">${changes.map((c, i) => {
+        const prev = changes[i + 1];
+        return `<div class="row oil-row">
+          <span class="row-main">
+            <span class="row-title">${e(c.date.replace(/-/g, '/'))}　${kmText(c.odo)}</span>
+            <span class="row-text">${prev ? `前回から ${kmText(c.odo - prev.odo)}` : '最初の記録'}${c.note ? `　${e(c.note)}` : ''}</span>
+          </span>
+          <button type="button" class="btn-text danger" data-action="delete-oil" data-id="${e(c.id)}">消す</button>
+        </div>`;
+      }).join('') || '<p class="empty">まだ記録がありません</p>'}</div>
+    </main>`;
+}
+
+async function saveOil() {
+  const date = document.getElementById('oil-date').value;
+  const odo = num(document.getElementById('oil-odo').value);
+  const note = document.getElementById('oil-note').value.trim();
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) { toast('交換した日を入れてください'); return; }
+  if (odo == null) { toast('交換したときのメーターを入れてください'); return; }
+  const s = state.settings;
+  s.oilChanges = [...(s.oilChanges || []), newOilChange(date, odo, note)];
+  s.oilAck = null;
+  await db.putSettings(s);
+  toast('オイル交換を記録しました');
+  renderOil();
+  window.scrollTo(0, 0);
+}
+
+// オイル交換のお知らせ（まだ見せていない目安を超えたとき。5,000km を超えたら毎回）
+async function checkOil() {
+  const s = state.settings;
+  const st = oilStatus(s, state.records);
+  const msg = oilAlertToShow(s, st);
+  if (!msg || document.querySelector('.dialog')) return;
+  if (st.level < OIL_LIMIT) {
+    s.oilAck = { changeId: st.last.id, level: st.level };
+    await db.putSettings(s);
+  }
+  if (await ask(msg.text, 'オイル交換を記録する', msg.danger, 'あとで', msg.title)) go('oil');
+}
+
 // ---- 画面：記録の決まり ----
 
 function renderRules() {
@@ -769,7 +879,7 @@ function renderRules() {
 
 function render() {
   if (state.view !== 'setup' && !state.settings.driverName) state.view = 'setup';
-  const views = { accidents: renderAccidents, accident: renderAccidentForm, rules: renderRules, setup: renderSetup, settings: renderSettings, home: renderHome, entry: renderEntry, list: renderList, export: renderExport };
+  const views = { oil: renderOil, accidents: renderAccidents, accident: renderAccidentForm, rules: renderRules, setup: renderSetup, settings: renderSettings, home: renderHome, entry: renderEntry, list: renderList, export: renderExport };
   (views[state.view] || renderHome)();
 }
 
@@ -842,6 +952,7 @@ async function saveEntry() {
   await reload();
   toast(state.mode === 'start' ? '乗務前点呼を記録しました' : state.mode === 'end' ? '乗務後点呼を記録しました。おつかれさまでした' : '記録しました');
   history.back();
+  setTimeout(checkOil, 400);
 }
 
 async function reload() {
@@ -1050,6 +1161,15 @@ app.addEventListener('click', async (ev) => {
   else if (action === 'new-accident') openAccident(null);
   else if (action === 'open-accident') openAccident(el.dataset.id);
   else if (action === 'save-accident') runBusy(saveAccident);
+  else if (action === 'save-oil') runBusy(saveOil);
+  else if (action === 'delete-oil') {
+    const c = state.settings.oilChanges.find((x) => x.id === el.dataset.id);
+    if (!c || !(await ask(`${c.date.replace(/-/g, '/')}（${kmText(c.odo)}）のオイル交換の記録を消します。`, '消す', true))) return;
+    state.settings.oilChanges = state.settings.oilChanges.filter((x) => x.id !== c.id);
+    state.settings.oilAck = null;
+    await db.putSettings(state.settings);
+    renderOil();
+  }
   else if (action === 'add-photo') photoInput.click();
   else if (action === 'view-photo') viewPhoto(el.dataset.id);
   else if (action === 'delete-photo') {
@@ -1200,6 +1320,7 @@ async function start() {
   history.replaceState({ view: 'home' }, '');
   render();
   setupUpdates();
+  if (state.view === 'home') setTimeout(checkOil, 600);
 }
 
 start();

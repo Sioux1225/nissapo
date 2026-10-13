@@ -13,6 +13,8 @@ export const DEFAULT_SETTINGS = {
   method: 'LINE',      // 点呼方法
   rollcaller: '',      // 点呼実施者名
   initialOdo: null,    // 使い始めたときのメーターの距離
+  oilChanges: [],      // オイル交換の記録 [{ id, date, odo, note }]
+  oilAck: null,        // 見せたオイル交換のお知らせ { changeId, level }
   retention: '1年間'
 };
 
