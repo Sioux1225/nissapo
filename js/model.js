@@ -28,6 +28,7 @@ export const DEFAULT_SETTINGS = {
   salesProject: '',    // 日当の案件の所属（案件名）
   dailyRate: '',       // 日当（円）
   advance: {},         // 希望する前払い額 { 'YYYY-MM': 円 }
+  lastVersion: '',     // 最後に開いたアプリの版（アップデートのお知らせ用）
   retention: '1年間'
 };
 

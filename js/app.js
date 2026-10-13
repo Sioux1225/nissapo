@@ -17,7 +17,7 @@ import {
   KINDS, COLLISIONS, ROAD_TYPES, SLOPES, SHAPES, SURFACES
 } from './accident.js';
 
-export const APP_VERSION = '0.9.8';
+export const APP_VERSION = '0.9.9';
 
 const app = document.getElementById('app');
 const state = {
@@ -1610,6 +1610,13 @@ async function start() {
   history.replaceState({ view: 'home' }, '');
   render();
   setupUpdates();
+  // 新しい版で初めて開いたときに知らせる（開き直すとその時点で最新版になるため、更新のお知らせが出ないことがある）
+  const s = state.settings;
+  if (s.lastVersion !== APP_VERSION) {
+    if (s.lastVersion && s.driverName) toast(`v${APP_VERSION} にアップデートしました`);
+    s.lastVersion = APP_VERSION;
+    db.putSettings(s).catch(() => {});
+  }
   if (state.view === 'home') setTimeout(runAlerts, 600);
 }
 
