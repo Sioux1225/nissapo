@@ -206,3 +206,15 @@ button:focus-visible { outline: 3px solid var(--blue); outline-offset: 2px; }
 /* 画面で確認する */
 .preview { display: flex; flex-direction: column; gap: 12px; }
 .preview img { width: 100%; border: 1px solid var(--line-strong); border-radius: 6px; background: #FFF; }
+
+/* 記録の決まり */
+.link-btn { border: none; background: transparent; color: var(--orange-text); font-size: 14px; font-weight: 600; text-decoration: underline; text-underline-offset: 3px; cursor: pointer; min-height: 44px; padding: 0 4px; }
+.link-btn.inline { min-height: 0; padding: 0; margin-left: 4px; font-size: 13px; }
+.rules { display: flex; flex-direction: column; }
+.rule { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 14px 16px; }
+.rule + .rule { border-top: 1px solid var(--line-soft); }
+.rule-name { font-weight: 600; display: flex; flex-direction: column; }
+.rule-name small { font-size: 12px; font-weight: 400; color: var(--sub); }
+.rule-term { font-size: 20px; font-weight: 800; color: var(--orange-text); white-space: nowrap; }
+.rule-list { margin: 0; padding-left: 1.3em; display: flex; flex-direction: column; gap: 6px; font-size: 14px; line-height: 1.6; }
+.info a { color: var(--orange-text); }

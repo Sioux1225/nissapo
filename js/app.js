@@ -9,7 +9,7 @@ import {
 import { buildXlsx } from './xlsx.js';
 import { specsToPdf, renderSheet } from './pdf.js';
 
-export const APP_VERSION = '0.1.1';
+export const APP_VERSION = '0.1.2';
 
 const app = document.getElementById('app');
 const state = {
@@ -174,6 +174,7 @@ function renderSettings() {
         <button type="button" class="btn-outline" data-action="backup">バックアップを作る</button>
         <button type="button" class="btn-outline" data-action="restore">バックアップから戻す</button>
       </div>
+      <button type="button" class="btn-outline" data-action="go" data-view="rules">記録の決まり（保存期間など）</button>
       <p class="info center">日報サポート v${APP_VERSION}</p>
     </main>`;
 }
@@ -236,6 +237,7 @@ function renderHome() {
         <button type="button" class="btn-outline" data-action="go" data-view="list">記録の一覧</button>
         <button type="button" class="btn-outline" data-action="go" data-view="export">書き出し・共有</button>
       </div>
+      <button type="button" class="link-btn" data-action="go" data-view="rules">記録の決まり（保存期間・点呼で確かめること）</button>
       ${installHint()}
     </main>`;
 }
@@ -410,7 +412,64 @@ function renderExport() {
       <button type="button" class="${canShare ? 'btn-outline' : 'btn-primary'}" data-action="export" data-how="save">このスマホに保存する</button>
       <button type="button" class="btn-text" data-action="preview">画面で確認する</button>
       <p class="info">${canShare ? '事務所に送るときは「共有する」を押して、LINEやメールを選んでください。' : '保存したファイルを、LINEやメールに添付して事務所に送ってください。'}</p>
+      <p class="info">運転日報・点呼記録簿は<b>1年間</b>の保存が決まりです。毎月送って、事務所で保管してください。<button type="button" class="link-btn inline" data-action="go" data-view="rules">記録の決まり</button></p>
       <div id="preview" class="preview"></div>
+    </main>`;
+}
+
+// ---- 画面：記録の決まり ----
+
+function renderRules() {
+  app.innerHTML = `
+    <main class="screen">
+      ${head('記録の決まり')}
+      <p class="small">軽貨物（貨物軽自動車運送事業）の運転日報と点呼記録簿には、国の決まり（貨物自動車運送事業輸送安全規則）があります。</p>
+
+      <h2 class="section-title">保存しておく期間</h2>
+      <div class="card list rules">
+        <div class="rule"><span class="rule-name">点呼記録簿</span><span class="rule-term">1年間</span></div>
+        <div class="rule"><span class="rule-name">運転日報（業務記録）<small>2025年4月から義務</small></span><span class="rule-term">1年間</span></div>
+        <div class="rule"><span class="rule-name">事故の記録<small>2025年4月から義務</small></span><span class="rule-term">3年間</span></div>
+      </div>
+
+      <h2 class="section-title">点呼で確かめること</h2>
+      <div class="card pad">
+        <p class="small"><b>乗務前（出発するとき）</b></p>
+        <ul class="rule-list">
+          <li>酒気帯びの有無（<b>アルコール検知器を使う</b>）</li>
+          <li>健康状態（病気・疲れ・睡眠不足などで、安全に運転できないおそれがないか）</li>
+          <li>日常点検の結果</li>
+        </ul>
+        <p class="small"><b>乗務後（帰ってきたとき）</b></p>
+        <ul class="rule-list">
+          <li>酒気帯びの有無（<b>アルコール検知器を使う</b>）</li>
+          <li>車両・道路・運行の状況の報告</li>
+        </ul>
+        <p class="small muted">点呼でのアルコール検知器の使用は、2011年4月から義務です。酒気帯びがあるときは乗務できません。</p>
+      </div>
+
+      <h2 class="section-title">運転日報に書くこと</h2>
+      <div class="card pad">
+        <p class="small">乗務を始めた・終えた地点と時刻、主な経過地点、走行距離、休憩、荷役作業や荷主都合の待機、事故・異常など。このアプリの入力項目で、すべて書けます。</p>
+      </div>
+
+      <h2 class="section-title">このアプリでの保存</h2>
+      <div class="card pad">
+        <ul class="rule-list">
+          <li>記録はこのスマホの中だけにあります。<b>毎月「書き出し・共有」で事務所に送ってください。</b></li>
+          <li>事務所は、受け取った Excel・PDF を<b>1年間</b>保管します。</li>
+          <li>アプリの記録は、自分で消さないかぎり残ります。1年たっていない記録は消さないでください。</li>
+          <li>スマホを替える・アプリを消す前に、設定から<b>バックアップ</b>を作ってください。</li>
+        </ul>
+      </div>
+
+      <h2 class="section-title">事故が起きたら</h2>
+      <div class="card pad">
+        <p class="small">すぐに事務所（運行管理者）に連絡してください。事故の記録（概要・原因・再発防止策）は3年間保存します。けが人が出た事故など一定の事故は、国への報告が必要です（事務所が行います）。</p>
+      </div>
+
+      <p class="info">決まりは法令の改正で変わることがあります。くわしくは事務所か運輸支局に確かめてください。<br>
+        出典：<a href="https://www.mlit.go.jp/report/press/jidosha02_hh_000665.html" target="_blank" rel="noopener">国土交通省「貨物軽自動車運送事業者に対する規制の適正化」</a></p>
     </main>`;
 }
 
@@ -418,7 +477,7 @@ function renderExport() {
 
 function render() {
   if (state.view !== 'setup' && !state.settings.driverName) state.view = 'setup';
-  const views = { setup: renderSetup, settings: renderSettings, home: renderHome, entry: renderEntry, list: renderList, export: renderExport };
+  const views = { rules: renderRules, setup: renderSetup, settings: renderSettings, home: renderHome, entry: renderEntry, list: renderList, export: renderExport };
   (views[state.view] || renderHome)();
 }
 
