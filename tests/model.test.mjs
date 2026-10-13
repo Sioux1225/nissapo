@@ -86,17 +86,36 @@ test('PDF：ページ数と終わりの印', () => {
   assert.equal(pdf.slice(start, start + 4), 'xref');
 });
 
-test('事故の記録：Excel・CSV・入力チェック', async () => {
-  const { newAccident, accidentSheet, accidentCsv, validateAccident } = await import('../js/accident.js');
-  const a = { ...newAccident(settings, '2026-10-13', '14:05'), place: '八王子市中野町', summary: '右折時に対向車と接触, けが人なし', cause: '確認不足', prevention: '一時停止して確認' };
-  assert.equal(validateAccident({ ...a, summary: '' }), '事故の概要を入れてください');
+test('事故の記録：様式の項目・別紙・報告が必要な事故・Excel・CSV', async () => {
+  const { newAccident, normalizeAccident, needsReport, annexLines, wareki, planFromRecord, accidentSheet, accidentCsv, validateAccident } = await import('../js/accident.js');
+  const a = { ...newAccident(settings, '2026-10-13', '14:05'), place: '八王子市中野町', situation: '右折時に対向車と接触, けが人なし', kind: '物損', cause: '確認不足', prevention: '一時停止して確認' };
+  assert.equal(validateAccident({ ...a, situation: '' }), '当時の状況を入れてください');
   assert.equal(validateAccident(a), null);
+  assert.equal(wareki('2026-07-30'), '令和8年7月30日');
+  assert.equal(wareki('2019-05-01'), '令和元年5月1日');
+
+  // 報告が必要な事故：軽傷1人だけなら不要、重傷・転落・負傷者10人以上なら必要
+  assert.equal(needsReport({ ...a, annex: { ...a.annex, light: '1' } }), false);
+  assert.equal(needsReport({ ...a, annex: { ...a.annex, serious: '1' } }), true);
+  assert.equal(needsReport({ ...a, annex: { ...a.annex, kinds: ['衝突', '転落'] } }), true);
+  assert.equal(needsReport({ ...a, annex: { ...a.annex, light: '10' } }), true);
+  assert.deepEqual(annexLines({ ...a, annex: { ...a.annex, kinds: ['衝突'], width: '3.1', light: '1' } }),
+    [['事故の種類（区分）', '衝突'], ['道路の幅員', '3.1 m'], ['損害の程度（人）', '軽傷 1人（うち運転者 0人）']]);
+
+  // 以前の版の記録（summary・injury）を読み替える
+  const old = normalizeAccident({ id: 'x', date: '2026-10-01', time: '9:00', place: 'A', summary: '接触', injury: 'あり', updatedAt: '2026-10-02T00:00:00Z' });
+  assert.equal(old.situation, '接触');
+  assert.equal(old.created, '2026-10-02');
+  assert.deepEqual(old.annex.kinds, []);
+
+  assert.equal(planFromRecord(records[0]), '7:20 八王子営業所を出庫～中沢1,2、唐木田1にて配送～19:55 八王子営業所に帰庫');
+
   const sheet = accidentSheet([a], settings);
-  assert.equal(sheet.rows[0][0], '2026/10/13');
-  assert.deepEqual(sheet.rows[0][1], { time: '14:05' });
+  assert.equal(sheet.rows[0][1], '2026/10/13');
+  assert.deepEqual(sheet.rows[0][2], { time: '14:05' });
   assert.equal(sheet.rows[0].length, sheet.widths.length);
-  assert.match(sheetXml(sheet), /ht="72"/);
   const csv = accidentCsv([a]).trim().split('\r\n');
   assert.equal(csv.length, 2);
   assert.ok(csv[1].includes('"右折時に対向車と接触, けが人なし"'));
+  assert.ok(csv[1].includes(',14:05,'));
 });

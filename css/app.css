@@ -227,3 +227,12 @@ button:focus-visible { outline: 3px solid var(--blue); outline-offset: 2px; }
 .row-title { font-size: 16px; font-weight: 700; }
 .row-text { font-size: 14px; color: var(--sub); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
 .row-main { display: flex; flex-direction: column; gap: 4px; }
+
+.seg.wrap button { flex: 0 1 auto; min-width: 64px; }
+.annex { overflow: hidden; }
+.annex summary { padding: 14px 16px; }
+.people { display: grid; grid-template-columns: 2.4em 56px auto 1fr 56px auto; align-items: center; gap: 6px; font-size: 14px; }
+.people .sub { justify-self: end; color: var(--sub); font-size: 13px; }
+.people input { width: 56px !important; min-height: 44px !important; text-align: center; padding: 0 4px !important; }
+.warn.block { margin: 0; }
+.tag.danger { color: var(--warn); background: var(--warn-bg); }

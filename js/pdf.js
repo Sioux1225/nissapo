@@ -146,21 +146,26 @@ export function renderSheet(spec) {
   return canvas;
 }
 
+// 行の頭に来てはいけない文字（句読点・閉じかっこなど）。はみ出してでも前の行に付ける
+const NO_LINE_START = '、。，．,.)）」』】〕！？!?ー…ぁぃぅぇぉっゃゅょァィゥェォッャュョ';
+
 // 文字を枠の幅で折り返す（日本語は1文字ずつ区切れる）
 function wrapLines(ctx, text, maxW) {
   const out = [];
   for (const para of String(text || '').split('\n')) {
     let line = '';
     for (const ch of para) {
-      if (ctx.measureText(line + ch).width > maxW && line) { out.push(line); line = ch; } else line += ch;
+      if (ctx.measureText(line + ch).width > maxW && line && !NO_LINE_START.includes(ch)) { out.push(line); line = ch; } else line += ch;
     }
     out.push(line);
   }
   return out;
 }
 
-// 事故の記録：1件を A4縦 1枚に描く
-// fields：[{ label, value, tall }]（tall は文章が長くなる欄）
+// 事故の記録：1件を A4縦 1枚に描く（国土交通省の様式と同じ並び）
+// fields：[{ label, value, group?, tall? }]
+//   group：左に縦長の見出しをまとめる欄（「事故の概要」）
+//   tall：文章が長くなる欄。文章の量に合わせて高さを配分し、入りきらなければ文字を小さくする
 export function renderAccident({ title, sub, fields, footer }) {
   const W = 1654;
   const H = 2339;
@@ -174,41 +179,118 @@ export function renderAccident({ title, sub, fields, footer }) {
   ctx.strokeStyle = '#000000';
   ctx.textBaseline = 'middle';
 
-  const m = 110;
+  const m = 100;
   ctx.font = `700 56px ${FONT}`;
   ctx.textAlign = 'center';
-  ctx.fillText(title, W / 2, 150);
-  ctx.font = `400 28px ${FONT}`;
+  ctx.fillText(title, W / 2, 130);
+  ctx.font = `400 26px ${FONT}`;
   ctx.textAlign = 'right';
-  ctx.fillText(sub, W - m, 230);
+  ctx.fillText(sub, W - m, 205);
 
-  const labelW = 400;
-  const top = 270;
-  const bottom = H - 160;
-  const shortH = 100;
-  const talls = fields.filter((f) => f.tall).length;
-  const tallH = (bottom - top - shortH * (fields.length - talls)) / Math.max(talls, 1);
-  let y = top;
+  const groupW = 110;
+  const labelW = 360;
+  const valueX = m + labelW;
+  const valueW = W - m - valueX - 36;
+  const top = 240;
+  const bottom = H - 150;
+  const shortH = 84;
+  const size = 28;
+  const lh = (sz) => sz * 1.45;
+
+  // 文章の欄の高さ：文字の量（28px で折り返した行数）に合わせて配分する
+  ctx.font = `400 ${size}px ${FONT}`;
+  const need = fields.map((f) => (f.tall ? Math.max(2, wrapLines(ctx, f.value, valueW).length) * lh(size) + 36 : shortH));
+  const shortTotal = fields.reduce((t, f, i) => t + (f.tall ? 0 : need[i]), 0);
+  const tallNeed = fields.reduce((t, f, i) => t + (f.tall ? need[i] : 0), 0);
+  const room = bottom - top - shortTotal;
+  const heights = fields.map((f, i) => (f.tall ? (need[i] / tallNeed) * room : need[i]));
+
   ctx.lineWidth = 2;
-  for (const f of fields) {
-    const h = f.tall ? tallH : shortH;
+  let y = top;
+  fields.forEach((f, i) => {
+    const h = heights[i];
+    const lx = f.group ? m + groupW : m;
+    const lw = f.group ? labelW - groupW : labelW;
     ctx.fillStyle = '#EFEFEF';
-    ctx.fillRect(m, y, labelW, h);
+    ctx.fillRect(lx, y, lw, h);
     ctx.fillStyle = '#000000';
-    ctx.strokeRect(m, y, labelW, h);
-    ctx.strokeRect(m + labelW, y, W - m * 2 - labelW, h);
-    drawLines(ctx, f.label.replace('（', '\n（'), m, y, labelW, h, { size: 28, weight: 700 });
-    ctx.font = `400 30px ${FONT}`;
+    ctx.strokeRect(lx, y, lw, h);
+    ctx.strokeRect(valueX, y, W - m - valueX, h);
+    drawLines(ctx, f.label, lx, y, lw, h, { size: 26, weight: 700 });
+
+    // 入りきるまで文字を小さくする
+    let sz = size;
+    let lines;
+    for (;;) {
+      ctx.font = `400 ${sz}px ${FONT}`;
+      lines = wrapLines(ctx, f.value, valueW);
+      if (lines.length * lh(sz) <= h - 24 || sz <= 16) break;
+      sz -= 1;
+    }
     ctx.textAlign = 'left';
-    const lines = wrapLines(ctx, f.value, W - m * 2 - labelW - 40);
-    const lh = 44;
-    const startY = f.tall ? y + 40 : y + h / 2 - ((lines.length - 1) * lh) / 2;
-    lines.slice(0, Math.floor((h - 20) / lh)).forEach((line, i) => ctx.fillText(line, m + labelW + 20, startY + i * lh));
+    const first = f.tall ? y + 18 + lh(sz) / 2 : y + h / 2 - ((lines.length - 1) * lh(sz)) / 2;
+    lines.forEach((line, k) => ctx.fillText(line, valueX + 18, first + k * lh(sz)));
     y += h;
-  }
+  });
+
+  // 「事故の概要」のまとめ見出し
+  let gy = top;
+  fields.forEach((f, i) => {
+    if (f.group && (i === 0 || !fields[i - 1].group)) {
+      let gh = 0;
+      for (let k = i; k < fields.length && fields[k].group; k++) gh += heights[k];
+      ctx.fillStyle = '#E2E2E2';
+      ctx.fillRect(m, gy, groupW, gh);
+      ctx.fillStyle = '#000000';
+      ctx.strokeRect(m, gy, groupW, gh);
+      // 縦書き
+      ctx.font = `700 28px ${FONT}`;
+      ctx.textAlign = 'center';
+      const chars = [...f.group];
+      chars.forEach((ch, k) => ctx.fillText(ch, m + groupW / 2, gy + gh / 2 + (k - (chars.length - 1) / 2) * 36));
+    }
+    gy += heights[i];
+  });
+
   ctx.font = `400 24px ${FONT}`;
   ctx.textAlign = 'left';
-  ctx.fillText(footer, m, H - 110);
+  footer.forEach((t, k) => ctx.fillText(t, m, H - 110 + k * 36));
+  return canvas;
+}
+
+// 別紙（くわしく記録した内容）：A4縦 1枚
+export function renderAnnex({ title, sub, rows }) {
+  const W = 1654;
+  const H = 2339;
+  const canvas = document.createElement('canvas');
+  canvas.width = W;
+  canvas.height = H;
+  const ctx = canvas.getContext('2d');
+  ctx.fillStyle = '#FFFFFF';
+  ctx.fillRect(0, 0, W, H);
+  ctx.fillStyle = '#000000';
+  ctx.strokeStyle = '#000000';
+  ctx.textBaseline = 'middle';
+  const m = 100;
+  ctx.font = `700 52px ${FONT}`;
+  ctx.textAlign = 'center';
+  ctx.fillText(title, W / 2, 130);
+  ctx.font = `400 26px ${FONT}`;
+  ctx.textAlign = 'right';
+  ctx.fillText(sub, W - m, 205);
+  const labelW = 400;
+  const rowH = 96;
+  ctx.lineWidth = 2;
+  rows.forEach(([label, value], i) => {
+    const y = 240 + i * rowH;
+    ctx.fillStyle = '#EFEFEF';
+    ctx.fillRect(m, y, labelW, rowH);
+    ctx.fillStyle = '#000000';
+    ctx.strokeRect(m, y, labelW, rowH);
+    ctx.strokeRect(m + labelW, y, W - m * 2 - labelW, rowH);
+    drawLines(ctx, label, m, y, labelW, rowH, { size: 26, weight: 700 });
+    drawLines(ctx, value, m + labelW, y, W - m * 2 - labelW, rowH, { size: 28, align: 'left' });
+  });
   return canvas;
 }
 
