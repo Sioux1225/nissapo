@@ -17,7 +17,7 @@ import {
   KINDS, COLLISIONS, ROAD_TYPES, SLOPES, SHAPES, SURFACES
 } from './accident.js';
 
-export const APP_VERSION = '0.8.2';
+export const APP_VERSION = '0.8.3';
 
 const app = document.getElementById('app');
 const state = {
@@ -473,7 +473,7 @@ function renderExport() {
       </section>
       ${canShare ? '<button type="button" class="btn-primary" data-action="export" data-how="share">共有する（LINE・メールなど）</button>' : ''}
       <button type="button" class="${canShare ? 'btn-outline' : 'btn-primary'}" data-action="export" data-how="save">このスマホに保存する</button>
-      <button type="button" class="btn-text" data-action="preview">画面で確認する</button>
+      <button type="button" class="btn-text" data-action="preview">プレビューで確認する</button>
       <p class="info">${canShare ? '事務所に送るときは「共有する」を押して、LINEやメールを選んでください。' : '保存したファイルを、LINEやメールに添付して事務所に送ってください。'}</p>
       <p class="info">${isAcc ? '事故の記録は<b>3年間</b>、自分で保管するのが決まりです。事務所にも送っておくと、会社でも控えを残せます。' : '運転日報・点呼記録簿は<b>1年間</b>、自分で保管するのが決まりです。毎月書き出して保存し、事務所にも送っておくと安心です。'}<button type="button" class="link-btn inline" data-action="go" data-view="rules">記録の決まり</button></p>
       <div id="preview" class="preview"></div>
@@ -937,7 +937,7 @@ function renderSales() {
       </section>
       <p class="info">前払いは<b>月初めからの売上</b>で計算します。${sagawa ? '日ごとの配達個数は、乗務後点呼の画面か、下の一覧で入れられます。' : '運転日報で乗務を記録した日を、日当1日分として数えます。'}</p>
       <button type="button" class="btn-primary" data-action="share-sales">PDFにしてLINEで送る</button>
-      <button type="button" class="btn-text" data-action="preview-sales">画面で確認する</button>
+      <button type="button" class="btn-text" data-action="preview-sales">プレビューで確認する</button>
       <div class="card list">${rows || '<p class="empty">この月はまだ乗務の記録がありません</p>'}</div>
       <div id="preview" class="preview"></div>`}
     </main>`;
