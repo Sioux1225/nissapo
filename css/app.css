@@ -308,3 +308,17 @@ button:focus-visible { outline: 3px solid var(--blue); outline-offset: 2px; }
 @keyframes oil-grow { from { width: 0; } }
 @media (prefers-reduced-motion: reduce) { .oil-bar.grow .oil-fill { animation: none; } }
 .nb-line { font-size: 11px; font-weight: 600; color: var(--orange-text); }
+
+/* iPhone の Safari では日付・時刻の欄が横幅を守らずにはみ出すので、幅に収める */
+.field input[type="date"], .field input[type="time"] {
+  -webkit-appearance: none;
+  appearance: none;
+  display: block;
+  min-width: 0;
+  max-width: 100%;
+  box-sizing: border-box;
+  text-align: left;
+}
+.field input[type="date"]::-webkit-date-and-time-value,
+.field input[type="time"]::-webkit-date-and-time-value { text-align: left; }
+.field input { min-width: 0; max-width: 100%; }
