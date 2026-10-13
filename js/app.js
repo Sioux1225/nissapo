@@ -17,7 +17,7 @@ import {
   KINDS, COLLISIONS, ROAD_TYPES, SLOPES, SHAPES, SURFACES
 } from './accident.js';
 
-export const APP_VERSION = '0.7.7';
+export const APP_VERSION = '0.7.8';
 
 const app = document.getElementById('app');
 const state = {
@@ -220,7 +220,6 @@ function renderSettings() {
         <button type="button" class="btn-outline" data-action="backup">バックアップを作る</button>
         <button type="button" class="btn-outline" data-action="restore">バックアップから戻す</button>
       </div>
-      <button type="button" class="btn-outline" data-action="go" data-view="oil">オイル交換の記録</button>
       <button type="button" class="btn-outline" data-action="go" data-view="rules">記録の決まり（保存期間など）</button>
       <p class="info center">日報サポート v${APP_VERSION}</p>
     </main>`;
