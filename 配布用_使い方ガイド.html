@@ -73,6 +73,7 @@ h3 { font-size: 16px; font-weight: 700; }
 .term { padding: 6px 8px; border-radius: 10px; background: var(--orange-tint); display: flex; flex-direction: column; align-items: center; gap: 0; text-align: center; min-width: 0; }
 .term span { font-size: 11.5px; color: var(--sub); }
 .term b { font-size: 17px; color: var(--orange-text); }
+.card.wide { grid-column: 1 / -1; }
 </style>
 
 </head>
@@ -103,25 +104,27 @@ h3 { font-size: 16px; font-weight: 700; }
   </section>
 
   <section aria-labelledby="flow-h">
-    <h2 id="flow-h">使い方は、この4つだけ</h2>
+    <h2 id="flow-h">使い方は、この5つだけ</h2>
     <div class="flow">
       <article class="card often"><span class="when">毎日（出発するとき）</span><h3>① 乗務前点呼を記録する</h3>
-        <p>ホームのオレンジのボタン「<b>乗務前点呼を記録</b>」を押します。時刻と出発時のメーターは自動で入ります。<b>アルコール検知器・酒気帯び・健康状態・日常点検</b>を確かめて「<b>この内容で記録する</b>」。</p>
-        <p class="tip">酒気帯びがあるときは乗務できません。すぐに事務所に連絡を。</p></article>
+        <p>「<b>乗務前点呼を記録</b>」を押すと、時刻とメーターは自動で入ります。<b>アルコール検知器・酒気帯び・健康状態・日常点検</b>を確かめて「<b>この内容で記録する</b>」。</p>
+        <p class="tip">酒気帯びがあるときは乗務できません。</p></article>
       <article class="card often"><span class="when">毎日（帰ってきたとき）</span><h3>② 乗務後点呼を記録する</h3>
-        <p>「<b>乗務後点呼を記録</b>」を押し、<b>帰着時のメーター</b>か<b>今日走った距離</b>の、どちらか一方を入れます。経過地点・休憩などは前回と同じ内容が入っているので、変わったときだけ直します。</p>
-        <p class="tip">入れ忘れた日は「<b>記録の一覧</b>」から日付をタップして追加・修正できます。</p></article>
+        <p>「<b>乗務後点呼を記録</b>」を押し、<b>帰着時のメーター</b>か<b>今日走った距離</b>のどちらかを入れます。経過地点・休憩などは前回と同じ内容が入っています。</p>
+        <p class="tip">入れ忘れた日は「<b>記録の一覧</b>」から追加できます。</p></article>
       <article class="card rare"><span class="when">毎月（月末に）</span><h3>③ 書き出して保管する</h3>
         <p>「<b>書き出し・共有</b>」で月と形式（<b>Excel・PDF・CSV</b>）を選び、スマホに保存します。「<b>共有する</b>」から LINE やメールで事務所にも送れます。Excel は事務所の運転日報・点呼記録簿と同じ形です。</p></article>
       <article class="card rare"><span class="when">事故があったら</span><h3>④ 事故の記録をつける</h3>
         <p>救護・警察（110番）・事務所への連絡が先です。落ち着いたら、ホームの「<b>事故の記録</b>」から記録します。国土交通省の様式と同じ項目で、記入例つき。<b>写真</b>も付けられ、PDF にして送れます。</p></article>
+      <article class="card rare wide"><span class="when">オイル交換をしたら</span><h3>⑤ オイル交換を記録する</h3>
+        <p>「<b>オイル交換</b>」から交換した日・メーター・<b>エレメントも交換したか</b>を記録。前回から <b>3,000・3,500・4,000・4,500km</b> でお知らせが出ます。<b>5,000km までに必ず</b>交換し、エレメントは<b>3回に1回</b>交換します。</p></article>
     </div>
   </section>
 
   <section class="facts">
     <div class="box"><h2>運転日報・点呼記録簿ってなに？</h2>
       <p>軽貨物の仕事を<b>自分の名前で届け出ている人</b>は、国の決まりで、記録をつけて<b>自分で保管する</b>ことになっています。</p>
-      <p><b>点呼記録簿</b>：乗務の前と後に、酒気帯び（<b>アルコール検知器</b>を使う）・健康状態・日常点検などを確かめた記録。<br><b>運転日報</b>：仕事を始めた・終えた地点と時刻、経過地点、走った距離などの記録（2025年4月から義務）。</p>
+      <p><b>点呼記録簿</b>：乗務の前と後に、酒気帯び（<b>アルコール検知器</b>）・健康状態・日常点検などを確かめた記録。<b>運転日報</b>：始めた・終えた地点と時刻、経過地点、走った距離などの記録。</p>
       <div class="terms">
         <div class="term"><span>点呼記録簿</span><b>1年間</b></div>
         <div class="term"><span>運転日報</span><b>1年間</b></div>
@@ -130,11 +133,11 @@ h3 { font-size: 16px; font-weight: 700; }
     <div class="box"><h2>大切な3つのこと</h2>
       <ul class="must">
         <li><b>1. 点呼は、その場で記録する。</b>出発する前と帰ってきたときに、そのつど記録してください。</li>
-        <li><b>2. 月に1回、書き出して別の場所にも保存。</b>データはスマホの中だけにあり、次のときは消えてしまいます。書き出したファイルや<b>バックアップ</b>を iCloud Drive や Google ドライブに保存しておきましょう。
+        <li><b>2. 月に1回、書き出して別の場所にも保存。</b>データはスマホの中だけにあり、次のときは消えます。<b>バックアップ</b>を iCloud Drive や Google ドライブに保存しましょう。
           <ul class="lost">
-            <li>ホーム画面から日報サポの<b>アイコンを削除</b>したとき（一番多い原因です）</li>
-            <li>ブラウザの「<b>履歴とWebサイトデータを消去</b>」をしたとき</li>
-            <li><b>機種変更</b>・スマホの故障・紛失のとき</li>
+            <li>日報サポの<b>アイコンを削除</b>したとき（一番多い原因）</li>
+            <li>ブラウザの<b>Webサイトデータを消去</b>したとき</li>
+            <li><b>機種変更</b>・故障・紛失のとき</li>
           </ul></li>
         <li><b>3. 保存期間のあいだは消さない。</b>監査などで求められたら、見せられるようにしておきます。</li>
       </ul></div>
