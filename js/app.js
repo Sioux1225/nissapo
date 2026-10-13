@@ -17,7 +17,7 @@ import {
   KINDS, COLLISIONS, ROAD_TYPES, SLOPES, SHAPES, SURFACES
 } from './accident.js';
 
-export const APP_VERSION = '0.11.2';
+export const APP_VERSION = '0.11.3';
 
 const app = document.getElementById('app');
 const state = {
@@ -949,7 +949,7 @@ function advanceSection(s, y, m, salesAmount, today) {
     </div>
     <div class="adv-sum">
       <div><span class="muted">前払いの合計</span><b>${yen(total)}</b></div>
-      <div class="adv-rest"><span class="muted">前払いできる残り</span><b class="${info.target - total < 0 ? 'warn-text' : ''}">${yen(info.remaining)}</b></div>
+      <div class="adv-rest"><span class="muted">前払い可能額</span><b class="${info.target - total < 0 ? 'warn-text' : ''}">${yen(info.remaining)}</b></div>
     </div>
     <div class="adv-add">
       <input id="adv-date" type="date" value="${def}" aria-label="前払いを受けた日">
@@ -996,7 +996,7 @@ function renderSales() {
       <section class="card fields">
         ${field('希望する前払い額（円）', `<input id="advance" data-advance="${advanceKey(y, m)}" value="${advanceOf(s, y, m) ?? ''}" type="number" inputmode="numeric" min="0" placeholder="例：50000">`,
           advanceOf(s, y, m) != null && advanceOf(s, y, m) > advanceInfo(s, y, m, t.amount).remaining
-            ? '<span class="warn-text">前払いできる残りより多い額です</span>' : '')}
+            ? '<span class="warn-text">前払い可能額より多い額です</span>' : '')}
       </section>
       <p class="info">前払いは<b>月初めからの売上</b>で計算します。${sagawa ? '日ごとの配達個数は、乗務後点呼の画面か、下の一覧で入れられます。' : '運転日報で乗務を記録した日を、日極1日分として数えます。'}</p>
       <button type="button" class="btn-primary" data-action="share-sales">PDFにしてLINEで送る</button>
@@ -1152,7 +1152,7 @@ function renderAdvanceRules() {
           <li><b>翌月以降</b>は、その月の売上の<b>50%</b>が前払いの対象額です。</li>
           <li>ただし、<b>前月の売上が40万円に届かなかった場合</b>は、<b>5万円の留保</b>が必要です。</li>
           <li>前払いは<b>当月分を当月中にだけ</b>申請できます。月が変わるとリセットされ、元には戻せません。</li>
-          <li>このアプリでは、<b>売上表（前払い）</b>の画面で、前払いの対象額と前払いできる残りを自動で計算します（リース車両かどうかは設定で選びます）。</li>
+          <li>このアプリでは、<b>売上表（前払い）</b>の画面で、前払いの対象額と前払い可能額を自動で計算します（リース車両かどうかは設定で選びます）。</li>
         </ul>
       </div>
 
