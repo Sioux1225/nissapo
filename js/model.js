@@ -18,15 +18,15 @@ export const DEFAULT_SETTINGS = {
   shakenDate: '',      // 車検の満了日（任意）
   licenseDate: '',     // 運転免許証の有効期限（任意）
   expiryAck: {},       // 見せた期限のお知らせ { shaken: { date, stage }, license: { date, stage } }
-  salesType: '',       // 売上表：'sagawa'（佐川急便）・'daily'（日当の案件）
+  salesType: '',       // 売上表：'sagawa'（佐川急便）・'daily'（日極の案件）
   salesOffice: '',     // 佐川急便の営業所（単価表の営業所名、または「その他」）
   salesOfficeName: '', // 「その他」のときの営業所名
   salesStartDate: '',  // 稼働を開始した日（新人保証の期間を数える）
   priceTakuhai: '',    // 単価（円/個）宅配
   priceShogyo: '',     // 単価 商業（空なら宅配と同じ）
   priceShuka: '',      // 単価 集荷（空なら宅配と同じ）
-  salesProject: '',    // 日当の案件の所属（案件名）
-  dailyRate: '',       // 日当（円）
+  salesProject: '',    // 日極の案件の所属（案件名）
+  dailyRate: '',       // 日極（円）
   advance: {},         // 希望する前払い額 { 'YYYY-MM': 円 }
   lastVersion: '',     // 最後に開いたアプリの版（アップデートのお知らせ用）
   retention: '1年間'

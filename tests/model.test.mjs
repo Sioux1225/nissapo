@@ -222,7 +222,7 @@ test('車検・免許証の期限：60・30・14・7日前と期限切れ', asyn
   assert.match(expiryMessage({ ...expiryStatus({ licenseDate: '2026-10-01' }, '2026-10-13')[0] }).text, /無免許運転/);
 });
 
-test('売上表：佐川急便は個数×単価、日当は乗務した日×日当、月初めから今日まで', async () => {
+test('売上表：佐川急便は個数×単価、日極は乗務した日×日極、月初めから今日まで', async () => {
   const { monthSales, dayAmount, unitPrices, salesReady } = await import('../js/sales.js');
   const sg = { ...settings, salesType: 'sagawa', salesOffice: 'その他', salesOfficeName: '○○', priceTakuhai: '150', priceShogyo: '150', priceShuka: '50' };
   assert.deepEqual(unitPrices(sg), { takuhai: 150, shogyo: 150, shuka: 50, daily: 0 });
@@ -262,7 +262,7 @@ test('売上表：佐川急便は個数×単価、日当は乗務した日×日�
   assert.equal(rows[2].off, true);
   // 月全体なら 10/20 も含む
   assert.equal(monthSales(recs, 2026, 10, sg).total.amount, 17500 + 7500);
-  // 日当
+  // 日極
   const dl = { ...settings, salesType: 'daily', dailyRate: '15000' };
   assert.equal(monthSales(recs, 2026, 10, dl, '2026-10-13').total.amount, 30000);
 });

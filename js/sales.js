@@ -1,5 +1,5 @@
 // 売上表（月報・前払い用）
-// 佐川急便：その日の配達個数（宅配・商業・集荷）× 単価。日当の案件：乗務した日 × 日当。
+// 佐川急便：その日の配達個数（宅配・商業・集荷）× 単価。日極の案件：乗務した日 × 日極。
 // 前払いは月初めからの売上で計算するため、合計はその月の分だけ（前月の分は含めない）。
 
 import { num, daysInMonth, dateKey, weekday, distanceOf, isOff, isOffDay, todayKey } from './model.js';

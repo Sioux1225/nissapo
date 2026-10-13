@@ -959,7 +959,7 @@ function renderSales() {
 function salesCanvas() {
   const { s, y, m, today, thisMonth, data } = salesContext();
   const sagawa = s.salesType === 'sagawa';
-  // 佐川急便は個数の列あり。日当の案件は個数の列を出さない
+  // 佐川急便は個数の列あり。日極の案件は個数の列を出さない
   const countHead = sagawa ? COUNT_KEYS.map(([, tx]) => ({ text: tx, w: 9 })) : [];
   // 新人保証の期間がかかっている月は「新人保証」の列を足す（金額には新人保証を含む）
   const nbCol = sagawa && data.hasNewbie;
