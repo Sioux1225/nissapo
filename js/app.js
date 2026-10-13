@@ -17,7 +17,7 @@ import {
   KINDS, COLLISIONS, ROAD_TYPES, SLOPES, SHAPES, SURFACES
 } from './accident.js';
 
-export const APP_VERSION = '0.8.0';
+export const APP_VERSION = '0.8.1';
 
 const app = document.getElementById('app');
 const state = {
@@ -255,8 +255,7 @@ function renderHome() {
   } else if (!rec.end) {
     main = `<button type="button" class="btn-big end" data-action="open-end" data-date="${today}"><small>帰ってきたとき</small>乗務後点呼を記録</button>`;
   } else {
-    main = `<div class="done-msg">${ICON.check} 今日の記録は完了です。おつかれさまでした。</div>
-      <button type="button" class="btn-outline" data-action="open-day" data-date="${today}">今日の記録を見る・直す</button>`;
+    main = `<div class="done-msg">${ICON.check} 今日の記録は完了です。おつかれさまでした。</div>`;
   }
 
   app.innerHTML = `
