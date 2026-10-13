@@ -14,7 +14,7 @@ import {
   KINDS, COLLISIONS, ROAD_TYPES, SLOPES, SHAPES, SURFACES
 } from './accident.js';
 
-export const APP_VERSION = '0.4.1';
+export const APP_VERSION = '0.4.2';
 
 const app = document.getElementById('app');
 const state = {
@@ -139,20 +139,20 @@ function settingsForm(s) {
     field(text, `<input data-setting="${key}" value="${e(s[key] ?? '')}" ${attrs}>`, note);
   return `
     <div class="card fields">
-      ${f('driverName', '運転者名 <b class="req">必須</b>', 'autocomplete="name" placeholder="例：伊藤 孝"')}
-      ${f('office', '営業所', 'placeholder="例：八王子"')}
-      ${f('vehicleNo', '車両番号', 'placeholder="例：多摩 480 あ 12-34"')}
+      ${f('driverName', '運転者名 <b class="req">必須</b>', 'autocomplete="name" placeholder="例：配送 太郎"')}
+      ${f('office', '営業所', 'placeholder="例：○○"')}
+      ${f('vehicleNo', '車両番号', 'placeholder="例：品川 000 あ 1234"')}
       ${f('company', '事業者名')}
     </div>
     <h2 class="section-title">毎日ほぼ同じ内容（入力の初期値になります）</h2>
     <div class="card fields">
-      ${f('startPlace', '乗務開始・終了地点', 'placeholder="例：八王子営業所"')}
-      ${f('via', '主な経過地点（集荷・納品先など）', 'placeholder="例：中沢1,2、唐木田1"')}
-      ${f('restPlace', '休憩地点', 'placeholder="例：唐木田1-21-1"')}
+      ${f('startPlace', '乗務開始・終了地点', 'placeholder="例：○○営業所"')}
+      ${f('via', '主な経過地点（集荷・納品先など）', 'placeholder="例：○○町1丁目、△△町2丁目"')}
+      ${f('restPlace', '休憩地点', 'placeholder="例：○○公園駐車場"')}
       ${f('restMin', '休憩時間（分）', 'type="number" inputmode="numeric" min="0"')}
-      ${f('rollcaller', '点呼実施者名', 'placeholder="例：神野"', '点呼をしてくれる人（運行管理者）の名前')}
+      ${f('rollcaller', '点呼実施者名', 'placeholder="例：運行 花子"', '点呼をしてくれる人（運行管理者）の名前')}
       <div class="field"><span class="field-label">点呼方法</span>${METHODS.map((m) => `<button type="button" class="chip" data-setting-seg="method" data-value="${m}" aria-pressed="${s.method === m}">${m}</button>`).join('')}</div>
-      ${f('initialOdo', '今のメーターの距離（km）', 'type="number" inputmode="numeric" min="0" placeholder="例：56009"', '最初の日の「開始時走行距離」になります。あとは前の日の終了距離が自動で入ります')}
+      ${f('initialOdo', '今のメーターの距離（km）', 'type="number" inputmode="numeric" min="0" placeholder="例：12345"', '最初の日の「開始時走行距離」になります。あとは前の日の終了距離が自動で入ります')}
     </div>`;
 }
 

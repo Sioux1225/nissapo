@@ -4,20 +4,20 @@ import { DEFAULT_SETTINGS, newStart, newEnd, prevOdo, monthSheets, yearSheets, t
 import { buildXlsx, colName, sheetXml } from '../js/xlsx.js';
 import { buildPdf } from '../js/pdf.js';
 
-const settings = { ...DEFAULT_SETTINGS, driverName: '伊藤 孝', office: '八王子', startPlace: '八王子営業所', via: '中沢1,2、唐木田1', restPlace: '唐木田1-21-1', rollcaller: '神野', initialOdo: 56000 };
+const settings = { ...DEFAULT_SETTINGS, driverName: '配送 太郎', office: '○○', startPlace: '○○営業所', via: '○○町1,2丁目、△△町', restPlace: '○○公園駐車場', rollcaller: '運行 花子', initialOdo: 12000 };
 
 function rec(date, s, e, a, b) {
   return {
-    date, rollcaller: '神野',
+    date, rollcaller: '運行 花子',
     start: { ...newStart(settings, a, s) },
     end: e ? { ...newEnd(settings, e), odo: b } : null
   };
 }
 
 const records = [
-  rec('2026-10-01', '7:20', '19:55', 56000, 56110),
-  rec('2026-10-02', '7:05', '20:01', 56110, 56230),
-  rec('2026-10-05', '7:30', null, 56230)
+  rec('2026-10-01', '7:20', '19:55', 12000, 12110),
+  rec('2026-10-02', '7:05', '20:01', 12110, 12230),
+  rec('2026-10-05', '7:30', null, 12230)
 ];
 
 test('時刻をExcelの値にする', () => {
@@ -26,9 +26,9 @@ test('時刻をExcelの値にする', () => {
 });
 
 test('前の日の終了距離を次の開始距離にする', () => {
-  assert.equal(prevOdo(records, '2026-10-03', settings), 56230);
-  assert.equal(prevOdo(records, '2026-10-06', settings), 56230); // 乗務後がない日は開始距離
-  assert.equal(prevOdo(records, '2026-09-30', settings), 56000); // 記録がなければ設定の距離
+  assert.equal(prevOdo(records, '2026-10-03', settings), 12230);
+  assert.equal(prevOdo(records, '2026-10-06', settings), 12230); // 乗務後がない日は開始距離
+  assert.equal(prevOdo(records, '2026-09-30', settings), 12000); // 記録がなければ設定の距離
   assert.equal(distanceOf(records[0]), 110);
 });
 
@@ -37,8 +37,8 @@ test('運転日報・点呼記録簿の行が事務所のブックと同じ列�
   assert.equal(daily.name, '運転日報10月');
   assert.equal(roll.name, '点呼記録簿10月');
   assert.equal(daily.rows.length, 31);
-  assert.deepEqual(daily.rows[0], [1, '八王子営業所', { time: '7:20' }, '八王子営業所', { time: '19:55' }, '中沢1,2、唐木田1', 56000, 56110, 110, '唐木田1-21-1', 60, '無', '有', '無', '無', '無']);
-  assert.deepEqual(roll.rows[0], [1, { time: '7:20' }, 'LINE', '有', '無', '良好', '良好', '無', { time: '19:55' }, 'LINE', '有', '無', '無', '無', '神野', null]);
+  assert.deepEqual(daily.rows[0], [1, '○○営業所', { time: '7:20' }, '○○営業所', { time: '19:55' }, '○○町1,2丁目、△△町', 12000, 12110, 110, '○○公園駐車場', 60, '無', '有', '無', '無', '無']);
+  assert.deepEqual(roll.rows[0], [1, { time: '7:20' }, 'LINE', '有', '無', '良好', '良好', '無', { time: '19:55' }, 'LINE', '有', '無', '無', '無', '運行 花子', null]);
   // 休みの日は空欄
   assert.deepEqual(daily.rows[2].slice(1), Array(15).fill(null));
   // 乗務後がまだの日は乗務前だけ
@@ -59,7 +59,7 @@ test('xlsx：列名・式・時刻の書式', () => {
   assert.equal(colName(26), 'AA');
   const [daily, roll] = monthSheets(records, 2026, 10, settings);
   const x = sheetXml(daily);
-  assert.match(x, /<c r="H4" s="6"><f>SUM\(G4,I4\)<\/f><v>56110<\/v><\/c>/);
+  assert.match(x, /<c r="H4" s="6"><f>SUM\(G4,I4\)<\/f><v>12110<\/v><\/c>/);
   assert.match(x, /<c r="C4" s="5"><v>0\.30555/);
   assert.match(sheetXml(roll), /<mergeCell ref="B3:H3"\/>/);
   const bytes = buildXlsx([daily, roll]);
@@ -71,8 +71,8 @@ test('CSV：記録のある日だけ、BOM付き', () => {
   assert.ok(csv.startsWith('﻿日付,'));
   const lines = csv.trim().split('\r\n');
   assert.equal(lines.length, 4);
-  assert.ok(lines[1].startsWith('2026/10/01,八王子営業所,7:20,八王子営業所,19:55,"中沢1,2、唐木田1",56000,56110,110,'));
-  assert.ok(lines[1].endsWith(',神野'));
+  assert.ok(lines[1].startsWith('2026/10/01,○○営業所,7:20,○○営業所,19:55,"○○町1,2丁目、△△町",12000,12110,110,'));
+  assert.ok(lines[1].endsWith(',運行 花子'));
 });
 
 test('PDF：ページ数と終わりの印', () => {
@@ -88,7 +88,7 @@ test('PDF：ページ数と終わりの印', () => {
 
 test('事故の記録：様式の項目・別紙・報告が必要な事故・Excel・CSV', async () => {
   const { newAccident, normalizeAccident, needsReport, annexLines, wareki, planFromRecord, accidentSheet, accidentCsv, validateAccident } = await import('../js/accident.js');
-  const a = { ...newAccident(settings, '2026-10-13', '14:05'), place: '八王子市中野町', situation: '右折時に対向車と接触, けが人なし', kind: '物損', cause: '確認不足', prevention: '一時停止して確認' };
+  const a = { ...newAccident(settings, '2026-10-13', '14:05'), place: '○○市○○町', situation: '右折時に対向車と接触, けが人なし', kind: '物損', cause: '確認不足', prevention: '一時停止して確認' };
   assert.equal(validateAccident({ ...a, situation: '' }), '当時の状況を入れてください');
   assert.equal(validateAccident(a), null);
   assert.equal(wareki('2026-07-30'), '令和8年7月30日');
@@ -108,7 +108,7 @@ test('事故の記録：様式の項目・別紙・報告が必要な事故・Ex
   assert.equal(old.created, '2026-10-02');
   assert.deepEqual(old.annex.kinds, []);
 
-  assert.equal(planFromRecord(records[0]), '7:20 八王子営業所を出庫～中沢1,2、唐木田1にて配送～19:55 八王子営業所に帰庫');
+  assert.equal(planFromRecord(records[0]), '7:20 ○○営業所を出庫～○○町1,2丁目、△△町にて配送～19:55 ○○営業所に帰庫');
 
   const sheet = accidentSheet([a], settings);
   assert.equal(sheet.rows[0][1], '2026/10/13');
