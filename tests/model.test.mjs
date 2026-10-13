@@ -229,6 +229,7 @@ test('売上表：佐川急便は個数×単価、日当は乗務した日×日�
   assert.deepEqual(unitPrices({ salesType: 'sagawa', salesOffice: '八王子' }), { takuhai: 178, shogyo: 80, shuka: 100 });
   assert.deepEqual(unitPrices({ salesType: 'sagawa', salesOffice: '三多摩' }), { takuhai: 165, shogyo: 80, shuka: 100 });
   assert.deepEqual(unitPrices({ salesType: 'sagawa', salesOffice: '三多摩（山単価）' }), { takuhai: 186, shogyo: 80, shuka: 100 });
+  assert.deepEqual(unitPrices({ salesType: 'sagawa', salesOffice: '三多摩B' }), { takuhai: 165, shogyo: 80, shuka: 100 });
   assert.deepEqual(unitPrices({ salesType: 'sagawa', salesOffice: '台東' }), { takuhai: 173, shogyo: 100, shuka: 70 });
   // 以前の版の入力（「八王子営業所」）も読み替える。表の営業所なら入力した単価は使わない
   assert.deepEqual(unitPrices({ salesType: 'sagawa', salesOffice: '八王子営業所', priceTakuhai: '150' }), { takuhai: 178, shogyo: 80, shuka: 100 });
