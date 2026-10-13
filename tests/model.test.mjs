@@ -33,14 +33,16 @@ test('前の日の終了距離を次の開始距離にする', () => {
 });
 
 test('運転日報・点呼記録簿の行が事務所のブックと同じ列になる', () => {
-  const [daily, roll] = monthSheets(records, 2026, 10, settings);
+  const [daily, roll] = monthSheets(records, 2026, 10, settings, '2026-10-06');
   assert.equal(daily.name, '運転日報10月');
   assert.equal(roll.name, '点呼記録簿10月');
   assert.equal(daily.rows.length, 31);
   assert.deepEqual(daily.rows[0], [1, '○○営業所', { time: '7:20' }, '○○営業所', { time: '19:55' }, '○○町1,2丁目、△△町', 12000, 12110, 110, '○○公園駐車場', 60, '無', '有', '無', '無', '無']);
   assert.deepEqual(roll.rows[0], [1, { time: '7:20' }, 'LINE', '有', '無', '良好', '良好', '無', { time: '19:55' }, 'LINE', '有', '無', '無', '無', '運行 花子', null]);
-  // 休みの日は空欄
-  assert.deepEqual(daily.rows[2].slice(1), Array(15).fill(null));
+  // 記録のない過去の日（10/3）は自動で休み、今日以降（10/6・10/7）は空欄
+  assert.deepEqual(daily.rows[2], [3, ...Array(14).fill(null), '休み']);
+  assert.deepEqual(daily.rows[5].slice(1), Array(15).fill(null));
+  assert.deepEqual(daily.rows[6].slice(1), Array(15).fill(null));
   // 乗務後がまだの日は乗務前だけ
   assert.deepEqual(roll.rows[4].slice(8, 14), [null, null, null, null, null, null]);
 });
@@ -67,7 +69,7 @@ test('xlsx：列名・式・時刻の書式', () => {
 });
 
 test('CSV：記録のある日だけ、BOM付き', () => {
-  const csv = toCsv(records, '2026-10-01', '2026-10-31');
+  const csv = toCsv(records, '2026-10-01', '2026-10-31', '2026-10-01');
   assert.ok(csv.startsWith('﻿日付,'));
   const lines = csv.trim().split('\r\n');
   assert.equal(lines.length, 4);
@@ -290,4 +292,17 @@ test('川口（DRF）は個数の金額に1日10,000円を足す', async () => {
   assert.equal(rows[1].missing, true);
   assert.equal(total.amount, 36700);
   assert.equal(total.missing, 1);
+});
+
+test('走行距離を入れなかった過去の日は自動で休み（今日は休みにしない）', async () => {
+  const { isOffDay } = await import('../js/model.js');
+  assert.equal(isOffDay(undefined, '2026-10-05', '2026-10-06'), true);
+  assert.equal(isOffDay(undefined, '2026-10-06', '2026-10-06'), false);
+  assert.equal(isOffDay({ date: '2026-10-05', start: { time: '7:00' }, end: null }, '2026-10-05', '2026-10-06'), false); // 乗務後まだは休みではない
+  const csv = toCsv(records, '2026-10-01', '2026-10-31', '2026-10-06').trim().split('\r\n').map((l) => l.split(',')[0]);
+  assert.deepEqual(csv.slice(1), ['2026/10/01', '2026/10/02', '2026/10/03', '2026/10/04', '2026/10/05']);
+  const { monthSales } = await import('../js/sales.js');
+  const { rows } = monthSales(records, 2026, 10, { salesType: 'daily', dailyRate: '10000' }, '2026-10-06', '2026-10-06');
+  assert.equal(rows[2].off, true);
+  assert.equal(rows[6].off, false);
 });

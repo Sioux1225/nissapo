@@ -130,12 +130,20 @@ const n = (v) => num(v);
 
 // 休みの日は、事務所の書式を崩さないよう「備考」に「休み」と書く
 const offRow = (day) => [day, ...Array(14).fill(null), '休み'];
+// 以前の版で「休み」にした記録
 export const isOff = (rec) => !!rec?.off && !rec.start && !rec.end;
 
-function dailyRow(day, rec) {
+// 休みの日：今日より前で、乗務前・乗務後のどちらも記録がない日（走行距離を入れなかった日）は自動で休み。
+// 今日はまだ記録の途中かもしれないので休みにしない
+export function isOffDay(rec, key, today = todayKey()) {
+  if (rec?.start || rec?.end) return false;
+  return isOff(rec) || key < today;
+}
+
+function dailyRow(day, rec, off = isOff(rec)) {
   const s = rec?.start;
   const e = rec?.end;
-  if (isOff(rec)) return offRow(day);
+  if (off) return offRow(day);
   if (!s && !e) return [day, ...Array(15).fill(null)];
   const dist = distanceOf(rec);
   return [
@@ -158,10 +166,10 @@ function dailyRow(day, rec) {
   ];
 }
 
-function rollcallRow(day, rec) {
+function rollcallRow(day, rec, off = isOff(rec)) {
   const s = rec?.start;
   const e = rec?.end;
-  if (isOff(rec)) return offRow(day);
+  if (off) return offRow(day);
   if (!s && !e) return [day, ...Array(15).fill(null)];
   return [
     day,
@@ -185,10 +193,11 @@ function rollcallRow(day, rec) {
 
 // 1か月分の「運転日報」「点呼記録簿」の2枚。xlsx.js と pdf.js がこの形を使う。
 // 列番号は0始まり。info・head の範囲は [開始列, 終了列]。
-export function monthSheets(records, year, month, settings) {
+export function monthSheets(records, year, month, settings, today = todayKey()) {
   const byDate = new Map(records.map((r) => [r.date, r]));
   const days = daysInMonth(year, month);
   const recs = Array.from({ length: days }, (_, i) => byDate.get(dateKey(year, month, i + 1)));
+  const offs = recs.map((rec, i) => isOffDay(rec, dateKey(year, month, i + 1), today));
   const name = clean(settings.driverName);
   const ym = `${year}年 ${month}月`;
   const info = [
@@ -214,7 +223,7 @@ export function monthSheets(records, year, month, settings) {
       .map((text, i) => ({ r: [0, 0], c: [i, i], text })),
     // 終了時走行距離は、事務所のブックと同じく「開始＋従事距離」の式にする
     formulas: { 7: (row) => `SUM(G${row},I${row})` },
-    rows: recs.map((rec, i) => dailyRow(i + 1, rec))
+    rows: recs.map((rec, i) => dailyRow(i + 1, rec, offs[i]))
   };
 
   const rollcall = {
@@ -236,14 +245,14 @@ export function monthSheets(records, year, month, settings) {
         .map((text, i) => ({ r: [1, 1], c: [8 + i, 8 + i], text }))
     ],
     formulas: {},
-    rows: recs.map((rec, i) => rollcallRow(i + 1, rec))
+    rows: recs.map((rec, i) => rollcallRow(i + 1, rec, offs[i]))
   };
   return [daily, rollcall];
 }
 
 // 1年分（事務所のブックと同じく、運転日報1〜12月 → 点呼記録簿1〜12月の順）
-export function yearSheets(records, year, settings) {
-  const months = Array.from({ length: 12 }, (_, i) => monthSheets(records, year, i + 1, settings));
+export function yearSheets(records, year, settings, today = todayKey()) {
+  const months = Array.from({ length: 12 }, (_, i) => monthSheets(records, year, i + 1, settings, today));
   return [...months.map((m) => m[0]), ...months.map((m) => m[1])];
 }
 
@@ -271,15 +280,21 @@ const csvCell = (v) => {
   return /[",\r\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
 };
 
-// 記録のある日だけを1日1行で書き出す（先頭にBOMを付け、Excelで文字化けしないようにする）
-export function toCsv(records, from, to) {
+// 記録のある日と休みの日を1日1行で書き出す（先頭にBOMを付け、Excelで文字化けしないようにする）
+export function toCsv(records, from, to, today = todayKey()) {
   const lines = [CSV_HEAD.join(',')];
-  const list = records.filter((r) => r.date >= from && r.date <= to).sort((a, b) => (a.date < b.date ? -1 : 1));
-  for (const rec of list) {
-    const day = Number(rec.date.slice(8));
-    const d = dailyRow(day, rec).slice(1);
-    const r = rollcallRow(day, rec).slice(1, 15);
-    lines.push([rec.date.replace(/-/g, '/'), ...d, ...r].map(csvCell).join(','));
+  const byDate = new Map(records.map((r) => [r.date, r]));
+  const [fy, fm, fd] = from.split('-').map(Number);
+  for (let dt = new Date(fy, fm - 1, fd); ; dt.setDate(dt.getDate() + 1)) {
+    const key = dateKey(dt.getFullYear(), dt.getMonth() + 1, dt.getDate());
+    if (key > to) break;
+    const rec = byDate.get(key);
+    const off = isOffDay(rec, key, today);
+    if (!off && !rec?.start && !rec?.end) continue; // 今日以降で記録のない日
+    const day = dt.getDate();
+    const d = dailyRow(day, rec, off).slice(1);
+    const r = rollcallRow(day, rec, off).slice(1, 15);
+    lines.push([key.replace(/-/g, '/'), ...d, ...r].map(csvCell).join(','));
   }
   return '﻿' + lines.join('\r\n') + '\r\n';
 }

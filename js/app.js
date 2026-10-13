@@ -8,7 +8,7 @@ import { EXPIRED, expiryStatus, expiryMessage, expiryAlertsToShow } from './expi
 import { OIL_LIMIT, OIL_STEPS, newOilChange, currentOdo, oilStatus, oilMessage, oilAlertToShow, sortOilChanges } from './oil.js';
 import {
   DEFAULT_SETTINGS, METHODS, newStart, newEnd, todayKey, nowTime, isTime, num, distanceOf, prevOdo,
-  monthSheets, yearSheets, hasMonth, toCsv, daysInMonth, dateKey, weekday, pad2, isOff
+  monthSheets, yearSheets, hasMonth, toCsv, daysInMonth, dateKey, weekday, pad2, isOff, isOffDay
 } from './model.js';
 import { buildXlsx } from './xlsx.js';
 import { specsToPdf, renderSheet, renderAccident, renderAnnex, renderPhotoPage, renderSalesSheet, canvasesToPdf } from './pdf.js';
@@ -17,7 +17,7 @@ import {
   KINDS, COLLISIONS, ROAD_TYPES, SLOPES, SHAPES, SURFACES
 } from './accident.js';
 
-export const APP_VERSION = '0.7.13';
+export const APP_VERSION = '0.8.0';
 
 const app = document.getElementById('app');
 const state = {
@@ -246,16 +246,12 @@ function renderHome() {
     <div class="status ${done ? 'done' : ''}">
       <span class="status-mark">${done ? ICON.check : ''}</span>
       <span class="status-label">${text}</span>
-      <span class="status-time">${done ? e(hm(time)) : isOff(rec) ? '休み' : 'まだ'}</span>
+      <span class="status-time">${done ? e(hm(time)) : 'まだ'}</span>
     </div>`;
 
   let main;
-  if (isOff(rec)) {
-    main = `<div class="done-msg off-msg">今日は休みです</div>
-      <button type="button" class="link-btn" data-action="unset-off" data-date="${today}">休みを取り消す</button>`;
-  } else if (!rec?.start) {
-    main = `<button type="button" class="btn-big" data-action="open-start" data-date="${today}"><small>出発するとき</small>乗務前点呼を記録</button>
-      <button type="button" class="link-btn" data-action="set-off" data-date="${today}">今日は休み</button>`;
+  if (!rec?.start) {
+    main = `<button type="button" class="btn-big" data-action="open-start" data-date="${today}"><small>出発するとき</small>乗務前点呼を記録</button>`;
   } else if (!rec.end) {
     main = `<button type="button" class="btn-big end" data-action="open-end" data-date="${today}"><small>帰ってきたとき</small>乗務後点呼を記録</button>`;
   } else {
@@ -376,13 +372,8 @@ function renderEntry() {
   let body = '';
   if (mode === 'start') body = startSection(false);
   else if (mode === 'end') body = endSection(false);
-  else if (isOff(d)) {
-    body = `<section class="card pad off-card"><p><b>この日は休みです</b></p>
-      <p class="small">乗務した日だった場合は、休みを取り消してから入力してください。</p>
-      <button type="button" class="btn-outline" data-action="unset-off" data-date="${d.date}">休みを取り消す</button></section>`;
-  } else {
-    body = (!findRecord(d.date) ? `<button type="button" class="btn-outline" data-action="set-off" data-date="${d.date}">この日は休みにする</button>` : '')
-      + (d.start ? startSection(true) : `<button type="button" class="btn-outline" data-action="add-part" data-part="start">＋ 乗務前点呼を入力する</button>`)
+  else {
+    body = (d.start ? startSection(true) : `<button type="button" class="btn-outline" data-action="add-part" data-part="start">＋ 乗務前点呼を入力する</button>`)
       + (d.end ? endSection(true) : `<button type="button" class="btn-outline" data-action="add-part" data-part="end">＋ 乗務後点呼を入力する</button>`)
       + `<section class="card fields">${field('点呼実施者名', input('rollcaller'))}</section>`;
   }
@@ -392,7 +383,7 @@ function renderEntry() {
       ${head(title, state.back)}
       ${mode !== 'day' ? `<p class="muted">${label(d.date)}　${e(state.settings.driverName)}</p>` : ''}
       ${body}
-      ${isOff(d) ? '' : '<button type="button" class="btn-primary" data-action="save-entry">この内容で記録する</button>'}
+      <button type="button" class="btn-primary" data-action="save-entry">この内容で記録する</button>
       ${mode === 'day' && exists && !isOff(d) ? '<button type="button" class="btn-text danger" data-action="delete-day">この日の記録を消す</button>' : ''}
     </main>`;
 }
@@ -412,7 +403,7 @@ function renderList() {
     const r = findRecord(key);
     const wd = weekday(key);
     const dist = distanceOf(r);
-    const off = isOff(r);
+    const off = isOffDay(r, key, today);
     if (r && !off) { work++; km += dist || 0; }
     const sub = off
       ? '<span class="tag off-tag">休み</span>'
@@ -437,7 +428,7 @@ function renderList() {
       </div>
       <p class="muted center">出勤 ${work}日・走行 ${km.toLocaleString('ja-JP')} km</p>
       <div class="card list">${rows.join('') || '<p class="empty">この月の記録はありません</p>'}</div>
-      <p class="info">日付をタップすると、記録を直したり、入れ忘れた日を追加したり、休みにしたりできます。</p>
+      <p class="info">走行距離を入れなかった日は、自動で「休み」になります。日付をタップすると、記録を直したり、入れ忘れた日を追加したりできます。</p>
     </main>`;
 }
 
@@ -1404,17 +1395,6 @@ app.addEventListener('click', async (ev) => {
       const pdf = await canvasesToPdf([salesCanvas()]);
       await deliver(new File([pdf], `${y}年${m}月_${safeName(state.settings.driverName)}_売上表.pdf`, { type: 'application/pdf' }), 'share');
     });
-  }
-  else if (action === 'set-off') {
-    await db.putRecord({ date: el.dataset.date, off: true, start: null, end: null, rollcaller: '' });
-    await reload();
-    toast(`${label(el.dataset.date)} を休みにしました`);
-    if (state.view === 'entry') history.back(); else renderHome();
-  } else if (action === 'unset-off') {
-    await db.deleteRecord(el.dataset.date);
-    await reload();
-    toast('休みを取り消しました');
-    if (state.view === 'entry') history.back(); else renderHome();
   }
   else if (action === 'delete-oil') {
     const c = state.settings.oilChanges.find((x) => x.id === el.dataset.id);

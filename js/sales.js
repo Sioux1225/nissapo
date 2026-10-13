@@ -2,7 +2,7 @@
 // 佐川急便：その日の配達個数（宅配・商業・集荷）× 単価。日当の案件：乗務した日 × 日当。
 // 前払いは月初めからの売上で計算するため、合計はその月の分だけ（前月の分は含めない）。
 
-import { num, daysInMonth, dateKey, weekday, distanceOf, isOff } from './model.js';
+import { num, daysInMonth, dateKey, weekday, distanceOf, isOff, isOffDay, todayKey } from './model.js';
 
 export const SALES_TYPES = [['sagawa', '佐川急便'], ['daily', 'その他']];
 export const COUNT_KEYS = [['takuhai', '宅配'], ['shogyo', '商業'], ['shuka', '集荷']];
@@ -91,7 +91,7 @@ export function dayAmount(rec, settings) {
 }
 
 // その月の売上表。upto（'YYYY-MM-DD'）までの日を数える（前払いは今日まで）
-export function monthSales(records, y, m, settings, upto = null) {
+export function monthSales(records, y, m, settings, upto = null, today = todayKey()) {
   const byDate = new Map(records.map((r) => [r.date, r]));
   const days = daysInMonth(y, m);
   const rows = [];
@@ -104,7 +104,7 @@ export function monthSales(records, y, m, settings, upto = null) {
     const counts = Object.fromEntries(COUNT_KEYS.map(([k]) => [k, num(rec?.sales?.[k])]));
     const km = distanceOf(rec);
     const missing = inRange && countsMissing(rec, settings);
-    rows.push({ date: key, day: d, week: weekday(key), rec, worked: worked(rec), off: isOff(rec), start: rec?.start?.time || '', end: rec?.end?.time || '', counts, km, amount, inRange, missing });
+    rows.push({ date: key, day: d, week: weekday(key), rec, worked: worked(rec), off: isOffDay(rec, key, today), start: rec?.start?.time || '', end: rec?.end?.time || '', counts, km, amount, inRange, missing });
     if (inRange && worked(rec)) {
       total.days++;
       for (const [k] of COUNT_KEYS) total[k] += counts[k] || 0;
