@@ -1,0 +1,148 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>日報サポ 使い方ガイド</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+JP:wght@400;600;700&amp;display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=M+PLUS+Rounded+1c:wght@800&amp;text=%E6%97%A5%E5%A0%B1%E3%82%B5%E3%83%9D%E3%83%BC%E3%83%88&amp;display=block">
+<style>
+/* 配布用の紙1枚（A4）。印刷物として作るため、明るい配色に固定している */
+:root {
+  --paper: #FFFFFF; --desk: #EFEEEC; --ink: #262626; --sub: #595959; --line: #C9C6C1;
+  --orange: #F39801; --orange-text: #7A4500; --orange-tint: #FFF3E0; --gray-tint: #F4F3F1; --warn: #A3341F; --brand-gray: #7D7D7D;
+  --font: 'IBM Plex Sans JP', 'Hiragino Sans', 'Noto Sans JP', sans-serif;
+  --round: 'M PLUS Rounded 1c', 'Hiragino Maru Gothic ProN', sans-serif;
+  color-scheme: light;
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--desk); color: var(--ink); font-family: var(--font); padding-inline: 16px; padding-block: 24px; }
+.sheet { max-width: 794px; margin: 0 auto; background: var(--paper); padding: 34px 44px 22px; position: relative; display: flex; flex-direction: column; gap: 12px; box-shadow: 0 1px 6px rgba(0,0,0,.12); }
+.sheet::before { content: ""; position: absolute; inset: 0 0 auto 0; height: 8px; background: var(--orange); }
+h1, h2, h3, p { margin: 0; }
+b { font-weight: 700; }
+.top { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+.brand { display: flex; align-items: center; gap: 14px; }
+.logo { width: 72px; height: 72px; flex: none; }
+.name { font-family: var(--round); font-size: 40px; font-weight: 800; letter-spacing: .02em; line-height: 1.2; }
+.name .g { color: var(--brand-gray); } .name .o { color: #E08A00; } .name small { font-size: 17px; color: var(--sub); }
+.catch { font-size: 17px; font-weight: 600; margin-top: 2px; }
+.tags { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; font-size: 12px; color: var(--sub); text-align: right; }
+.pill { padding: 3px 10px; border: 1px solid var(--orange); border-radius: 999px; color: var(--orange-text); font-weight: 700; }
+.start { display: grid; grid-template-columns: 180px minmax(0, 1fr); gap: 20px; padding: 12px 16px; border: 2px solid var(--orange); border-radius: 16px; }
+.qr { display: flex; flex-direction: column; align-items: center; gap: 6px; }
+.qr svg { width: 150px; height: 150px; }
+.qr span { font-size: 11px; color: var(--sub); text-align: center; word-break: break-all; }
+h2 { font-size: 18px; font-weight: 700; text-wrap: balance; }
+.steps { list-style: none; margin: 6px 0 0; padding: 0; display: flex; flex-direction: column; gap: 5px; font-size: 13px; line-height: 1.5; }
+.steps li { display: flex; gap: 10px; }
+.num { width: 22px; height: 22px; flex: none; border-radius: 11px; background: var(--orange); color: var(--ink); font-weight: 700; font-size: 12px; display: flex; align-items: center; justify-content: center; margin-top: 1px; }
+.note { font-size: 12px; color: var(--sub); margin-top: 4px; }
+.flow { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin-top: 8px; }
+.card { padding: 10px 14px; border-radius: 14px; display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.card.often { background: var(--orange-tint); } .card.rare { background: var(--gray-tint); }
+.when { font-size: 12px; font-weight: 700; color: var(--orange-text); letter-spacing: .02em; }
+.card.rare .when { color: var(--sub); }
+h3 { font-size: 16px; font-weight: 700; }
+.card p { font-size: 12.5px; line-height: 1.55; }
+.tip { font-size: 12px !important; color: var(--sub); }
+.facts { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.box { padding: 10px 14px; border: 1px solid var(--line); border-radius: 14px; display: flex; flex-direction: column; gap: 5px; min-width: 0; }
+.box h2 { font-size: 15px; }
+.box p { font-size: 12.5px; line-height: 1.55; }
+.must { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; font-size: 12.5px; line-height: 1.5; }
+.must b { color: var(--warn); }
+.lost { margin: 4px 0 0; padding-left: 1.2em; display: flex; flex-direction: column; gap: 2px; }
+.lost b { color: var(--ink); }
+.foot { margin-top: 4px; padding-top: 10px; border-top: 1px solid var(--line); display: flex; justify-content: space-between; gap: 16px; flex-wrap: wrap; font-size: 12px; color: var(--sub); }
+.foot b { color: var(--ink); }
+@media (max-width: 640px) {
+  .sheet { padding: 32px 18px 24px; }
+  .start, .flow, .facts { grid-template-columns: minmax(0, 1fr); }
+  .tags { align-items: flex-start; text-align: left; }
+  .name { font-size: 26px; }
+}
+/* 印刷：ブラウザが余白を付けても A4 の1枚に収まるよう、少し縮小して印刷する */
+@media print {
+  @page { size: A4 portrait; margin: 8mm; }
+  html, body { background: none; padding: 0; margin: 0; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  .sheet { box-shadow: none; width: 794px; max-width: none; height: auto; margin: 0 auto; zoom: 0.88; break-inside: avoid; }
+}
+.terms { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; margin-top: 2px; }
+.term { padding: 6px 8px; border-radius: 10px; background: var(--orange-tint); display: flex; flex-direction: column; align-items: center; gap: 0; text-align: center; min-width: 0; }
+.term span { font-size: 11.5px; color: var(--sub); }
+.term b { font-size: 17px; color: var(--orange-text); }
+</style>
+
+</head>
+<body>
+<main class="sheet">
+  <header class="top">
+    <div class="brand"><svg class="logo" viewBox="0 0 160 160" aria-hidden="true"><rect x="2" y="2" width="156" height="156" rx="34" fill="#FFFFFF" stroke="#E6E6E6" stroke-width="4"/><rect x="48" y="26" width="66" height="98" rx="7" fill="none" stroke="#F39801" stroke-width="11" stroke-linejoin="round"/><rect x="37" y="43" width="22" height="10" rx="5" fill="#7D7D7D"/><rect x="37" y="70" width="22" height="10" rx="5" fill="#7D7D7D"/><rect x="37" y="97" width="22" height="10" rx="5" fill="#7D7D7D"/><circle cx="70" cy="62" r="7" fill="#7D7D7D"/><circle cx="94" cy="62" r="7" fill="#7D7D7D"/><path d="M68 83 Q82 97 96 83" fill="none" stroke="#7D7D7D" stroke-width="8" stroke-linecap="round"/><circle cx="118" cy="116" r="23" fill="#F39801" stroke="#FFFFFF" stroke-width="6"/><path d="M108 116 L115.5 123.5 L129 109" fill="none" stroke="#FFFFFF" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      <div><h1 class="name"><span class="g">日報</span><span class="o">サポート</span></h1>
+        <p class="catch">タップするだけで、日報と点呼記録簿ができる</p></div>
+    </div>
+    <div class="tags"><span class="pill">使い方ガイド</span><span>無料 ・ データはあなたのスマホの中だけ</span></div>
+  </header>
+
+  <section class="start" aria-labelledby="start-h">
+    <div class="qr">
+      <svg viewBox="-4 -4 37 37" role="img" aria-label="日報サポを開くQRコード" shape-rendering="crispEdges"><rect x="-4" y="-4" width="37" height="37" fill="#FFFFFF"/><path d="M0 0h1v1h-1zM1 0h1v1h-1zM2 0h1v1h-1zM3 0h1v1h-1zM4 0h1v1h-1zM5 0h1v1h-1zM6 0h1v1h-1zM8 0h1v1h-1zM11 0h1v1h-1zM12 0h1v1h-1zM13 0h1v1h-1zM15 0h1v1h-1zM19 0h1v1h-1zM20 0h1v1h-1zM22 0h1v1h-1zM23 0h1v1h-1zM24 0h1v1h-1zM25 0h1v1h-1zM26 0h1v1h-1zM27 0h1v1h-1zM28 0h1v1h-1zM0 1h1v1h-1zM6 1h1v1h-1zM8 1h1v1h-1zM9 1h1v1h-1zM11 1h1v1h-1zM13 1h1v1h-1zM16 1h1v1h-1zM17 1h1v1h-1zM18 1h1v1h-1zM20 1h1v1h-1zM22 1h1v1h-1zM28 1h1v1h-1zM0 2h1v1h-1zM2 2h1v1h-1zM3 2h1v1h-1zM4 2h1v1h-1zM6 2h1v1h-1zM9 2h1v1h-1zM10 2h1v1h-1zM11 2h1v1h-1zM12 2h1v1h-1zM15 2h1v1h-1zM18 2h1v1h-1zM19 2h1v1h-1zM22 2h1v1h-1zM24 2h1v1h-1zM25 2h1v1h-1zM26 2h1v1h-1zM28 2h1v1h-1zM0 3h1v1h-1zM2 3h1v1h-1zM3 3h1v1h-1zM4 3h1v1h-1zM6 3h1v1h-1zM8 3h1v1h-1zM9 3h1v1h-1zM10 3h1v1h-1zM12 3h1v1h-1zM14 3h1v1h-1zM17 3h1v1h-1zM19 3h1v1h-1zM22 3h1v1h-1zM24 3h1v1h-1zM25 3h1v1h-1zM26 3h1v1h-1zM28 3h1v1h-1zM0 4h1v1h-1zM2 4h1v1h-1zM3 4h1v1h-1zM4 4h1v1h-1zM6 4h1v1h-1zM9 4h1v1h-1zM11 4h1v1h-1zM14 4h1v1h-1zM15 4h1v1h-1zM17 4h1v1h-1zM19 4h1v1h-1zM22 4h1v1h-1zM24 4h1v1h-1zM25 4h1v1h-1zM26 4h1v1h-1zM28 4h1v1h-1zM0 5h1v1h-1zM6 5h1v1h-1zM9 5h1v1h-1zM10 5h1v1h-1zM11 5h1v1h-1zM13 5h1v1h-1zM17 5h1v1h-1zM19 5h1v1h-1zM22 5h1v1h-1zM28 5h1v1h-1zM0 6h1v1h-1zM1 6h1v1h-1zM2 6h1v1h-1zM3 6h1v1h-1zM4 6h1v1h-1zM5 6h1v1h-1zM6 6h1v1h-1zM8 6h1v1h-1zM10 6h1v1h-1zM12 6h1v1h-1zM14 6h1v1h-1zM16 6h1v1h-1zM18 6h1v1h-1zM20 6h1v1h-1zM22 6h1v1h-1zM23 6h1v1h-1zM24 6h1v1h-1zM25 6h1v1h-1zM26 6h1v1h-1zM27 6h1v1h-1zM28 6h1v1h-1zM8 7h1v1h-1zM9 7h1v1h-1zM11 7h1v1h-1zM15 7h1v1h-1zM16 7h1v1h-1zM17 7h1v1h-1zM0 8h1v1h-1zM2 8h1v1h-1zM3 8h1v1h-1zM5 8h1v1h-1zM6 8h1v1h-1zM7 8h1v1h-1zM10 8h1v1h-1zM11 8h1v1h-1zM12 8h1v1h-1zM13 8h1v1h-1zM15 8h1v1h-1zM16 8h1v1h-1zM17 8h1v1h-1zM19 8h1v1h-1zM20 8h1v1h-1zM22 8h1v1h-1zM25 8h1v1h-1zM27 8h1v1h-1zM28 8h1v1h-1zM0 9h1v1h-1zM1 9h1v1h-1zM2 9h1v1h-1zM4 9h1v1h-1zM5 9h1v1h-1zM8 9h1v1h-1zM11 9h1v1h-1zM13 9h1v1h-1zM14 9h1v1h-1zM16 9h1v1h-1zM17 9h1v1h-1zM18 9h1v1h-1zM19 9h1v1h-1zM20 9h1v1h-1zM22 9h1v1h-1zM23 9h1v1h-1zM24 9h1v1h-1zM28 9h1v1h-1zM0 10h1v1h-1zM3 10h1v1h-1zM4 10h1v1h-1zM5 10h1v1h-1zM6 10h1v1h-1zM7 10h1v1h-1zM8 10h1v1h-1zM11 10h1v1h-1zM12 10h1v1h-1zM13 10h1v1h-1zM18 10h1v1h-1zM22 10h1v1h-1zM26 10h1v1h-1zM27 10h1v1h-1zM0 11h1v1h-1zM3 11h1v1h-1zM8 11h1v1h-1zM16 11h1v1h-1zM19 11h1v1h-1zM22 11h1v1h-1zM23 11h1v1h-1zM28 11h1v1h-1zM0 12h1v1h-1zM3 12h1v1h-1zM4 12h1v1h-1zM5 12h1v1h-1zM6 12h1v1h-1zM8 12h1v1h-1zM10 12h1v1h-1zM14 12h1v1h-1zM15 12h1v1h-1zM16 12h1v1h-1zM17 12h1v1h-1zM19 12h1v1h-1zM21 12h1v1h-1zM23 12h1v1h-1zM25 12h1v1h-1zM26 12h1v1h-1zM1 13h1v1h-1zM2 13h1v1h-1zM5 13h1v1h-1zM8 13h1v1h-1zM10 13h1v1h-1zM14 13h1v1h-1zM15 13h1v1h-1zM16 13h1v1h-1zM19 13h1v1h-1zM21 13h1v1h-1zM22 13h1v1h-1zM26 13h1v1h-1zM27 13h1v1h-1zM28 13h1v1h-1zM0 14h1v1h-1zM1 14h1v1h-1zM6 14h1v1h-1zM7 14h1v1h-1zM8 14h1v1h-1zM9 14h1v1h-1zM10 14h1v1h-1zM11 14h1v1h-1zM12 14h1v1h-1zM13 14h1v1h-1zM19 14h1v1h-1zM20 14h1v1h-1zM22 14h1v1h-1zM23 14h1v1h-1zM24 14h1v1h-1zM26 14h1v1h-1zM27 14h1v1h-1zM28 14h1v1h-1zM0 15h1v1h-1zM1 15h1v1h-1zM2 15h1v1h-1zM3 15h1v1h-1zM8 15h1v1h-1zM9 15h1v1h-1zM10 15h1v1h-1zM14 15h1v1h-1zM15 15h1v1h-1zM19 15h1v1h-1zM20 15h1v1h-1zM23 15h1v1h-1zM27 15h1v1h-1zM3 16h1v1h-1zM4 16h1v1h-1zM6 16h1v1h-1zM7 16h1v1h-1zM9 16h1v1h-1zM10 16h1v1h-1zM11 16h1v1h-1zM14 16h1v1h-1zM18 16h1v1h-1zM20 16h1v1h-1zM23 16h1v1h-1zM24 16h1v1h-1zM25 16h1v1h-1zM27 16h1v1h-1zM4 17h1v1h-1zM5 17h1v1h-1zM12 17h1v1h-1zM14 17h1v1h-1zM15 17h1v1h-1zM17 17h1v1h-1zM20 17h1v1h-1zM21 17h1v1h-1zM23 17h1v1h-1zM25 17h1v1h-1zM26 17h1v1h-1zM27 17h1v1h-1zM0 18h1v1h-1zM3 18h1v1h-1zM4 18h1v1h-1zM5 18h1v1h-1zM6 18h1v1h-1zM7 18h1v1h-1zM9 18h1v1h-1zM10 18h1v1h-1zM11 18h1v1h-1zM13 18h1v1h-1zM14 18h1v1h-1zM15 18h1v1h-1zM16 18h1v1h-1zM17 18h1v1h-1zM21 18h1v1h-1zM23 18h1v1h-1zM24 18h1v1h-1zM26 18h1v1h-1zM7 19h1v1h-1zM8 19h1v1h-1zM9 19h1v1h-1zM10 19h1v1h-1zM12 19h1v1h-1zM13 19h1v1h-1zM14 19h1v1h-1zM15 19h1v1h-1zM17 19h1v1h-1zM18 19h1v1h-1zM19 19h1v1h-1zM22 19h1v1h-1zM23 19h1v1h-1zM24 19h1v1h-1zM26 19h1v1h-1zM1 20h1v1h-1zM2 20h1v1h-1zM5 20h1v1h-1zM6 20h1v1h-1zM10 20h1v1h-1zM12 20h1v1h-1zM13 20h1v1h-1zM14 20h1v1h-1zM17 20h1v1h-1zM20 20h1v1h-1zM21 20h1v1h-1zM22 20h1v1h-1zM23 20h1v1h-1zM24 20h1v1h-1zM25 20h1v1h-1zM26 20h1v1h-1zM8 21h1v1h-1zM9 21h1v1h-1zM10 21h1v1h-1zM11 21h1v1h-1zM16 21h1v1h-1zM17 21h1v1h-1zM18 21h1v1h-1zM20 21h1v1h-1zM24 21h1v1h-1zM25 21h1v1h-1zM26 21h1v1h-1zM27 21h1v1h-1zM28 21h1v1h-1zM0 22h1v1h-1zM1 22h1v1h-1zM2 22h1v1h-1zM3 22h1v1h-1zM4 22h1v1h-1zM5 22h1v1h-1zM6 22h1v1h-1zM8 22h1v1h-1zM12 22h1v1h-1zM14 22h1v1h-1zM16 22h1v1h-1zM18 22h1v1h-1zM19 22h1v1h-1zM20 22h1v1h-1zM22 22h1v1h-1zM24 22h1v1h-1zM25 22h1v1h-1zM27 22h1v1h-1zM0 23h1v1h-1zM6 23h1v1h-1zM8 23h1v1h-1zM11 23h1v1h-1zM12 23h1v1h-1zM13 23h1v1h-1zM14 23h1v1h-1zM15 23h1v1h-1zM16 23h1v1h-1zM18 23h1v1h-1zM19 23h1v1h-1zM20 23h1v1h-1zM24 23h1v1h-1zM25 23h1v1h-1zM28 23h1v1h-1zM0 24h1v1h-1zM2 24h1v1h-1zM3 24h1v1h-1zM4 24h1v1h-1zM6 24h1v1h-1zM9 24h1v1h-1zM10 24h1v1h-1zM12 24h1v1h-1zM15 24h1v1h-1zM16 24h1v1h-1zM17 24h1v1h-1zM20 24h1v1h-1zM21 24h1v1h-1zM22 24h1v1h-1zM23 24h1v1h-1zM24 24h1v1h-1zM26 24h1v1h-1zM0 25h1v1h-1zM2 25h1v1h-1zM3 25h1v1h-1zM4 25h1v1h-1zM6 25h1v1h-1zM8 25h1v1h-1zM13 25h1v1h-1zM15 25h1v1h-1zM16 25h1v1h-1zM19 25h1v1h-1zM20 25h1v1h-1zM23 25h1v1h-1zM24 25h1v1h-1zM25 25h1v1h-1zM28 25h1v1h-1zM0 26h1v1h-1zM2 26h1v1h-1zM3 26h1v1h-1zM4 26h1v1h-1zM6 26h1v1h-1zM8 26h1v1h-1zM9 26h1v1h-1zM12 26h1v1h-1zM13 26h1v1h-1zM17 26h1v1h-1zM18 26h1v1h-1zM21 26h1v1h-1zM23 26h1v1h-1zM26 26h1v1h-1zM28 26h1v1h-1zM0 27h1v1h-1zM6 27h1v1h-1zM9 27h1v1h-1zM10 27h1v1h-1zM12 27h1v1h-1zM13 27h1v1h-1zM14 27h1v1h-1zM15 27h1v1h-1zM18 27h1v1h-1zM19 27h1v1h-1zM20 27h1v1h-1zM21 27h1v1h-1zM23 27h1v1h-1zM25 27h1v1h-1zM27 27h1v1h-1zM0 28h1v1h-1zM1 28h1v1h-1zM2 28h1v1h-1zM3 28h1v1h-1zM4 28h1v1h-1zM5 28h1v1h-1zM6 28h1v1h-1zM8 28h1v1h-1zM9 28h1v1h-1zM14 28h1v1h-1zM15 28h1v1h-1zM18 28h1v1h-1zM20 28h1v1h-1zM22 28h1v1h-1zM23 28h1v1h-1zM25 28h1v1h-1zM27 28h1v1h-1z" fill="#1F1F1F"/></svg>
+      <span>sioux1225.github.io/nissapo</span>
+    </div>
+    <div>
+      <h2 id="start-h">はじめに</h2>
+      <ol class="steps">
+        <li><span class="num">1</span><span>スマホのカメラで<b>左のQRコード</b>を読み取ります。</span></li>
+        <li><span class="num">2</span><span><b>iPhone</b>：ブラウザの下の共有ボタン →「<b>ホーム画面に追加</b>」<br><b>Android</b>：Chrome で「<b>アプリをインストール</b>」（またはメニュー →「ホーム画面に追加」）</span></li>
+        <li><span class="num">3</span><span>ホーム画面の「<b>日報サポ</b>」を開き、<b>運転者名・車両番号・乗務開始地点・主な経過地点・点呼実施者名・今のメーターの距離</b>を入れて「<b>はじめる</b>」。<br>ここで入れた内容が、毎日の入力の初期値になります。</span></li>
+      </ol>
+      <p class="note">※ 2回目からは、電波のない場所でも開けます。</p>
+    </div>
+  </section>
+
+  <section aria-labelledby="flow-h">
+    <h2 id="flow-h">使い方は、この4つだけ</h2>
+    <div class="flow">
+      <article class="card often"><span class="when">毎日（出発するとき）</span><h3>① 乗務前点呼を記録する</h3>
+        <p>ホームのオレンジのボタン「<b>乗務前点呼を記録</b>」を押します。時刻と出発時のメーターは自動で入ります。<b>アルコール検知器・酒気帯び・健康状態・日常点検</b>を確かめて「<b>この内容で記録する</b>」。</p>
+        <p class="tip">酒気帯びがあるときは乗務できません。すぐに事務所に連絡を。</p></article>
+      <article class="card often"><span class="when">毎日（帰ってきたとき）</span><h3>② 乗務後点呼を記録する</h3>
+        <p>「<b>乗務後点呼を記録</b>」を押し、<b>帰着時のメーター</b>か<b>今日走った距離</b>の、どちらか一方を入れます。経過地点・休憩などは前回と同じ内容が入っているので、変わったときだけ直します。</p>
+        <p class="tip">入れ忘れた日は「<b>記録の一覧</b>」から日付をタップして追加・修正できます。</p></article>
+      <article class="card rare"><span class="when">毎月（月末に）</span><h3>③ 書き出して保管する</h3>
+        <p>「<b>書き出し・共有</b>」で月と形式（<b>Excel・PDF・CSV</b>）を選び、スマホに保存します。「<b>共有する</b>」から LINE やメールで事務所にも送れます。Excel は事務所の運転日報・点呼記録簿と同じ形です。</p></article>
+      <article class="card rare"><span class="when">事故があったら</span><h3>④ 事故の記録をつける</h3>
+        <p>救護・警察（110番）・事務所への連絡が先です。落ち着いたら、ホームの「<b>事故の記録</b>」から記録します。国土交通省の様式と同じ項目で、記入例つき。<b>写真</b>も付けられ、PDF にして送れます。</p></article>
+    </div>
+  </section>
+
+  <section class="facts">
+    <div class="box"><h2>運転日報・点呼記録簿ってなに？</h2>
+      <p>軽貨物の仕事を<b>自分の名前で届け出ている人</b>は、国の決まりで、記録をつけて<b>自分で保管する</b>ことになっています。</p>
+      <p><b>点呼記録簿</b>：乗務の前と後に、酒気帯び（<b>アルコール検知器</b>を使う）・健康状態・日常点検などを確かめた記録。<br><b>運転日報</b>：仕事を始めた・終えた地点と時刻、経過地点、走った距離などの記録（2025年4月から義務）。</p>
+      <div class="terms">
+        <div class="term"><span>点呼記録簿</span><b>1年間</b></div>
+        <div class="term"><span>運転日報</span><b>1年間</b></div>
+        <div class="term"><span>事故の記録</span><b>3年間</b></div>
+      </div></div>
+    <div class="box"><h2>大切な3つのこと</h2>
+      <ul class="must">
+        <li><b>1. 点呼は、その場で記録する。</b>出発する前と帰ってきたときに、そのつど記録してください。</li>
+        <li><b>2. 月に1回、書き出して別の場所にも保存。</b>データはスマホの中だけにあり、次のときは消えてしまいます。書き出したファイルや<b>バックアップ</b>を iCloud Drive や Google ドライブに保存しておきましょう。
+          <ul class="lost">
+            <li>ホーム画面から日報サポの<b>アイコンを削除</b>したとき（一番多い原因です）</li>
+            <li>ブラウザの「<b>履歴とWebサイトデータを消去</b>」をしたとき</li>
+            <li><b>機種変更</b>・スマホの故障・紛失のとき</li>
+          </ul></li>
+        <li><b>3. 保存期間のあいだは消さない。</b>監査などで求められたら、見せられるようにしておきます。</li>
+      </ul></div>
+  </section>
+
+  <footer class="foot">
+    <span>決まりについて迷ったら、事務所か運輸支局にご相談ください。</span>
+  </footer>
+</main>
+</body>
+</html>
