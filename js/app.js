@@ -17,7 +17,7 @@ import {
   KINDS, COLLISIONS, ROAD_TYPES, SLOPES, SHAPES, SURFACES
 } from './accident.js';
 
-export const APP_VERSION = '0.9.0';
+export const APP_VERSION = '0.9.1';
 
 const app = document.getElementById('app');
 const state = {
@@ -893,7 +893,8 @@ function salesContext() {
   return { s, y, m, today, thisMonth, upto, data: monthSales(state.records, y, m, s, upto) };
 }
 
-function salesSub(s, y, m) {
+// withOffice：false なら営業所名を書かない（PDF では表題の「佐川急便」の右に書くため）
+function salesSub(s, y, m, withOffice = true) {
   if (s.salesType === 'daily') return `所属：${s.salesProject || ''}　日当：${yen(s.dailyRate)}`;
   const p = unitPrices(s);
   // その月に新人保証の期間がかかっていれば書く
@@ -901,7 +902,7 @@ function salesSub(s, y, m) {
   const monthFrom = y ? `${y}-${pad2(m)}-01` : '';
   const monthTo = y ? `${y}-${pad2(m)}-31` : '';
   const nbText = nb && (!y || (nb.from <= monthTo && nb.to >= monthFrom)) ? `　新人保証：1日 ${yen(nb.perDay)}（〜${Number(nb.to.slice(5, 7))}/${Number(nb.to.slice(8))}）` : '';
-  return `営業所：${officeName(s)}　単価：宅配 ${yen(p.takuhai)}・商業 ${yen(p.shogyo)}・集荷 ${yen(p.shuka)}${p.daily ? `＋1日 ${yen(p.daily)}` : ''}${nbText}`;
+  return `${withOffice ? `営業所：${officeName(s)}　` : ''}単価：宅配 ${yen(p.takuhai)}・商業 ${yen(p.shogyo)}・集荷 ${yen(p.shuka)}${p.daily ? `＋1日 ${yen(p.daily)}` : ''}${nbText}`;
 }
 
 function renderSales() {
@@ -969,10 +970,10 @@ function salesCanvas() {
   const foot = ['合計', '', `${t.days}日`, '', ...(sagawa ? [`${t.takuhai}`, `${t.shogyo}`, `${t.shuka}`] : []), kmText(t.km), yen(t.amount)];
   const [ty, tm, td] = today.split('-').map(Number);
   return renderSalesSheet({
-    title: sagawa ? '佐川急便' : (s.salesProject || '売上表'),
+    title: sagawa ? `佐川急便　${officeName(s)}` : (s.salesProject || '売上表'),
     ym: reiwa,
     name: s.driverName,
-    sub: salesSub(s, y, m),
+    sub: salesSub(s, y, m, !sagawa),
     head,
     rows,
     foot,
