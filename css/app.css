@@ -302,3 +302,8 @@ button:focus-visible { outline: 3px solid var(--blue); outline-offset: 2px; }
 .warn-text { color: var(--warn); font-weight: 700; }
 .price-line b { color: var(--ink); font-size: 15px; }
 .sales-row .row-km { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; }
+
+/* オイル交換のバー：アプリを開いたときに左から右へ伸ばす */
+.oil-bar.grow .oil-fill { animation: oil-grow 1.2s cubic-bezier(0.22, 1, 0.36, 1) 0.15s both; }
+@keyframes oil-grow { from { width: 0; } }
+@media (prefers-reduced-motion: reduce) { .oil-bar.grow .oil-fill { animation: none; } }

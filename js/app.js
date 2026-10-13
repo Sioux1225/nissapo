@@ -17,7 +17,7 @@ import {
   KINDS, COLLISIONS, ROAD_TYPES, SLOPES, SHAPES, SURFACES
 } from './accident.js';
 
-export const APP_VERSION = '0.7.8';
+export const APP_VERSION = '0.7.9';
 
 const app = document.getElementById('app');
 const state = {
@@ -767,15 +767,19 @@ const accFileName = (a) => `事故の記録_${a.date.replace(/-/g, '')}_${safeNa
 const kmText = (v) => `${Number(v).toLocaleString('ja-JP')}km`;
 
 // 0〜5,000km のバー（3,000km からの目安に目盛り）
-function oilBar(st) {
+// animate：アプリを開いたときに、バーを左から右へ伸ばす
+function oilBar(st, animate = false) {
   const pct = Math.min(100, (st.since / OIL_LIMIT) * 100);
   const cls = st.level >= 4500 ? 'danger' : st.level >= 3000 ? 'caution' : '';
-  return `<div class="oil-bar ${cls}" role="img" aria-label="前回の交換から${kmText(st.since)}（5,000kmまで）">
+  return `<div class="oil-bar ${cls} ${animate ? 'grow' : ''}" role="img" aria-label="前回の交換から${kmText(st.since)}（5,000kmまで）">
     <div class="oil-fill" style="width:${pct}%"></div>
     ${OIL_STEPS.map((s) => `<span class="oil-tick" style="left:${(s / OIL_LIMIT) * 100}%"></span>`).join('')}
   </div>
   <div class="oil-scale"><span>0</span><span style="left:60%">3,000</span><span style="left:100%">5,000km</span></div>`;
 }
+
+// アプリを開いた（戻ってきた）あと、最初にホームを描くときだけバーを動かす
+let oilBarGrow = true;
 
 function oilCard() {
   const st = oilStatus(state.settings, state.records);
@@ -786,9 +790,11 @@ function oilCard() {
     </button>`;
   }
   const msg = oilMessage(st);
+  const grow = oilBarGrow;
+  oilBarGrow = false;
   return `<button type="button" class="card pad oil-card ${st.level >= 4500 ? 'danger' : st.level >= 3000 ? 'caution' : ''}" data-action="go" data-view="oil">
     <span class="oil-head"><b>オイル交換</b><span class="oil-num">前回から <b>${kmText(st.since)}</b></span></span>
-    ${oilBar(st)}
+    ${oilBar(st, grow)}
     <span class="small">${msg ? `<b>${e(msg.title)}</b>　` : ''}${st.remaining > 0 ? `5,000km まで あと ${kmText(st.remaining)}` : `5,000km を ${kmText(-st.remaining)} 超えています`}${st.element.need === 'must' ? '<br>次のオイル交換では<b>エレメントも必ず交換</b>します' : st.element.need === 'suggest' ? '<br>次のオイル交換は<b>エレメントも交換の時期</b>です' : ''}</span>
   </button>`;
 }
@@ -1586,7 +1592,9 @@ function setupUpdates() {
 
 // 日付が変わったとき・アプリに戻ってきたときに、ホームの「今日」を新しくする
 document.addEventListener('visibilitychange', () => {
-  if (!document.hidden && state.view === 'home') renderHome();
+  // 別のアプリから戻ってきたら、オイル交換のバーをもう一度動かす
+  if (document.hidden) { oilBarGrow = true; return; }
+  if (state.view === 'home') renderHome();
 });
 
 // 写真を撮る・選ぶ（スマホでは「写真を撮る」「写真ライブラリ」を選べる）
