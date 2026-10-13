@@ -17,7 +17,7 @@ import {
   KINDS, COLLISIONS, ROAD_TYPES, SLOPES, SHAPES, SURFACES
 } from './accident.js';
 
-export const APP_VERSION = '0.9.1';
+export const APP_VERSION = '0.9.2';
 
 const app = document.getElementById('app');
 const state = {
@@ -893,6 +893,12 @@ function salesContext() {
   return { s, y, m, today, thisMonth, upto, data: monthSales(state.records, y, m, s, upto) };
 }
 
+// 「八王子」→「八王子営業所」、「八王子（代走）」→「八王子営業所（代走）」
+function officeTitle(name) {
+  if (!name || /営業所/.test(name)) return name || '';
+  return name.replace(/^([^（]+)(（.*）)?$/, '$1営業所$2');
+}
+
 // withOffice：false なら営業所名を書かない（PDF では表題の「佐川急便」の右に書くため）
 function salesSub(s, y, m, withOffice = true) {
   if (s.salesType === 'daily') return `所属：${s.salesProject || ''}　日当：${yen(s.dailyRate)}`;
@@ -970,7 +976,7 @@ function salesCanvas() {
   const foot = ['合計', '', `${t.days}日`, '', ...(sagawa ? [`${t.takuhai}`, `${t.shogyo}`, `${t.shuka}`] : []), kmText(t.km), yen(t.amount)];
   const [ty, tm, td] = today.split('-').map(Number);
   return renderSalesSheet({
-    title: sagawa ? `佐川急便　${officeName(s)}` : (s.salesProject || '売上表'),
+    title: sagawa ? `佐川急便　${officeTitle(officeName(s))}` : (s.salesProject || '売上表'),
     ym: reiwa,
     name: s.driverName,
     sub: salesSub(s, y, m, !sagawa),
