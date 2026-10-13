@@ -28,6 +28,7 @@ export const DEFAULT_SETTINGS = {
   salesProject: '',    // 日極の案件の所属（案件名）
   dailyRate: '',       // 日極（円）
   advance: {},         // 希望する前払い額 { 'YYYY-MM': 円 }
+  advanceHistory: {},  // 受けた前払いの履歴 { 'YYYY-MM': [{ id, date, amount }] }
   lastVersion: '',     // 最後に開いたアプリの版（アップデートのお知らせ用）
   retention: '1年間'
 };

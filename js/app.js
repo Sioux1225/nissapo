@@ -3,7 +3,7 @@
 
 import { db, requestPersist } from './db.js';
 import { shrinkImage, newPhoto, blobToDataUrl, dataUrlToBlob } from './photo.js';
-import { SALES_TYPES, COUNT_KEYS, unitPrices, salesReady, monthSales, yen, defaultShogyo, defaultShuka, advanceKey, advanceOf, OFFICES, OTHER_OFFICE, PRICE_TABLE_DATE, officeEntry, officeName, newbiePeriod, newbieSpan } from './sales.js';
+import { SALES_TYPES, COUNT_KEYS, unitPrices, salesReady, monthSales, yen, defaultShogyo, defaultShuka, advanceKey, advanceOf, advanceHistory, advanceTotal, OFFICES, OTHER_OFFICE, PRICE_TABLE_DATE, officeEntry, officeName, newbiePeriod, newbieSpan } from './sales.js';
 import { EXPIRED, expiryStatus, expiryMessage, expiryAlertsToShow } from './expiry.js';
 import { OIL_LIMIT, OIL_STEPS, newOilChange, currentOdo, oilStatus, oilMessage, oilAlertToShow, sortOilChanges } from './oil.js';
 import {
@@ -17,7 +17,7 @@ import {
   KINDS, COLLISIONS, ROAD_TYPES, SLOPES, SHAPES, SURFACES
 } from './accident.js';
 
-export const APP_VERSION = '0.9.15';
+export const APP_VERSION = '0.10.0';
 
 const app = document.getElementById('app');
 const state = {
@@ -911,6 +911,29 @@ function salesSub(s, y, m, withOffice = true) {
   return `${withOffice ? `営業所：${officeName(s)}　` : ''}単価：宅配 ${yen(p.takuhai)}・商業 ${yen(p.shogyo)}・集荷 ${yen(p.shuka)}${p.daily ? `＋1日 ${yen(p.daily)}` : ''}${nbText}`;
 }
 
+// その月に受けた前払いの履歴・合計・残り（希望する前払い額の欄の上）
+function advanceSection(s, y, m, salesAmount, today) {
+  const list = advanceHistory(s, y, m);
+  const total = advanceTotal(s, y, m);
+  const def = today.startsWith(`${y}-${pad2(m)}-`) ? today : dateKey(y, m, 1);
+  return `<section class="card adv">
+    <h2 class="card-title">${m}月の前払い</h2>
+    <div class="adv-list">${list.map((a) => `<div class="adv-row">
+        <span>${Number(a.date.slice(5, 7))}/${Number(a.date.slice(8))}</span><b>${yen(a.amount)}</b>
+        <button type="button" class="btn-text danger" data-action="delete-advance" data-id="${e(a.id)}">消す</button>
+      </div>`).join('') || '<p class="empty">まだ前払いの記録はありません</p>'}</div>
+    <div class="adv-sum">
+      <div><span class="muted">前払いの合計</span><b>${yen(total)}</b></div>
+      <div><span class="muted">前払いできる残り</span><b class="${salesAmount - total < 0 ? 'warn-text' : ''}">${yen(salesAmount - total)}</b></div>
+    </div>
+    <div class="adv-add">
+      <input id="adv-date" type="date" value="${def}" aria-label="前払いを受けた日">
+      <input id="adv-amount" type="number" inputmode="numeric" min="0" placeholder="金額（円）" aria-label="前払いの金額">
+      <button type="button" class="btn-outline" data-action="add-advance">前払いを記録する</button>
+    </div>
+  </section>`;
+}
+
 function renderSales() {
   const { s, y, m, today, thisMonth, upto, data } = salesContext();
   const ready = salesReady(s);
@@ -944,9 +967,11 @@ function renderSales() {
         ${t.missing ? `<span class="small warn-text">配達個数がまだの日が ${t.missing}日あります</span>` : ''}
         <span class="small muted">${e(salesSub(s, y, m))}</span>
       </section>
+      ${advanceSection(s, y, m, t.amount, today)}
       <section class="card fields">
         ${field('希望する前払い額（円）', `<input id="advance" data-advance="${advanceKey(y, m)}" value="${advanceOf(s, y, m) ?? ''}" type="number" inputmode="numeric" min="0" placeholder="例：50000">`,
-          advanceOf(s, y, m) != null && advanceOf(s, y, m) > t.amount ? '<span class="warn-text">売上の合計より多い額です</span>' : '')}
+          advanceOf(s, y, m) != null && advanceOf(s, y, m) > t.amount - advanceTotal(s, y, m)
+            ? `<span class="warn-text">${advanceTotal(s, y, m) ? '前払いできる残り' : '売上の合計'}より多い額です</span>` : '')}
       </section>
       <p class="info">前払いは<b>月初めからの売上</b>で計算します。${sagawa ? '日ごとの配達個数は、乗務後点呼の画面か、下の一覧で入れられます。' : '運転日報で乗務を記録した日を、日極1日分として数えます。'}</p>
       <button type="button" class="btn-primary" data-action="share-sales">PDFにしてLINEで送る</button>
@@ -1394,6 +1419,33 @@ app.addEventListener('click', async (ev) => {
   else if (action === 'open-accident') openAccident(el.dataset.id);
   else if (action === 'save-accident') runBusy(saveAccident);
   else if (action === 'save-oil') runBusy(saveOil);
+  else if (action === 'add-advance') {
+    const date = document.getElementById('adv-date').value;
+    const amount = num(document.getElementById('adv-amount').value);
+    const { y, m } = state.salesMonth;
+    if (!date.startsWith(`${y}-${pad2(m)}-`)) { toast(`${m}月の日付を入れてください`); return; }
+    if (!amount || amount <= 0) { toast('前払いの金額を入れてください'); return; }
+    const s = state.settings;
+    const key = advanceKey(y, m);
+    const hist = { ...(s.advanceHistory || {}) };
+    hist[key] = [...(hist[key] || []), { id: `adv-${Date.now().toString(36)}`, date, amount }];
+    s.advanceHistory = hist;
+    await db.putSettings(s);
+    toast(`前払い ${yen(amount)} を記録しました`);
+    const sy = window.scrollY;
+    renderSales();
+    window.scrollTo(0, sy);
+  } else if (action === 'delete-advance') {
+    const s = state.settings;
+    const key = advanceKey(state.salesMonth.y, state.salesMonth.m);
+    const item = (s.advanceHistory?.[key] || []).find((a) => a.id === el.dataset.id);
+    if (!item || !(await ask(`${Number(item.date.slice(5, 7))}/${Number(item.date.slice(8))} の前払い ${yen(item.amount)} の記録を消します。`, '消す', true))) return;
+    s.advanceHistory = { ...s.advanceHistory, [key]: s.advanceHistory[key].filter((a) => a.id !== item.id) };
+    await db.putSettings(s);
+    const sy = window.scrollY;
+    renderSales();
+    window.scrollTo(0, sy);
+  }
   else if (action === 'sales-month') {
     const d = new Date(state.salesMonth.y, state.salesMonth.m - 1 + Number(el.dataset.step), 1);
     state.salesMonth = { y: d.getFullYear(), m: d.getMonth() + 1 };

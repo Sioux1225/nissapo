@@ -370,3 +370,13 @@ test('各営業所の新人保証と代走', async () => {
   assert.deepEqual(unitPrices({ salesType: 'sagawa', salesOffice: '戸田（代走）' }), { takuhai: 167, shogyo: 100, shuka: 100, daily: 10000 });
   assert.equal(unitPrices({ salesType: 'sagawa', salesOffice: '戸田' }).daily, 10000); // 以前の「戸田」も代走として扱う
 });
+
+test('前払いの履歴と合計（月ごと）', async () => {
+  const { advanceHistory, advanceTotal } = await import('../js/sales.js');
+  const s = { advanceHistory: { '2026-10': [{ id: 'b', date: '2026-10-20', amount: 30000 }, { id: 'a', date: '2026-10-05', amount: 50000 }], '2026-09': [{ id: 'c', date: '2026-09-10', amount: 70000 }] } };
+  assert.deepEqual(advanceHistory(s, 2026, 10).map((a) => a.id), ['a', 'b']);
+  assert.equal(advanceTotal(s, 2026, 10), 80000);
+  assert.equal(advanceTotal(s, 2026, 9), 70000);
+  assert.equal(advanceTotal(s, 2026, 11), 0);
+  assert.equal(advanceTotal({}, 2026, 10), 0);
+});

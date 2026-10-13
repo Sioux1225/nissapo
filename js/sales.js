@@ -104,6 +104,14 @@ export function advanceOf(settings, y, m) {
   return num((settings.advance || {})[advanceKey(y, m)]);
 }
 
+// 受けた前払いの履歴（月ごと。キーは 'YYYY-MM'）[{ id, date, amount }]
+export function advanceHistory(settings, y, m) {
+  return [...((settings.advanceHistory || {})[advanceKey(y, m)] || [])].sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0));
+}
+export function advanceTotal(settings, y, m) {
+  return advanceHistory(settings, y, m).reduce((t, a) => t + (num(a.amount) || 0), 0);
+}
+
 export function salesReady(settings) {
   if (settings.salesType === 'sagawa') return unitPrices(settings).takuhai != null;
   if (settings.salesType === 'daily') return num(settings.dailyRate) != null;
