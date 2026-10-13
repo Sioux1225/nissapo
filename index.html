@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>日報サポ</title>
+  <meta name="description" content="運転日報と点呼記録簿を、スマホで簡単に記録。Excel・PDF・CSVで事務所に送れます。">
+  <meta name="theme-color" content="#FFFFFF">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="日報サポ">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <link rel="manifest" href="./manifest.webmanifest">
+  <link rel="icon" href="./icons/icon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="./icons/apple-touch-icon.png">
+  <link rel="stylesheet" href="./css/app.css">
+</head>
+<body>
+  <div id="app"></div>
+  <input id="import-input" type="file" accept="application/json,.json" hidden>
+  <div id="toast" class="toast" hidden role="status" aria-live="polite"></div>
+  <div id="update-banner" class="update-banner" hidden role="status" aria-live="polite">
+    <span>新しいバージョンがあります</span>
+    <button type="button" data-action="apply-update">更新する</button>
+  </div>
+  <noscript>日報サポを使うには JavaScript を有効にしてください。</noscript>
+  <script type="module" src="./js/app.js"></script>
+</body>
+</html>
