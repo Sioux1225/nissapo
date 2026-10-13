@@ -278,3 +278,4 @@ button:focus-visible { outline: 3px solid var(--blue); outline-offset: 2px; }
 .oil-row { cursor: default; }
 .oil-row .btn-text { min-height: 40px; flex: none; }
 .elem-line { padding-top: 6px; border-top: 1px dashed currentColor; border-color: rgba(0, 0, 0, 0.12); }
+.field-note.must b { color: var(--warn); }

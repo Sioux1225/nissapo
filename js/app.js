@@ -3,7 +3,7 @@
 
 import { db, requestPersist } from './db.js';
 import { shrinkImage, newPhoto, blobToDataUrl, dataUrlToBlob } from './photo.js';
-import { OIL_LIMIT, OIL_STEPS, ELEMENT_EVERY, newOilChange, currentOdo, oilStatus, oilMessage, oilAlertToShow, sortOilChanges } from './oil.js';
+import { OIL_LIMIT, OIL_STEPS, newOilChange, currentOdo, oilStatus, oilMessage, oilAlertToShow, sortOilChanges } from './oil.js';
 import {
   DEFAULT_SETTINGS, METHODS, newStart, newEnd, todayKey, nowTime, isTime, num, distanceOf, prevOdo,
   monthSheets, yearSheets, hasMonth, toCsv, daysInMonth, dateKey, weekday, pad2
@@ -15,7 +15,7 @@ import {
   KINDS, COLLISIONS, ROAD_TYPES, SLOPES, SHAPES, SURFACES
 } from './accident.js';
 
-export const APP_VERSION = '0.5.1';
+export const APP_VERSION = '0.5.2';
 
 const app = document.getElementById('app');
 const state = {
@@ -739,7 +739,7 @@ function oilCard() {
   return `<button type="button" class="card pad oil-card ${st.level >= 4500 ? 'danger' : st.level >= 3000 ? 'caution' : ''}" data-action="go" data-view="oil">
     <span class="oil-head"><b>オイル交換</b><span class="oil-num">前回から <b>${kmText(st.since)}</b></span></span>
     ${oilBar(st)}
-    <span class="small">${msg ? `<b>${e(msg.title)}</b>　` : ''}${st.remaining > 0 ? `5,000km まで あと ${kmText(st.remaining)}` : `5,000km を ${kmText(-st.remaining)} 超えています`}${st.element.dueNext ? '<br>次のオイル交換では<b>エレメントも交換</b>します' : ''}</span>
+    <span class="small">${msg ? `<b>${e(msg.title)}</b>　` : ''}${st.remaining > 0 ? `5,000km まで あと ${kmText(st.remaining)}` : `5,000km を ${kmText(-st.remaining)} 超えています`}${st.element.need === 'must' ? '<br>次のオイル交換では<b>エレメントも必ず交換</b>します' : st.element.need === 'suggest' ? '<br>次のオイル交換は<b>エレメントも交換の時期</b>です' : ''}</span>
   </button>`;
 }
 
@@ -757,8 +757,9 @@ function renderOil() {
   const nowOdo = currentOdo(state.records, s);
   const msg = oilMessage(st);
   const el = st.element;
-  // 今回エレメントも交換するか（初期値：3回に1回の回なら「交換した」）
-  if (state.oilElement == null) state.oilElement = el.dueNext ? '交換した' : '交換していない';
+  // 今回エレメントも交換したか（必ず交換する回は「交換した」、交換の時期・はじめての記録は選んでもらう）
+  if (state.oilElement == null) state.oilElement = el.need === 'must' ? '交換した' : el.need === 'suggest' || !st.last ? '' : '交換していない';
+  const elemKm = el.km != null ? `・${kmText(el.km)}` : '';
   app.innerHTML = `
     <main class="screen form">
       ${head('オイル交換')}
@@ -767,9 +768,9 @@ function renderOil() {
         <b class="oil-big">${kmText(st.since)}</b>
         ${oilBar(st)}
         <p class="small">${msg ? `<b>${e(msg.title)}</b><br>` : ''}${st.remaining > 0 ? `5,000km まで あと <b>${kmText(st.remaining)}</b>` : `5,000km を ${kmText(-st.remaining)} 超えています`}</p>
-        <p class="small elem-line">エレメント：${el.dueNext ? '<b>次のオイル交換で交換します</b>' : `次から数えて ${el.left} 回目のオイル交換で交換します`}${el.known ? `（前回のエレメント交換から オイル交換 ${el.since} 回）` : ''}</p>
+        <p class="small elem-line">エレメント：${el.need === 'must' ? '<b>次のオイル交換で必ず交換します</b>' : el.need === 'suggest' ? '<b>次のオイル交換で交換の時期です</b>' : `次から数えて ${el.left} 回目のオイル交換から交換の時期です`}${el.known ? `（前回のエレメント交換から オイル交換 ${el.since} 回${elemKm}）` : ''}</p>
       </section>` : ''}
-      <p class="info">前回の交換から <b>3,000km・3,500km・4,000km・4,500km</b> を超えるとお知らせします。<b>5,000km までに必ず</b>オイル交換をしてください。オイルエレメントは<b>オイル交換${ELEMENT_EVERY}回に1回</b>交換します。走った距離は、運転日報のメーターから計算します。</p>
+      <p class="info">前回の交換から <b>3,000km・3,500km・4,000km・4,500km</b> を超えるとお知らせします。<b>5,000km までに必ず</b>オイル交換をしてください。オイルエレメントは<b>オイル交換2〜3回に1回（10,000km〜15,000km）</b>交換します。走った距離は、運転日報のメーターから計算します。</p>
 
       <h2 class="section-title">オイル交換をしたら記録する</h2>
       <section class="card fields">
@@ -777,7 +778,7 @@ function renderOil() {
         ${field('交換したときのメーター（km）', `<input id="oil-odo" type="number" inputmode="numeric" min="0" value="${nowOdo ?? ''}">`, '運転日報のいちばん新しいメーターが入っています。違うときは直してください')}
         <div class="field"><span class="field-label">オイルエレメント</span>
           <div class="seg">${['交換した', '交換していない'].map((v) => `<button type="button" data-oil-element="${v}" aria-pressed="${state.oilElement === v}">${v}</button>`).join('')}</div>
-          <span class="field-note">${el.dueNext ? '<b>今回はエレメントも交換する回です</b>（オイル交換3回に1回）' : st.last ? `エレメントは、次から数えて ${el.left} 回目のオイル交換で交換します` : 'はじめての記録です。そのときエレメントも交換したかを選んでください'}</span>
+          <span class="field-note ${el.need === 'must' ? 'must' : ''}">${el.need === 'must' ? '<b>今回は必ずエレメントも交換してください</b>（2〜3回に1回・10,000km〜15,000km）' : el.need === 'suggest' ? '<b>エレメントも交換の時期です</b>（2〜3回に1回）。交換したかどうかを選んでください' : st.last ? `エレメントは、次から数えて ${el.left} 回目のオイル交換から交換の時期です` : 'はじめての記録です。そのときエレメントも交換したかを選んでください'}</span>
         </div>
       </section>
       <button type="button" class="btn-primary" data-action="save-oil">オイル交換を記録する</button>
@@ -801,6 +802,7 @@ async function saveOil() {
   const odo = num(document.getElementById('oil-odo').value);
   if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) { toast('交換した日を入れてください'); return; }
   if (odo == null) { toast('交換したときのメーターを入れてください'); return; }
+  if (!state.oilElement) { toast('オイルエレメントを交換したかどうかを選んでください'); return; }
   const s = state.settings;
   const element = state.oilElement === '交換した';
   s.oilChanges = [...(s.oilChanges || []), newOilChange(date, odo, element)];
