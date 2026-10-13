@@ -16,7 +16,7 @@ import {
   KINDS, COLLISIONS, ROAD_TYPES, SLOPES, SHAPES, SURFACES
 } from './accident.js';
 
-export const APP_VERSION = '0.6.1';
+export const APP_VERSION = '0.6.2';
 
 const app = document.getElementById('app');
 const state = {
@@ -185,7 +185,7 @@ function renderSettings() {
       ${head('設定')}
       ${settingsForm(state.settings)}
       <button type="button" class="btn-primary" data-action="save-settings" data-next="home">保存する</button>
-      <h2 class="section-title">バックアップ（スマホを替えるとき）</h2>
+      <h2 class="section-title">バックアップ</h2>
       <div class="card pad">
         <p class="small">記録はこのスマホの中だけにあります。スマホを替える・アプリを消す前に、バックアップを作って保存してください。</p>
         <button type="button" class="btn-outline" data-action="backup">バックアップを作る</button>
