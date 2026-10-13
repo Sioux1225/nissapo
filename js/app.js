@@ -17,7 +17,7 @@ import {
   KINDS, COLLISIONS, ROAD_TYPES, SLOPES, SHAPES, SURFACES
 } from './accident.js';
 
-export const APP_VERSION = '0.7.10';
+export const APP_VERSION = '0.7.11';
 
 const app = document.getElementById('app');
 const state = {
@@ -945,7 +945,7 @@ function renderSales() {
         ${field('希望する前払い額（円）', `<input id="advance" data-advance="${advanceKey(y, m)}" value="${advanceOf(s, y, m) ?? ''}" type="number" inputmode="numeric" min="0" placeholder="例：50000">`,
           advanceOf(s, y, m) != null && advanceOf(s, y, m) > t.amount ? '<span class="warn-text">売上の合計より多い額です</span>' : '')}
       </section>
-      <p class="info">前払いは<b>月初めからの売上</b>で計算します。前の月の売上は含めません。${sagawa ? '日ごとの配達個数は、乗務後点呼の画面か、下の一覧で入れられます。' : '運転日報で乗務を記録した日を、日当1日分として数えます。'}</p>
+      <p class="info">前払いは<b>月初めからの売上</b>で計算します。${sagawa ? '日ごとの配達個数は、乗務後点呼の画面か、下の一覧で入れられます。' : '運転日報で乗務を記録した日を、日当1日分として数えます。'}</p>
       <button type="button" class="btn-primary" data-action="share-sales">PDFにして社長に送る</button>
       <button type="button" class="btn-text" data-action="preview-sales">画面で確認する</button>
       <div class="card list">${rows || '<p class="empty">この月はまだ乗務の記録がありません</p>'}</div>
