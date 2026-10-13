@@ -17,7 +17,7 @@ import {
   KINDS, COLLISIONS, ROAD_TYPES, SLOPES, SHAPES, SURFACES
 } from './accident.js';
 
-export const APP_VERSION = '0.8.1';
+export const APP_VERSION = '0.8.2';
 
 const app = document.getElementById('app');
 const state = {
@@ -936,7 +936,7 @@ function renderSales() {
           advanceOf(s, y, m) != null && advanceOf(s, y, m) > t.amount ? '<span class="warn-text">売上の合計より多い額です</span>' : '')}
       </section>
       <p class="info">前払いは<b>月初めからの売上</b>で計算します。${sagawa ? '日ごとの配達個数は、乗務後点呼の画面か、下の一覧で入れられます。' : '運転日報で乗務を記録した日を、日当1日分として数えます。'}</p>
-      <button type="button" class="btn-primary" data-action="share-sales">PDFにして送る</button>
+      <button type="button" class="btn-primary" data-action="share-sales">PDFにしてLINEで送る</button>
       <button type="button" class="btn-text" data-action="preview-sales">画面で確認する</button>
       <div class="card list">${rows || '<p class="empty">この月はまだ乗務の記録がありません</p>'}</div>
       <div id="preview" class="preview"></div>`}
