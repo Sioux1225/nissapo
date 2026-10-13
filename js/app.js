@@ -16,7 +16,7 @@ import {
   KINDS, COLLISIONS, ROAD_TYPES, SLOPES, SHAPES, SURFACES
 } from './accident.js';
 
-export const APP_VERSION = '0.6.0';
+export const APP_VERSION = '0.6.1';
 
 const app = document.getElementById('app');
 const state = {
@@ -157,7 +157,7 @@ function settingsForm(s) {
       <div class="field"><span class="field-label">点呼方法</span>${METHODS.map((m) => `<button type="button" class="chip" data-setting-seg="method" data-value="${m}" aria-pressed="${s.method === m}">${m}</button>`).join('')}</div>
       ${f('initialOdo', '今のメーターの距離（km）', 'type="number" inputmode="numeric" min="0" placeholder="例：12345"', '最初の日の「開始時走行距離」になります。あとは前の日の終了距離が自動で入ります')}
     </div>
-    <h2 class="section-title">期限のお知らせ（入れなくても使えます）</h2>
+    <h2 class="section-title">期限のお知らせ（任意）</h2>
     <div class="card fields">
       ${f('shakenDate', '車検の満了日', 'type="date"', '車検証に書いてある「有効期間の満了する日」')}
       ${f('licenseDate', '運転免許証の有効期限', 'type="date"', '免許証に書いてある「○年○月○日まで有効」の日')}
