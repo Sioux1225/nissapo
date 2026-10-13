@@ -306,3 +306,31 @@ test('走行距離を入れなかった過去の日は自動で休み（今日�
   assert.equal(rows[2].off, true);
   assert.equal(rows[6].off, false);
 });
+
+test('八王子の新人保証（稼働開始から1か月は1日5,000円）と八王子（代走）', async () => {
+  const { unitPrices, newbiePeriod, dayBonus, monthSales } = await import('../js/sales.js');
+  const hj = { salesType: 'sagawa', salesOffice: '八王子', salesStartDate: '2026-10-13' };
+  assert.deepEqual(newbiePeriod(hj), { from: '2026-10-13', to: '2026-11-12', perDay: 5000 });
+  assert.equal(newbiePeriod({ ...hj, salesStartDate: '2026-01-31' }).to, '2026-02-27'); // 月末をまたぐとき
+  assert.equal(newbiePeriod({ ...hj, salesStartDate: '' }), null); // 開始日がなければ保証なし
+  assert.equal(newbiePeriod({ ...hj, salesOffice: '練馬' }), null); // 保証のない営業所
+  assert.equal(dayBonus(hj, '2026-10-12'), 0);
+  assert.equal(dayBonus(hj, '2026-10-13'), 5000);
+  assert.equal(dayBonus(hj, '2026-11-12'), 5000);
+  assert.equal(dayBonus(hj, '2026-11-13'), 0);
+  // 代走：宅配190円、商業・集荷は八王子と同じ、新人保証なし
+  const dai = { salesType: 'sagawa', salesOffice: '八王子（代走）', salesStartDate: '2026-10-13' };
+  assert.deepEqual(unitPrices(dai), { takuhai: 190, shogyo: 80, shuka: 100, daily: 0 });
+  assert.equal(newbiePeriod(dai), null);
+  // 売上：保証期間の日は個数の金額＋5,000円、個数がまだでも5,000円
+  const recs = [
+    { date: '2026-11-12', start: { time: '8:00' }, end: { time: '18:00' }, sales: { takuhai: 100 } },
+    { date: '2026-11-13', start: { time: '8:00' }, end: { time: '18:00' }, sales: { takuhai: 100 } },
+    { date: '2026-11-11', start: { time: '8:00' }, end: { time: '18:00' } }
+  ];
+  const { rows, total } = monthSales(recs, 2026, 11, hj, '2026-11-30', '2026-12-01');
+  assert.equal(rows[11].amount, 100 * 178 + 5000);
+  assert.equal(rows[12].amount, 100 * 178);
+  assert.equal(rows[10].amount, 5000);
+  assert.equal(total.amount, 17800 * 2 + 10000);
+});

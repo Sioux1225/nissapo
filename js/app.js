@@ -3,7 +3,7 @@
 
 import { db, requestPersist } from './db.js';
 import { shrinkImage, newPhoto, blobToDataUrl, dataUrlToBlob } from './photo.js';
-import { SALES_TYPES, COUNT_KEYS, unitPrices, salesReady, monthSales, yen, defaultShogyo, defaultShuka, advanceKey, advanceOf, OFFICES, OTHER_OFFICE, PRICE_TABLE_DATE, officeEntry, officeName } from './sales.js';
+import { SALES_TYPES, COUNT_KEYS, unitPrices, salesReady, monthSales, yen, defaultShogyo, defaultShuka, advanceKey, advanceOf, OFFICES, OTHER_OFFICE, PRICE_TABLE_DATE, officeEntry, officeName, newbiePeriod } from './sales.js';
 import { EXPIRED, expiryStatus, expiryMessage, expiryAlertsToShow } from './expiry.js';
 import { OIL_LIMIT, OIL_STEPS, newOilChange, currentOdo, oilStatus, oilMessage, oilAlertToShow, sortOilChanges } from './oil.js';
 import {
@@ -17,7 +17,7 @@ import {
   KINDS, COLLISIONS, ROAD_TYPES, SLOPES, SHAPES, SURFACES
 } from './accident.js';
 
-export const APP_VERSION = '0.8.3';
+export const APP_VERSION = '0.9.0';
 
 const app = document.getElementById('app');
 const state = {
@@ -185,7 +185,8 @@ function sagawaFields(s, f) {
     `<option value="${OTHER_OFFICE}" ${selected === OTHER_OFFICE ? 'selected' : ''}>一覧にない営業所（単価を入力）</option>`].join('');
   return `
     ${field('営業所', `<select class="select" data-setting="salesOffice">${opts}</select>`)}
-    ${entry ? `<p class="field-note pad-note price-line">単価：<b>宅配 ${yen(p.takuhai)}・商業 ${yen(p.shogyo)}・集荷 ${yen(p.shuka)}${p.daily ? `＋1日 ${yen(p.daily)}` : ''}</b><br>（佐川単価表 ${PRICE_TABLE_DATE}更新）</p>` : ''}
+    ${entry ? `<p class="field-note pad-note price-line">単価：<b>宅配 ${yen(p.takuhai)}・商業 ${yen(p.shogyo)}・集荷 ${yen(p.shuka)}${p.daily ? `＋1日 ${yen(p.daily)}` : ''}</b>${entry.newbie ? `<br>新人保証：<b>稼働を開始した日から${entry.newbie.months}か月間、1日 ${yen(entry.newbie.perDay)}をプラス</b>` : ''}<br>（佐川単価表 ${PRICE_TABLE_DATE}更新）</p>` : ''}
+    ${f('salesStartDate', '稼働を開始した日', 'type="date"', entry?.newbie ? (newbiePeriod(s) ? `新人保証は ${newbiePeriod(s).to.replace(/-/g, '/')} まで` : '新人保証の期間を数えるのに使います。入れてください') : '新人保証の期間を数えるのに使います')}
     ${selected === OTHER_OFFICE ? `
       ${f('salesOfficeName', '営業所名', 'placeholder="例：○○"')}
       ${f('priceTakuhai', '単価：宅配（円/個）', 'type="number" inputmode="numeric" min="0" placeholder="例：170"')}
@@ -892,10 +893,15 @@ function salesContext() {
   return { s, y, m, today, thisMonth, upto, data: monthSales(state.records, y, m, s, upto) };
 }
 
-function salesSub(s) {
+function salesSub(s, y, m) {
   if (s.salesType === 'daily') return `所属：${s.salesProject || ''}　日当：${yen(s.dailyRate)}`;
   const p = unitPrices(s);
-  return `営業所：${officeName(s)}　単価：宅配 ${yen(p.takuhai)}・商業 ${yen(p.shogyo)}・集荷 ${yen(p.shuka)}${p.daily ? `＋1日 ${yen(p.daily)}` : ''}`;
+  // その月に新人保証の期間がかかっていれば書く
+  const nb = newbiePeriod(s);
+  const monthFrom = y ? `${y}-${pad2(m)}-01` : '';
+  const monthTo = y ? `${y}-${pad2(m)}-31` : '';
+  const nbText = nb && (!y || (nb.from <= monthTo && nb.to >= monthFrom)) ? `　新人保証：1日 ${yen(nb.perDay)}（〜${Number(nb.to.slice(5, 7))}/${Number(nb.to.slice(8))}）` : '';
+  return `営業所：${officeName(s)}　単価：宅配 ${yen(p.takuhai)}・商業 ${yen(p.shogyo)}・集荷 ${yen(p.shuka)}${p.daily ? `＋1日 ${yen(p.daily)}` : ''}${nbText}`;
 }
 
 function renderSales() {
@@ -929,7 +935,7 @@ function renderSales() {
         <b class="oil-big">${yen(t.amount)}</b>
         <span class="small">稼働 ${t.days}日${sagawa ? `・宅配 ${t.takuhai}個・商業 ${t.shogyo}個・集荷 ${t.shuka}個` : ''}・${kmText(t.km)}</span>
         ${t.missing ? `<span class="small warn-text">配達個数がまだの日が ${t.missing}日あります</span>` : ''}
-        <span class="small muted">${e(salesSub(s))}</span>
+        <span class="small muted">${e(salesSub(s, y, m))}</span>
       </section>
       <section class="card fields">
         ${field('希望する前払い額（円）', `<input id="advance" data-advance="${advanceKey(y, m)}" value="${advanceOf(s, y, m) ?? ''}" type="number" inputmode="numeric" min="0" placeholder="例：50000">`,
@@ -966,7 +972,7 @@ function salesCanvas() {
     title: sagawa ? '佐川急便' : (s.salesProject || '売上表'),
     ym: reiwa,
     name: s.driverName,
-    sub: salesSub(s),
+    sub: salesSub(s, y, m),
     head,
     rows,
     foot,
@@ -1491,8 +1497,8 @@ app.addEventListener('input', (ev) => {
     if (out) out.value = odo;
   } else if (t.dataset.setting) {
     state.settings[t.dataset.setting] = t.value;
-    // 営業所を選んだら、単価の表示を描き直す
-    if (t.dataset.setting === 'salesOffice') {
+    // 営業所・稼働を開始した日を変えたら、単価・新人保証の表示を描き直す
+    if (t.dataset.setting === 'salesOffice' || t.dataset.setting === 'salesStartDate') {
       const y = window.scrollY;
       render();
       window.scrollTo(0, y);
