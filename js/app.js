@@ -3,7 +3,7 @@
 
 import { db, requestPersist } from './db.js';
 import { shrinkImage, newPhoto, blobToDataUrl, dataUrlToBlob } from './photo.js';
-import { SALES_TYPES, COUNT_KEYS, unitPrices, salesReady, monthSales, yen, defaultShogyo, defaultShuka, advanceKey, advanceOf } from './sales.js';
+import { SALES_TYPES, COUNT_KEYS, unitPrices, salesReady, monthSales, yen, defaultShogyo, defaultShuka, advanceKey, advanceOf, OFFICES, OTHER_OFFICE, PRICE_TABLE_DATE, officeEntry, officeName } from './sales.js';
 import { EXPIRED, expiryStatus, expiryMessage, expiryAlertsToShow } from './expiry.js';
 import { OIL_LIMIT, OIL_STEPS, newOilChange, currentOdo, oilStatus, oilMessage, oilAlertToShow, sortOilChanges } from './oil.js';
 import {
@@ -17,7 +17,7 @@ import {
   KINDS, COLLISIONS, ROAD_TYPES, SLOPES, SHAPES, SURFACES
 } from './accident.js';
 
-export const APP_VERSION = '0.7.1';
+export const APP_VERSION = '0.7.2';
 
 const app = document.getElementById('app');
 const state = {
@@ -167,17 +167,31 @@ function settingsForm(s) {
     <h2 class="section-title">売上表・前払い（任意）</h2>
     <div class="card fields">
       <div class="field"><span class="field-label">案件</span>${SALES_TYPES.map(([v, t]) => `<button type="button" class="chip" data-setting-seg="salesType" data-value="${v}" aria-pressed="${s.salesType === v}">${t}</button>`).join('')}</div>
-      ${s.salesType === 'sagawa' ? `
-        ${f('salesOffice', '営業所名', 'placeholder="例：○○営業所"')}
-        ${f('priceTakuhai', '単価：宅配（円/個）', 'type="number" inputmode="numeric" min="0" placeholder="例：150"')}
-        ${f('priceShogyo', '単価：商業（円/個）', `type="number" inputmode="numeric" min="0" placeholder="空なら ${defaultShogyo(s.salesOffice)}円"`, '入れなければ 100円（三多摩・八王子は 80円）')}
-        ${f('priceShuka', '単価：集荷（円/個）', `type="number" inputmode="numeric" min="0" placeholder="空なら ${defaultShuka(s.salesOffice)}円"`, '入れなければ 100円（台東は 70円）')}
-        <p class="field-note pad-note">毎日の配達個数を入れるだけで、売上の合計が出ます。</p>` : ''}
+      ${s.salesType === 'sagawa' ? sagawaFields(s, f) : ''}
       ${s.salesType === 'daily' ? `
         ${f('salesProject', '所属（案件名）', 'placeholder="例：○○便"')}
         ${f('dailyRate', '日当（円）', 'type="number" inputmode="numeric" min="0" placeholder="例：15000"')}
         <p class="field-note pad-note">運転日報で乗務を記録した日を、日当1日分として数えます。</p>` : ''}
     </div>`;
+}
+
+// 佐川急便：営業所を選ぶだけで単価が決まる（一覧にない営業所は単価を入力）
+function sagawaFields(s, f) {
+  const entry = officeEntry(s.salesOffice);
+  const selected = entry ? entry.name : s.salesOffice === OTHER_OFFICE ? OTHER_OFFICE : '';
+  const p = unitPrices(s);
+  const opts = ['<option value="">選んでください</option>',
+    ...OFFICES.map(([o]) => `<option value="${o}" ${o === selected ? 'selected' : ''}>${o}</option>`),
+    `<option value="${OTHER_OFFICE}" ${selected === OTHER_OFFICE ? 'selected' : ''}>一覧にない営業所（単価を入力）</option>`].join('');
+  return `
+    ${field('営業所', `<select class="select" data-setting="salesOffice">${opts}</select>`)}
+    ${entry ? `<p class="field-note pad-note price-line">単価：<b>宅配 ${yen(p.takuhai)}・商業 ${yen(p.shogyo)}・集荷 ${yen(p.shuka)}</b><br>（佐川単価表 ${PRICE_TABLE_DATE}更新）</p>` : ''}
+    ${selected === OTHER_OFFICE ? `
+      ${f('salesOfficeName', '営業所名', 'placeholder="例：○○"')}
+      ${f('priceTakuhai', '単価：宅配（円/個）', 'type="number" inputmode="numeric" min="0" placeholder="例：170"')}
+      ${f('priceShogyo', '単価：商業（円/個）', `type="number" inputmode="numeric" min="0" placeholder="空なら ${defaultShogyo(s.salesOfficeName)}円"`, '入れなければ 100円（三多摩・八王子は 80円）')}
+      ${f('priceShuka', '単価：集荷（円/個）', `type="number" inputmode="numeric" min="0" placeholder="空なら ${defaultShuka(s.salesOfficeName)}円"`, '入れなければ 100円（台東は 70円）')}` : ''}
+    <p class="field-note pad-note">毎日の配達個数を入れるだけで、売上の合計が出ます。</p>`;
 }
 
 function renderSetup() {
@@ -886,7 +900,7 @@ function salesContext() {
 function salesSub(s) {
   if (s.salesType === 'daily') return `所属：${s.salesProject || ''}　日当：${yen(s.dailyRate)}`;
   const p = unitPrices(s);
-  return `営業所：${s.salesOffice || ''}　単価：宅配 ${yen(p.takuhai)}・商業 ${yen(p.shogyo)}・集荷 ${yen(p.shuka)}`;
+  return `営業所：${officeName(s)}　単価：宅配 ${yen(p.takuhai)}・商業 ${yen(p.shogyo)}・集荷 ${yen(p.shuka)}`;
 }
 
 function renderSales() {
@@ -1494,8 +1508,14 @@ app.addEventListener('input', (ev) => {
     if (out) out.value = odo;
   } else if (t.dataset.setting) {
     state.settings[t.dataset.setting] = t.value;
-    // 営業所名で決まる商業・集荷の単価を、入力欄の例に出す
+    // 営業所を選んだら、単価の表示を描き直す
     if (t.dataset.setting === 'salesOffice') {
+      const y = window.scrollY;
+      render();
+      window.scrollTo(0, y);
+    }
+    // 一覧にない営業所の名前で決まる商業・集荷の単価を、入力欄の例に出す
+    if (t.dataset.setting === 'salesOfficeName') {
       const sh = app.querySelector('[data-setting="priceShogyo"]');
       const sk = app.querySelector('[data-setting="priceShuka"]');
       if (sh) sh.placeholder = `空なら ${defaultShogyo(t.value)}円`;

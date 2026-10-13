@@ -300,3 +300,4 @@ button:focus-visible { outline: 3px solid var(--blue); outline-offset: 2px; }
 .sales-row .row-km { padding-top: 2px; }
 .sales-total { gap: 4px; }
 .warn-text { color: var(--warn); font-weight: 700; }
+.price-line b { color: var(--ink); font-size: 15px; }

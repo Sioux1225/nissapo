@@ -19,7 +19,8 @@ export const DEFAULT_SETTINGS = {
   licenseDate: '',     // 運転免許証の有効期限（任意）
   expiryAck: {},       // 見せた期限のお知らせ { shaken: { date, stage }, license: { date, stage } }
   salesType: '',       // 売上表：'sagawa'（佐川急便）・'daily'（日当の案件）
-  salesOffice: '',     // 佐川急便の営業所名
+  salesOffice: '',     // 佐川急便の営業所（単価表の営業所名、または「その他」）
+  salesOfficeName: '', // 「その他」のときの営業所名
   priceTakuhai: '',    // 単価（円/個）宅配
   priceShogyo: '',     // 単価 商業（空なら宅配と同じ）
   priceShuka: '',      // 単価 集荷（空なら宅配と同じ）

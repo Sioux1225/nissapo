@@ -16,12 +16,42 @@ export function defaultShuka(office) {
   return /台東/.test(office || '') ? 70 : 100;
 }
 
-// 単価（商業・集荷は、入力がなければ営業所で決まった単価）
+// 佐川急便の営業所と宅配の単価（佐川単価表 2026年5月27日更新の「一般」）
+export const PRICE_TABLE_DATE = '2026年5月27日';
+export const OFFICES = [
+  ['東京', 173], ['江東', 173], ['台東', 173], ['世田谷', 176], ['墨田', 175], ['横浜', 176], ['湘南', 170],
+  ['千葉南', 170], ['千葉北', 170], ['城北', 177], ['三多摩（山単価）', 186], ['三多摩', 165], ['練馬', 180],
+  ['越谷', 167], ['足立', 175], ['八王子', 178], ['川崎', 173], ['さいたま', 180], ['川口', 180], ['川口（DRF）', 167],
+  ['所沢', 180], ['赤羽', 177], ['座間', 173], ['横須賀', 178], ['横浜北', 175], ['杉並', 177], ['木更津', 168],
+  ['茂原', 168], ['横浜鶴見', 176], ['城南', 174], ['目黒', 173], ['横浜緑', 171], ['佐倉', 166], ['町田', 159],
+  ['千葉', 168], ['中野', 173], ['相模原', 169], ['戸田', 167]
+];
+export const OTHER_OFFICE = 'その他';
+
+// 選んだ営業所（表にあればその行、「その他」や表にない名前なら null）
+// 以前の版で「八王子営業所」のように入力した名前も、表の営業所に読み替える
+export function officeEntry(name) {
+  const n = String(name || '').replace(/\s|　/g, '').replace(/営業所$/, '');
+  const hit = OFFICES.find(([o]) => o === n);
+  return hit ? { name: hit[0], takuhai: hit[1] } : null;
+}
+
+// 売上表に出す営業所名
+export function officeName(settings) {
+  if (settings.salesOffice === OTHER_OFFICE) return settings.salesOfficeName || '';
+  return officeEntry(settings.salesOffice)?.name || settings.salesOffice || '';
+}
+
+// 単価：表の営業所なら宅配は表の「一般」、商業・集荷は営業所で決まった単価。
+// 一覧にない営業所は、入力した単価（商業・集荷は空なら営業所名で決まった単価）
 export function unitPrices(settings) {
+  const entry = officeEntry(settings.salesOffice);
+  const name = officeName(settings);
+  if (entry) return { takuhai: entry.takuhai, shogyo: defaultShogyo(entry.name), shuka: defaultShuka(entry.name) };
   return {
     takuhai: num(settings.priceTakuhai),
-    shogyo: num(settings.priceShogyo) ?? defaultShogyo(settings.salesOffice),
-    shuka: num(settings.priceShuka) ?? defaultShuka(settings.salesOffice)
+    shogyo: num(settings.priceShogyo) ?? defaultShogyo(name),
+    shuka: num(settings.priceShuka) ?? defaultShuka(name)
   };
 }
 
@@ -32,7 +62,7 @@ export function advanceOf(settings, y, m) {
 }
 
 export function salesReady(settings) {
-  if (settings.salesType === 'sagawa') return num(settings.priceTakuhai) != null;
+  if (settings.salesType === 'sagawa') return unitPrices(settings).takuhai != null;
   if (settings.salesType === 'daily') return num(settings.dailyRate) != null;
   return false;
 }

@@ -222,15 +222,21 @@ test('車検・免許証の期限：60・30・14・7日前と期限切れ', asyn
 
 test('売上表：佐川急便は個数×単価、日当は乗務した日×日当、月初めから今日まで', async () => {
   const { monthSales, dayAmount, unitPrices, salesReady } = await import('../js/sales.js');
-  const sg = { ...settings, salesType: 'sagawa', salesOffice: '○○営業所', priceTakuhai: '150', priceShogyo: '150', priceShuka: '50' };
+  const sg = { ...settings, salesType: 'sagawa', salesOffice: 'その他', salesOfficeName: '○○', priceTakuhai: '150', priceShogyo: '150', priceShuka: '50' };
   assert.deepEqual(unitPrices(sg), { takuhai: 150, shogyo: 150, shuka: 50 });
-  // 商業・集荷の決まった単価：商業100円（三多摩・八王子80円）、集荷100円（台東70円）
-  const base = { salesType: 'sagawa', priceTakuhai: '150', priceShogyo: '', priceShuka: '' };
-  assert.deepEqual(unitPrices({ ...base, salesOffice: '練馬営業所' }), { takuhai: 150, shogyo: 100, shuka: 100 });
-  assert.deepEqual(unitPrices({ ...base, salesOffice: '八王子営業所' }), { takuhai: 150, shogyo: 80, shuka: 100 });
-  assert.deepEqual(unitPrices({ ...base, salesOffice: '三多摩' }), { takuhai: 150, shogyo: 80, shuka: 100 });
-  assert.deepEqual(unitPrices({ ...base, salesOffice: '台東営業所' }), { takuhai: 150, shogyo: 100, shuka: 70 });
-  assert.deepEqual(unitPrices({ ...base, salesOffice: '台東営業所', priceShuka: '90' }).shuka, 90);
+  // 営業所を選ぶだけ：宅配は単価表の「一般」、商業100円（三多摩・八王子80円）、集荷100円（台東70円）
+  assert.deepEqual(unitPrices({ salesType: 'sagawa', salesOffice: '練馬' }), { takuhai: 180, shogyo: 100, shuka: 100 });
+  assert.deepEqual(unitPrices({ salesType: 'sagawa', salesOffice: '八王子' }), { takuhai: 178, shogyo: 80, shuka: 100 });
+  assert.deepEqual(unitPrices({ salesType: 'sagawa', salesOffice: '三多摩' }), { takuhai: 165, shogyo: 80, shuka: 100 });
+  assert.deepEqual(unitPrices({ salesType: 'sagawa', salesOffice: '三多摩（山単価）' }), { takuhai: 186, shogyo: 80, shuka: 100 });
+  assert.deepEqual(unitPrices({ salesType: 'sagawa', salesOffice: '台東' }), { takuhai: 173, shogyo: 100, shuka: 70 });
+  // 以前の版の入力（「八王子営業所」）も読み替える。表の営業所なら入力した単価は使わない
+  assert.deepEqual(unitPrices({ salesType: 'sagawa', salesOffice: '八王子営業所', priceTakuhai: '150' }), { takuhai: 178, shogyo: 80, shuka: 100 });
+  // 一覧にない営業所は入力した単価。商業・集荷が空なら営業所名で決まる
+  const other = { salesType: 'sagawa', salesOffice: 'その他', salesOfficeName: '三多摩B', priceTakuhai: '170', priceShogyo: '', priceShuka: '' };
+  assert.deepEqual(unitPrices(other), { takuhai: 170, shogyo: 80, shuka: 100 });
+  assert.equal(salesReady({ ...other, priceTakuhai: '' }), false);
+  assert.equal(salesReady({ salesType: 'sagawa', salesOffice: '八王子' }), true);
   assert.equal(salesReady(sg), true);
   assert.equal(salesReady({ ...settings, salesType: 'daily', dailyRate: '' }), false);
   const recs = [
