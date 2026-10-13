@@ -17,7 +17,7 @@ import {
   KINDS, COLLISIONS, ROAD_TYPES, SLOPES, SHAPES, SURFACES
 } from './accident.js';
 
-export const APP_VERSION = '0.9.10';
+export const APP_VERSION = '0.9.11';
 
 const app = document.getElementById('app');
 const state = {
@@ -992,6 +992,7 @@ function salesCanvas() {
     request: advanceOf(s, y, m) != null ? { label: '希望する前払い額', value: yen(advanceOf(s, y, m)) } : null,
     note: [
       `作成日：${ty >= 2019 ? `令和${ty - 2018}年` : `${ty}年`}${tm}月${td}日`,
+      ...(sagawa ? ['＊大型貨物料金は省略とさせていただきます'] : []),
       `ドライバーズサポート株式会社`
     ]
   });
