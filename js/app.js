@@ -17,7 +17,7 @@ import {
   KINDS, COLLISIONS, ROAD_TYPES, SLOPES, SHAPES, SURFACES
 } from './accident.js';
 
-export const APP_VERSION = '0.9.14';
+export const APP_VERSION = '0.9.15';
 
 const app = document.getElementById('app');
 const state = {
@@ -170,8 +170,8 @@ function settingsForm(s) {
       ${s.salesType === 'sagawa' ? sagawaFields(s, f) : ''}
       ${s.salesType === 'daily' ? `
         ${f('salesProject', '所属（案件名）', 'placeholder="例：Amazon"')}
-        ${f('dailyRate', '日当（円）', 'type="number" inputmode="numeric" min="0" placeholder="例：15000"')}
-        <p class="field-note pad-note">運転日報で乗務を記録した日を、日当1日分として数えます。</p>` : ''}
+        ${f('dailyRate', '日極（円）', 'type="number" inputmode="numeric" min="0" placeholder="例：15000"')}
+        <p class="field-note pad-note">運転日報で乗務を記録した日を、日極1日分として数えます。</p>` : ''}
     </div>`;
 }
 
@@ -901,7 +901,7 @@ function officeTitle(name) {
 
 // withOffice：false なら営業所名を書かない（PDF では表題の「佐川急便」の右に書くため）
 function salesSub(s, y, m, withOffice = true) {
-  if (s.salesType === 'daily') return `所属：${s.salesProject || ''}　日当：${yen(s.dailyRate)}`;
+  if (s.salesType === 'daily') return `所属：${s.salesProject || ''}　日極：${yen(s.dailyRate)}`;
   const p = unitPrices(s);
   // その月に新人保証の期間がかかっていれば書く
   const nb = newbiePeriod(s);
@@ -934,7 +934,7 @@ function renderSales() {
         <button type="button" class="icon-btn" data-action="sales-month" data-step="1" aria-label="次の月">${ICON.next}</button>
       </div>
       ${!ready ? `<section class="card pad warn-card">
-        <p><b>はじめに、設定で案件と単価（または日当）を入れてください。</b></p>
+        <p><b>はじめに、設定で案件と単価（または日極）を入れてください。</b></p>
         <button type="button" class="btn-outline" data-action="go" data-view="settings">設定を開く</button>
       </section>` : `
       <section class="card pad sales-total">
@@ -948,7 +948,7 @@ function renderSales() {
         ${field('希望する前払い額（円）', `<input id="advance" data-advance="${advanceKey(y, m)}" value="${advanceOf(s, y, m) ?? ''}" type="number" inputmode="numeric" min="0" placeholder="例：50000">`,
           advanceOf(s, y, m) != null && advanceOf(s, y, m) > t.amount ? '<span class="warn-text">売上の合計より多い額です</span>' : '')}
       </section>
-      <p class="info">前払いは<b>月初めからの売上</b>で計算します。${sagawa ? '日ごとの配達個数は、乗務後点呼の画面か、下の一覧で入れられます。' : '運転日報で乗務を記録した日を、日当1日分として数えます。'}</p>
+      <p class="info">前払いは<b>月初めからの売上</b>で計算します。${sagawa ? '日ごとの配達個数は、乗務後点呼の画面か、下の一覧で入れられます。' : '運転日報で乗務を記録した日を、日極1日分として数えます。'}</p>
       <button type="button" class="btn-primary" data-action="share-sales">PDFにしてLINEで送る</button>
       <button type="button" class="btn-text" data-action="preview-sales">プレビューで確認する</button>
       <div class="card list">${rows || '<p class="empty">この月はまだ乗務の記録がありません</p>'}</div>
@@ -967,7 +967,7 @@ function salesCanvas() {
     { text: '日', w: 5 }, { text: '曜日', w: 6 }, { text: '開始', w: 10 }, { text: '終了', w: 10 },
     ...countHead, { text: '稼働距離', w: sagawa ? (nbCol ? 11 : 13) : 20, align: 'right' },
     ...(nbCol ? [{ text: '新人保証', w: 12, align: 'right' }] : []),
-    { text: sagawa ? '金額' : '金額（日当）', w: sagawa ? (nbCol ? 15 : 16) : 24, align: 'right' }
+    { text: sagawa ? '金額' : '金額（日極）', w: sagawa ? (nbCol ? 15 : 16) : 24, align: 'right' }
   ];
   const blank = Array(head.length - 4).fill('');
   const rows = data.rows.map((r) => {
