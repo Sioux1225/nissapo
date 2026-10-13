@@ -3,10 +3,11 @@
 
 import { db, requestPersist } from './db.js';
 import { shrinkImage, newPhoto, blobToDataUrl, dataUrlToBlob } from './photo.js';
+import { EXPIRED, expiryStatus, expiryMessage, expiryAlertsToShow } from './expiry.js';
 import { OIL_LIMIT, OIL_STEPS, newOilChange, currentOdo, oilStatus, oilMessage, oilAlertToShow, sortOilChanges } from './oil.js';
 import {
   DEFAULT_SETTINGS, METHODS, newStart, newEnd, todayKey, nowTime, isTime, num, distanceOf, prevOdo,
-  monthSheets, yearSheets, hasMonth, toCsv, daysInMonth, dateKey, weekday, pad2
+  monthSheets, yearSheets, hasMonth, toCsv, daysInMonth, dateKey, weekday, pad2, isOff
 } from './model.js';
 import { buildXlsx } from './xlsx.js';
 import { specsToPdf, renderSheet, renderAccident, renderAnnex, renderPhotoPage, canvasesToPdf } from './pdf.js';
@@ -15,7 +16,7 @@ import {
   KINDS, COLLISIONS, ROAD_TYPES, SLOPES, SHAPES, SURFACES
 } from './accident.js';
 
-export const APP_VERSION = '0.5.2';
+export const APP_VERSION = '0.6.0';
 
 const app = document.getElementById('app');
 const state = {
@@ -155,6 +156,12 @@ function settingsForm(s) {
       ${f('rollcaller', '点呼実施者名', 'placeholder="例：運行 花子"', '点呼をしてくれる人（運行管理者）の名前')}
       <div class="field"><span class="field-label">点呼方法</span>${METHODS.map((m) => `<button type="button" class="chip" data-setting-seg="method" data-value="${m}" aria-pressed="${s.method === m}">${m}</button>`).join('')}</div>
       ${f('initialOdo', '今のメーターの距離（km）', 'type="number" inputmode="numeric" min="0" placeholder="例：12345"', '最初の日の「開始時走行距離」になります。あとは前の日の終了距離が自動で入ります')}
+    </div>
+    <h2 class="section-title">期限のお知らせ（入れなくても使えます）</h2>
+    <div class="card fields">
+      ${f('shakenDate', '車検の満了日', 'type="date"', '車検証に書いてある「有効期間の満了する日」')}
+      ${f('licenseDate', '運転免許証の有効期限', 'type="date"', '免許証に書いてある「○年○月○日まで有効」の日')}
+      <p class="field-note pad-note">期限の60日前・30日前・14日前・7日前と、期限を過ぎたときにお知らせします。更新したら、新しい日付に入れ直してください。</p>
     </div>`;
 }
 
@@ -211,12 +218,16 @@ function renderHome() {
     <div class="status ${done ? 'done' : ''}">
       <span class="status-mark">${done ? ICON.check : ''}</span>
       <span class="status-label">${text}</span>
-      <span class="status-time">${done ? e(hm(time)) : 'まだ'}</span>
+      <span class="status-time">${done ? e(hm(time)) : isOff(rec) ? '休み' : 'まだ'}</span>
     </div>`;
 
   let main;
-  if (!rec?.start) {
-    main = `<button type="button" class="btn-big" data-action="open-start" data-date="${today}"><small>出発するとき</small>乗務前点呼を記録</button>`;
+  if (isOff(rec)) {
+    main = `<div class="done-msg off-msg">今日は休みです</div>
+      <button type="button" class="link-btn" data-action="unset-off" data-date="${today}">休みを取り消す</button>`;
+  } else if (!rec?.start) {
+    main = `<button type="button" class="btn-big" data-action="open-start" data-date="${today}"><small>出発するとき</small>乗務前点呼を記録</button>
+      <button type="button" class="link-btn" data-action="set-off" data-date="${today}">今日は休み</button>`;
   } else if (!rec.end) {
     main = `<button type="button" class="btn-big end" data-action="open-end" data-date="${today}"><small>帰ってきたとき</small>乗務後点呼を記録</button>`;
   } else {
@@ -240,6 +251,7 @@ function renderHome() {
         ${status(!!rec?.end, '乗務後点呼', rec?.end?.time)}
       </section>
       ${main}
+      ${expiryCards()}
       ${oilCard()}
       <section class="card month-sum">
         <div><span class="muted">${m}月の出勤</span><b>${workDays}<small>日</small></b></div>
@@ -334,8 +346,13 @@ function renderEntry() {
   let body = '';
   if (mode === 'start') body = startSection(false);
   else if (mode === 'end') body = endSection(false);
-  else {
-    body = (d.start ? startSection(true) : `<button type="button" class="btn-outline" data-action="add-part" data-part="start">＋ 乗務前点呼を入力する</button>`)
+  else if (isOff(d)) {
+    body = `<section class="card pad off-card"><p><b>この日は休みです</b></p>
+      <p class="small">乗務した日だった場合は、休みを取り消してから入力してください。</p>
+      <button type="button" class="btn-outline" data-action="unset-off" data-date="${d.date}">休みを取り消す</button></section>`;
+  } else {
+    body = (!findRecord(d.date) ? `<button type="button" class="btn-outline" data-action="set-off" data-date="${d.date}">この日は休みにする</button>` : '')
+      + (d.start ? startSection(true) : `<button type="button" class="btn-outline" data-action="add-part" data-part="start">＋ 乗務前点呼を入力する</button>`)
       + (d.end ? endSection(true) : `<button type="button" class="btn-outline" data-action="add-part" data-part="end">＋ 乗務後点呼を入力する</button>`)
       + `<section class="card fields">${field('点呼実施者名', input('rollcaller'))}</section>`;
   }
@@ -345,8 +362,8 @@ function renderEntry() {
       ${head(title, state.back)}
       ${mode !== 'day' ? `<p class="muted">${label(d.date)}　${e(state.settings.driverName)}</p>` : ''}
       ${body}
-      <button type="button" class="btn-primary" data-action="save-entry">この内容で記録する</button>
-      ${mode === 'day' && exists ? '<button type="button" class="btn-text danger" data-action="delete-day">この日の記録を消す</button>' : ''}
+      ${isOff(d) ? '' : '<button type="button" class="btn-primary" data-action="save-entry">この内容で記録する</button>'}
+      ${mode === 'day' && exists && !isOff(d) ? '<button type="button" class="btn-text danger" data-action="delete-day">この日の記録を消す</button>' : ''}
     </main>`;
 }
 
@@ -365,12 +382,15 @@ function renderList() {
     const r = findRecord(key);
     const wd = weekday(key);
     const dist = distanceOf(r);
-    if (r) { work++; km += dist || 0; }
-    const sub = r
-      ? `${e(hm(r.start?.time) || '--:--')} → ${e(hm(r.end?.time) || '--:--')}${r.start && !r.end ? '<span class="tag">乗務後まだ</span>' : ''}`
-      : '<span class="off">記録なし（休み）</span>';
+    const off = isOff(r);
+    if (r && !off) { work++; km += dist || 0; }
+    const sub = off
+      ? '<span class="tag off-tag">休み</span>'
+      : r
+        ? `${e(hm(r.start?.time) || '--:--')} → ${e(hm(r.end?.time) || '--:--')}${r.start && !r.end ? '<span class="tag">乗務後まだ</span>' : ''}`
+        : '<span class="off">記録なし</span>';
     rows.push(`
-      <button type="button" class="row ${r ? '' : 'is-off'}" data-action="open-day" data-date="${key}" data-back="list">
+      <button type="button" class="row ${r && !off ? '' : 'is-off'}" data-action="open-day" data-date="${key}" data-back="list">
         <span class="row-day ${wd === '日' ? 'sun' : wd === '土' ? 'sat' : ''}"><b>${d}</b><span>${wd}</span></span>
         <span class="row-main"><span class="row-sub">${sub}</span></span>
         <span class="row-km">${r ? fmtKm(dist) : ''}</span>
@@ -387,7 +407,7 @@ function renderList() {
       </div>
       <p class="muted center">出勤 ${work}日・走行 ${km.toLocaleString('ja-JP')} km</p>
       <div class="card list">${rows.join('') || '<p class="empty">この月の記録はありません</p>'}</div>
-      <p class="info">日付をタップすると、記録を直したり、入れ忘れた日を追加したりできます。</p>
+      <p class="info">日付をタップすると、記録を直したり、入れ忘れた日を追加したり、休みにしたりできます。</p>
     </main>`;
 }
 
@@ -827,6 +847,40 @@ async function checkOil() {
   if (await ask(msg.text, 'オイル交換を記録する', msg.danger, 'あとで', msg.title)) go('oil');
 }
 
+// ---- 車検・免許証の期限 ----
+
+// ホームに出す期限のカード（60日前から）
+function expiryCards() {
+  return expiryStatus(state.settings, todayKey()).filter((st) => st.stage > 0).map((st) => {
+    const danger = st.stage >= 3;
+    const text = st.stage === EXPIRED ? `${st.item.dateLabel}を過ぎています` : st.days === 0 ? '今日が期限です' : `あと <b>${st.days}日</b>`;
+    return `<button type="button" class="card pad expiry-card ${danger ? 'danger' : 'caution'}" data-action="go" data-view="settings">
+      <span class="oil-head"><b>${st.item.label}</b><span class="oil-num">${text}</span></span>
+      <span class="small">${st.item.dateLabel}：${st.date.replace(/-/g, '/')}　更新したら、設定で新しい日付に入れ直してください</span>
+    </button>`;
+  }).join('');
+}
+
+// 期限のお知らせ（まだ見せていない段階のもの。期限切れは毎回）
+async function checkExpiry() {
+  const s = state.settings;
+  for (const st of expiryAlertsToShow(s, todayKey())) {
+    if (document.querySelector('.dialog')) return;
+    if (st.stage !== EXPIRED) {
+      s.expiryAck = { ...(s.expiryAck || {}), [st.item.key]: { date: st.date, stage: st.stage } };
+      await db.putSettings(s);
+    }
+    const msg = expiryMessage(st);
+    if (await ask(msg.text, '日付を直す', msg.danger, 'わかった', msg.title)) { go('settings'); return; }
+  }
+}
+
+// アプリを開いたとき・点呼を記録したときのお知らせ（期限 → オイル交換の順）
+async function runAlerts() {
+  await checkExpiry();
+  if (state.view === 'home') await checkOil();
+}
+
 // ---- 画面：記録の決まり ----
 
 function renderRules() {
@@ -953,6 +1007,7 @@ async function saveEntry() {
   const err = validate(d);
   if (err) { toast(err); return; }
   if (!d.rollcaller) d.rollcaller = state.settings.rollcaller;
+  if (d.start || d.end) delete d.off; // 乗務を記録したら休みではない
   await db.putRecord(d);
   // 地点などを変えたら、次回からの初期値にする
   if (d.end) {
@@ -963,7 +1018,7 @@ async function saveEntry() {
   await reload();
   toast(state.mode === 'start' ? '乗務前点呼を記録しました' : state.mode === 'end' ? '乗務後点呼を記録しました。おつかれさまでした' : '記録しました');
   history.back();
-  setTimeout(checkOil, 400);
+  setTimeout(runAlerts, 400);
 }
 
 async function reload() {
@@ -1179,6 +1234,17 @@ app.addEventListener('click', async (ev) => {
   else if (action === 'open-accident') openAccident(el.dataset.id);
   else if (action === 'save-accident') runBusy(saveAccident);
   else if (action === 'save-oil') runBusy(saveOil);
+  else if (action === 'set-off') {
+    await db.putRecord({ date: el.dataset.date, off: true, start: null, end: null, rollcaller: '' });
+    await reload();
+    toast(`${label(el.dataset.date)} を休みにしました`);
+    if (state.view === 'entry') history.back(); else renderHome();
+  } else if (action === 'unset-off') {
+    await db.deleteRecord(el.dataset.date);
+    await reload();
+    toast('休みを取り消しました');
+    if (state.view === 'entry') history.back(); else renderHome();
+  }
   else if (action === 'delete-oil') {
     const c = state.settings.oilChanges.find((x) => x.id === el.dataset.id);
     if (!c || !(await ask(`${c.date.replace(/-/g, '/')}（${kmText(c.odo)}）のオイル交換の記録を消します。`, '消す', true))) return;
@@ -1338,7 +1404,7 @@ async function start() {
   history.replaceState({ view: 'home' }, '');
   render();
   setupUpdates();
-  if (state.view === 'home') setTimeout(checkOil, 600);
+  if (state.view === 'home') setTimeout(runAlerts, 600);
 }
 
 start();

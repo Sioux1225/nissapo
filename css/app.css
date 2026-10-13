@@ -279,3 +279,13 @@ button:focus-visible { outline: 3px solid var(--blue); outline-offset: 2px; }
 .oil-row .btn-text { min-height: 40px; flex: none; }
 .elem-line { padding-top: 6px; border-top: 1px dashed currentColor; border-color: rgba(0, 0, 0, 0.12); }
 .field-note.must b { color: var(--warn); }
+
+/* 休み・期限 */
+.off-msg { background: var(--bg); color: var(--sub); border: 1px dashed var(--line-strong); }
+.off-tag { color: var(--sub); background: var(--line-soft); }
+.off-card { border-style: dashed; }
+.expiry-card { text-align: left; width: 100%; cursor: pointer; font: inherit; color: inherit; gap: 4px; }
+.expiry-card.caution { border-color: var(--orange); background: var(--orange-tint); }
+.expiry-card.danger { border-color: var(--warn); background: var(--warn-bg); }
+.expiry-card.danger .oil-num, .expiry-card.danger .oil-num b { color: var(--warn); }
+.pad-note { padding: 10px 16px 14px; border-top: 1px solid var(--line-soft); }

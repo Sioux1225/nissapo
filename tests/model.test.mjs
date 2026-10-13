@@ -178,3 +178,44 @@ test('オイルエレメント：2〜3回に1回（10,000km〜15,000km）', asyn
   const st2 = oilStatus({ ...settings, oilChanges: two }, [{ date: '2026-10-01', end: { odo: 8100 } }]);
   assert.match(oilMessage(st2).text, /エレメントも交換の時期/);
 });
+
+test('休み：一覧・帳票の備考に「休み」', () => {
+  const recs = [...records, { date: '2026-10-03', off: true, start: null, end: null }];
+  const [daily, roll] = monthSheets(recs, 2026, 10, settings);
+  assert.deepEqual(daily.rows[2], [3, ...Array(14).fill(null), '休み']);
+  assert.deepEqual(roll.rows[2], [3, ...Array(14).fill(null), '休み']);
+  const csv = toCsv(recs, '2026-10-01', '2026-10-31').trim().split('\r\n');
+  assert.ok(csv.some((l) => l.startsWith('2026/10/03,') && l.includes(',休み,')));
+  // 休みの日はメーターの引き継ぎに影響しない
+  assert.equal(prevOdo(recs, '2026-10-04', settings), 12230);
+});
+
+test('車検・免許証の期限：60・30・14・7日前と期限切れ', async () => {
+  const { daysUntil, stageOf, expiryStatus, expiryAlertsToShow, expiryMessage, EXPIRED } = await import('../js/expiry.js');
+  assert.equal(daysUntil('2026-11-12', '2026-10-13'), 30);
+  assert.equal(daysUntil('2026-10-13', '2026-10-13'), 0);
+  assert.equal(stageOf(61), 0);
+  assert.equal(stageOf(60), 1);
+  assert.equal(stageOf(30), 2);
+  assert.equal(stageOf(14), 3);
+  assert.equal(stageOf(7), 4);
+  assert.equal(stageOf(0), 4);
+  assert.equal(stageOf(-1), EXPIRED);
+  // 入れていなければ何もしない
+  assert.deepEqual(expiryStatus({ shakenDate: '', licenseDate: '' }, '2026-10-13'), []);
+  const s = { shakenDate: '2026-11-10', licenseDate: '2027-05-01', expiryAck: {} };
+  const alerts = expiryAlertsToShow(s, '2026-10-13');
+  assert.equal(alerts.length, 1);
+  assert.equal(alerts[0].item.key, 'shaken');
+  assert.match(expiryMessage(alerts[0]).text, /あと28日/);
+  // 一度見せた段階は出さない。日付を入れ直したら出る
+  const acked = { ...s, expiryAck: { shaken: { date: '2026-11-10', stage: 2 } } };
+  assert.equal(expiryAlertsToShow(acked, '2026-10-13').length, 0);
+  assert.equal(expiryAlertsToShow(acked, '2026-10-30').length, 1);
+  // 期限切れは毎回
+  const over = { ...s, expiryAck: { shaken: { date: '2026-11-10', stage: EXPIRED } } };
+  const a2 = expiryAlertsToShow(over, '2026-11-11');
+  assert.equal(a2.length, 1);
+  assert.equal(expiryMessage(a2[0]).danger, true);
+  assert.match(expiryMessage({ ...expiryStatus({ licenseDate: '2026-10-01' }, '2026-10-13')[0] }).text, /無免許運転/);
+});

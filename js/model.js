@@ -15,6 +15,9 @@ export const DEFAULT_SETTINGS = {
   initialOdo: null,    // 使い始めたときのメーターの距離
   oilChanges: [],      // オイル交換の記録 [{ id, date, odo, note }]
   oilAck: null,        // 見せたオイル交換のお知らせ { changeId, level }
+  shakenDate: '',      // 車検の満了日（任意）
+  licenseDate: '',     // 運転免許証の有効期限（任意）
+  expiryAck: {},       // 見せた期限のお知らせ { shaken: { date, stage }, license: { date, stage } }
   retention: '1年間'
 };
 
@@ -116,9 +119,14 @@ const clean = (v) => (v == null ? '' : String(v));
 const t = (s) => (isTime(s) ? { time: String(s).replace(/^0(\d)/, '$1') } : null);
 const n = (v) => num(v);
 
+// 休みの日は、事務所の書式を崩さないよう「備考」に「休み」と書く
+const offRow = (day) => [day, ...Array(14).fill(null), '休み'];
+export const isOff = (rec) => !!rec?.off && !rec.start && !rec.end;
+
 function dailyRow(day, rec) {
   const s = rec?.start;
   const e = rec?.end;
+  if (isOff(rec)) return offRow(day);
   if (!s && !e) return [day, ...Array(15).fill(null)];
   const dist = distanceOf(rec);
   return [
@@ -144,6 +152,7 @@ function dailyRow(day, rec) {
 function rollcallRow(day, rec) {
   const s = rec?.start;
   const e = rec?.end;
+  if (isOff(rec)) return offRow(day);
   if (!s && !e) return [day, ...Array(15).fill(null)];
   return [
     day,
