@@ -399,4 +399,10 @@ test('前払いの対象額：留保額と50%', async () => {
   assert.equal(isFirstAdvanceMonth(h, 2026, 10), false);
   assert.equal(isFirstAdvanceMonth({}, 2026, 10), true);
   assert.equal(isFirstAdvanceMonth({ advanceBefore: 'yes' }, 2026, 10), false);
+  // 稼働を開始した月だけがはじめての留保の対象（2か月サイトのため、翌月以降は留保なし）
+  const st = { salesStartDate: '2026-10-13' };
+  assert.equal(isFirstAdvanceMonth(st, 2026, 10), true);
+  assert.equal(isFirstAdvanceMonth(st, 2026, 11), false);
+  assert.equal(isFirstAdvanceMonth({ ...st, advanceHistory: { '2026-10': [{ id: 'a', date: '2026-10-20', amount: 10000 }] } }, 2026, 10), true);
+  assert.equal(isFirstAdvanceMonth({ salesStartDate: '2026-08-01' }, 2026, 10), false);
 });
