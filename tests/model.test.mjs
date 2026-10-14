@@ -360,7 +360,7 @@ test('各営業所の新人保証と代走', async () => {
   const nb = (office, start = '2026-10-13') => newbiePeriod({ salesType: 'sagawa', salesOffice: office, salesStartDate: start });
   for (const o of ['世田谷', '城北', '赤羽']) assert.deepEqual(nb(o), { from: '2026-10-13', to: '2027-01-12', perDay: 3000 });
   assert.deepEqual(nb('練馬'), { from: '2026-10-13', to: '2026-11-12', perDay: 5000 });
-  assert.deepEqual(nb('所沢'), { from: '2026-10-13', to: '2026-11-12', perDay: 3000 });
+  for (const o of ['東京', '所沢']) assert.deepEqual(nb(o), { from: '2026-10-13', to: '2026-11-12', perDay: 3000 });
   // 代走は新人保証なし。所沢（代走）は1日5,000円、戸田（代走）は1日10,000円をずっと足す
   const so = { salesType: 'sagawa', salesOffice: '所沢（代走）', salesStartDate: '2026-10-13' };
   assert.equal(nb('所沢（代走）'), null);
