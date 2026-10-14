@@ -21,7 +21,7 @@ export const DEFAULT_SETTINGS = {
   salesType: '',       // 売上表：'sagawa'（佐川急便）・'daily'（日極の案件）
   salesOffice: '',     // 佐川急便の営業所（単価表の営業所名、または「その他」）
   salesOfficeName: '', // 「その他」のときの営業所名
-  salesStartDate: '',  // 稼働を開始した日（新人保証の期間を数える）
+  salesStartDate: '',  // 稼働を開始した日（佐川急便は新人保証の期間を数える。日極の案件にも入れておける）
   priceTakuhai: '',    // 単価（円/個）宅配
   priceShogyo: '',     // 単価 商業（空なら宅配と同じ）
   priceShuka: '',      // 単価 集荷（空なら宅配と同じ）

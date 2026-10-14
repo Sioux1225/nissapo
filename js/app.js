@@ -17,7 +17,7 @@ import {
   KINDS, COLLISIONS, ROAD_TYPES, SLOPES, SHAPES, SURFACES
 } from './accident.js';
 
-export const APP_VERSION = '0.11.5';
+export const APP_VERSION = '0.11.6';
 
 const app = document.getElementById('app');
 const state = {
@@ -171,6 +171,7 @@ function settingsForm(s) {
       ${s.salesType === 'daily' ? `
         ${f('salesProject', '所属（案件名）', 'placeholder="例：Amazon"')}
         ${f('dailyRate', '日極（円）', 'type="number" inputmode="numeric" min="0" placeholder="例：15000"')}
+        ${f('salesStartDate', '稼働を開始した日', 'type="date"', '日極の案件には新人保証はありません')}
         <p class="field-note pad-note">運転日報で乗務を記録した日を、日極1日分として数えます。</p>` : ''}
       ${s.salesType ? `
       <div class="field"><span class="field-label">リース車両</span>${[['yes', '利用している'], ['no', '利用していない']].map(([v, t]) => `<button type="button" class="chip" data-setting-seg="leaseCar" data-value="${v}" aria-pressed="${s.leaseCar === v}">${t}</button>`).join('')}</div>
