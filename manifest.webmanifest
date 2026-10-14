@@ -1,6 +1,6 @@
 {
   "name": "日報サポート",
-  "short_name": "日報サポ",
+  "short_name": "日サポ",
   "description": "運転日報と点呼記録簿を、スマホで簡単に",
   "lang": "ja",
   "start_url": "./",
