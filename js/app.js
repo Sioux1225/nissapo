@@ -17,7 +17,7 @@ import {
   KINDS, COLLISIONS, ROAD_TYPES, SLOPES, SHAPES, SURFACES
 } from './accident.js';
 
-export const APP_VERSION = '0.11.5';
+export const APP_VERSION = '0.11.7';
 
 const app = document.getElementById('app');
 const state = {
@@ -171,11 +171,12 @@ function settingsForm(s) {
       ${s.salesType === 'daily' ? `
         ${f('salesProject', '所属（案件名）', 'placeholder="例：Amazon"')}
         ${f('dailyRate', '日極（円）', 'type="number" inputmode="numeric" min="0" placeholder="例：15000"')}
+        ${f('salesStartDate', '稼働を開始した日', 'type="date"')}
         <p class="field-note pad-note">運転日報で乗務を記録した日を、日極1日分として数えます。</p>` : ''}
       ${s.salesType ? `
       <div class="field"><span class="field-label">リース車両</span>${[['yes', '利用している'], ['no', '利用していない']].map(([v, t]) => `<button type="button" class="chip" data-setting-seg="leaseCar" data-value="${v}" aria-pressed="${s.leaseCar === v}">${t}</button>`).join('')}</div>
       <div class="field"><span class="field-label">このアプリを使う前に、前払いを使ったこと</span>${[['yes', 'ある'], ['no', 'ない']].map(([v, t]) => `<button type="button" class="chip" data-setting-seg="advanceBefore" data-value="${v}" aria-pressed="${s.advanceBefore === v}">${t}</button>`).join('')}</div>
-      <p class="field-note pad-note">前払いの対象額の計算に使います（はじめての前払いは、リース車両なら10万円、それ以外は5万円を留保）。</p>` : ''}
+      <p class="field-note pad-note">前払いの対象額の計算に使います（稼働を開始した月のはじめての前払いは、リース車両なら10万円、それ以外は5万円を留保）。</p>` : ''}
     </div>`;
 }
 
@@ -1148,8 +1149,8 @@ function renderAdvanceRules() {
       <h2 class="section-title">前払いできる金額（対象額）</h2>
       <div class="card pad">
         <ul class="rule-list">
-          <li><b>はじめての前払い</b>は、まず売上のうち<b>留保額</b>を差し引きます。留保額は、<b>リース車両を利用している方は10万円</b>、<b>車両持ち込みの方は5万円</b>です。それを超えた売上の<b>50%</b>が前払いの対象額です。</li>
-          <li><b>翌月以降</b>は、その月の売上の<b>50%</b>が前払いの対象額です。</li>
+          <li><b>稼働を開始した月のはじめての前払い</b>は、まず売上のうち<b>留保額</b>を差し引きます。留保額は、<b>リース車両を利用している方は10万円</b>、<b>車両持ち込みの方は5万円</b>です。それを超えた売上の<b>50%</b>が前払いの対象額です。</li>
+          <li><b>翌月以降</b>は、その月の売上の<b>50%</b>が前払いの対象額です（支払いは2か月サイトのため、まだ支払われていない売上があるので、はじめての留保はいりません）。</li>
           <li>ただし、<b>前月の売上が40万円に届かなかった場合</b>は、<b>5万円の留保</b>が必要です。</li>
           <li>前払いは<b>当月分を当月中にだけ</b>申請できます。月が変わるとリセットされ、元には戻せません。</li>
           <li>このアプリでは、<b>売上表（前払い）</b>の画面で、前払いの対象額と前払い可能額を自動で計算します（リース車両かどうかは設定で選びます）。</li>

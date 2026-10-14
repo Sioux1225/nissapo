@@ -114,14 +114,16 @@ export function advanceTotal(settings, y, m) {
 
 // ---- 前払いの対象額 ----
 // 対象額 ＝（その月の売上 − 留保額）× 50%
-//   はじめての前払いの月：リース車両を利用している方は10万円、それ以外の方は5万円を留保
+//   はじめての前払いの月（稼働を開始した月だけ）：リース車両を利用している方は10万円、それ以外の方は5万円を留保
 //   2回目以降の月：前月の売上が40万円未満なら5万円を留保（前月の記録がないときも念のため5万円）
 export const ADVANCE_RATE = 0.5;
 
 // はじめての前払いの月か（このアプリを使う前に前払いを使ったことがあれば、はじめてではない）
+// 支払いは2か月サイトなので、稼働を開始した月より後の月は、まだ支払われていない売上があり、はじめての留保はいらない
 export function isFirstAdvanceMonth(settings, y, m) {
   if (settings.advanceBefore === 'yes') return false;
   const key = advanceKey(y, m);
+  if (isDate(settings.salesStartDate) && key > settings.salesStartDate.slice(0, 7)) return false;
   return !Object.entries(settings.advanceHistory || {}).some(([k, list]) => k < key && (list || []).length > 0);
 }
 
