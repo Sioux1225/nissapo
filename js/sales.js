@@ -121,7 +121,8 @@ export function advanceTotal(settings, y, m) {
 }
 
 // ---- 前払いの対象額 ----
-// 対象額 ＝（その月の売上 − 留保額）× 50%
+// 前払い可能額 ＝（その月の売上 − その月にすでに受けた前払い − 留保額）× 50%
+//   （前払いを受けた分は売上から先に差し引き、残りの売上の50%をもう一度前払いできる）
 //   はじめての前払いの月（稼働を開始した月だけ）：リース車両を利用している方は10万円、それ以外の方は5万円を留保
 //   2回目以降の月：前月の売上が40万円未満なら留保（前月の記録がないときも念のため）。リース車両は10万円、それ以外は5万円
 export const ADVANCE_RATE = 0.5;
@@ -135,8 +136,8 @@ export function isFirstAdvanceMonth(settings, y, m) {
   return !Object.entries(settings.advanceHistory || {}).some(([k, list]) => k < key && (list || []).length > 0);
 }
 
-// sales：その月の売上、prevSales：前月の売上（記録がなければ null）
-export function advanceLimit({ sales, prevSales, first, lease }) {
+// sales：その月の売上、advanced：その月にすでに受けた前払い、prevSales：前月の売上（記録がなければ null）
+export function advanceLimit({ sales, advanced = 0, prevSales, first, lease }) {
   let reserve = 0;
   let reason = '';
   if (first) {
@@ -149,7 +150,7 @@ export function advanceLimit({ sales, prevSales, first, lease }) {
     reserve = lease ? 100000 : 50000;
     reason = `前月の売上が40万円未満${lease ? '（リース車両）' : ''}`;
   }
-  const base = Math.max(0, sales - reserve);
+  const base = Math.max(0, sales - advanced - reserve);
   return { reserve, reason, base, target: Math.floor(base * ADVANCE_RATE) };
 }
 

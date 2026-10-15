@@ -17,7 +17,7 @@ import {
   KINDS, COLLISIONS, ROAD_TYPES, SLOPES, SHAPES, SURFACES
 } from './accident.js';
 
-export const APP_VERSION = '0.12.0';
+export const APP_VERSION = '0.12.1';
 
 const app = document.getElementById('app');
 const state = {
@@ -933,9 +933,9 @@ function advanceInfo(s, y, m, salesAmount) {
   const pm = pd.getMonth() + 1;
   const prevSales = hasMonth(state.records, py, pm) ? monthSales(state.records, py, pm, s).total.amount : null;
   const first = isFirstAdvanceMonth(s, y, m);
-  const lim = advanceLimit({ sales: salesAmount, prevSales, first, lease: s.leaseCar === 'yes' });
   const total = advanceTotal(s, y, m);
-  return { ...lim, first, prevSales, pm, total, remaining: Math.max(0, lim.target - total) };
+  const lim = advanceLimit({ sales: salesAmount, advanced: total, prevSales, first, lease: s.leaseCar === 'yes' });
+  return { ...lim, first, prevSales, pm, total, remaining: lim.target };
 }
 
 function advanceSection(s, y, m, salesAmount, today) {
@@ -950,13 +950,13 @@ function advanceSection(s, y, m, salesAmount, today) {
         <button type="button" class="btn-text danger" data-action="delete-advance" data-id="${e(a.id)}">消す</button>
       </div>`).join('') || '<p class="empty">まだ前払いの記録はありません</p>'}</div>
     <div class="adv-target">
-      <span class="muted">前払いの対象額</span>
-      <b>${yen(info.target)}</b>
-      <span class="small">（売上 ${yen(salesAmount)}${info.reserve ? ` − 留保 ${yen(info.reserve)}` : ''}）× 50%${info.reason ? `<br>留保：${info.reason}${info.prevSales != null && !info.first ? `（${info.pm}月の売上 ${yen(info.prevSales)}）` : ''}` : info.prevSales != null ? `<br>${info.pm}月の売上 ${yen(info.prevSales)}（40万円以上のため留保なし）` : ''}</span>
+      <span class="muted">前払い可能額の計算</span>
+      <span class="adv-formula">（売上 ${yen(salesAmount)}${total ? ` − 前払い済み ${yen(total)}` : ''}${info.reserve ? ` − 留保 ${yen(info.reserve)}` : ''}）× 50% ＝ <b>${yen(info.target)}</b></span>
+      <span class="small">${info.reason ? `留保：${info.reason}${info.prevSales != null && !info.first ? `（${info.pm}月の売上 ${yen(info.prevSales)}）` : ''}` : info.prevSales != null ? `${info.pm}月の売上 ${yen(info.prevSales)}（40万円以上のため留保なし）` : ''}</span>
     </div>
     <div class="adv-sum">
       <div><span class="muted">前払いの合計</span><b>${yen(total)}</b></div>
-      <div class="adv-rest"><span class="muted">前払い可能額</span><b class="${info.target - total < 0 ? 'warn-text' : ''}">${yen(info.remaining)}</b></div>
+      <div class="adv-rest"><span class="muted">前払い可能額</span><b>${yen(info.remaining)}</b></div>
     </div>
     <div class="adv-add">
       <input id="adv-date" type="date" value="${def}" aria-label="前払いを受けた日">
@@ -1156,6 +1156,7 @@ function renderAdvanceRules() {
       <div class="card pad">
         <ul class="rule-list">
           <li><b>稼働を開始した月のはじめての前払い</b>は、まず売上のうち<b>留保額</b>を差し引きます。留保額は、<b>リース車両を利用している方は10万円</b>、<b>車両持ち込みの方は5万円</b>です。それを超えた売上の<b>50%</b>が前払いの対象額です。</li>
+          <li><b>2回目からの前払い</b>は、売上から<b>すでに受けた前払いの額</b>を差し引き、残りの売上の<b>50%</b>が前払いできる額です（留保がある月は、留保額も差し引きます）。</li>
           <li><b>翌月以降</b>は、その月の売上の<b>50%</b>が前払いの対象額です（支払いは2か月サイトのため、まだ支払われていない売上があるので、はじめての留保はいりません）。</li>
           <li>ただし、<b>前月の売上が40万円に届かなかった場合</b>は、留保が必要です（<b>リース車両は10万円</b>、<b>車両持ち込みは5万円</b>）。</li>
           <li>前払いは<b>当月分を当月中にだけ</b>申請できます。月が変わるとリセットされ、元には戻せません。</li>

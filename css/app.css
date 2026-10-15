@@ -355,4 +355,5 @@ button:focus-visible { outline: 3px solid var(--blue); outline-offset: 2px; }
 /* 記録の決まり：前払いのルール */
 .fee-ex { background: var(--orange-tint); border-radius: 12px; padding: 10px 12px; display: flex; flex-direction: column; gap: 4px; }
 .adv-target { display: flex; flex-direction: column; gap: 2px; padding: 10px 16px; border-top: 1px solid var(--line-soft); background: var(--orange-tint); }
-.adv-target b { font-size: 24px; font-variant-numeric: tabular-nums; }
+.adv-formula { font-size: 15px; font-variant-numeric: tabular-nums; }
+.adv-formula b { font-size: 18px; }

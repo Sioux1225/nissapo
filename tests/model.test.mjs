@@ -394,6 +394,8 @@ test('前払いの対象額：留保額と50%', async () => {
   assert.equal(advanceLimit({ sales: 300000, prevSales: 399999, first: false, lease: true }).reserve, 100000);
   assert.equal(advanceLimit({ sales: 300000, prevSales: null, first: false, lease: true }).target, 100000);
   assert.equal(advanceLimit({ sales: 300000, prevSales: 400000, first: false, lease: true }).reserve, 0);
+  // すでに受けた前払いは売上から先に差し引く：（304,000 − 20,000 − 100,000）× 50% ＝ 92,000
+  assert.equal(advanceLimit({ sales: 304000, advanced: 20000, prevSales: null, first: false, lease: true }).target, 92000);
   // 売上が留保額より少なければ0
   assert.equal(advanceLimit({ sales: 40000, prevSales: null, first: true, lease: false }).target, 0);
   assert.equal(advanceLimit({ sales: 100001, prevSales: 500000, first: false }).target, 50000); // 円未満は切り捨て
