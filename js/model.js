@@ -30,6 +30,8 @@ export const DEFAULT_SETTINGS = {
   advance: {},         // 希望する前払い額 { 'YYYY-MM': 円 }
   advanceHistory: {},  // 受けた前払いの履歴 { 'YYYY-MM': [{ id, date, amount }] }
   leaseCar: '',        // リース車両を利用しているか（'yes'・'no'）
+  priorAdvance: '',      // このアプリを使う前に、今月すでに受けた前払いの金額
+  priorAdvanceMonth: '', // その金額の月（'YYYY-MM'。入力した月）
   advanceBefore: '',   // このアプリを使う前に前払いを行ったことがあるか（'yes'・'no'）
   lastVersion: '',     // 最後に開いたアプリの版（アップデートのお知らせ用）
   retention: '1年間'

@@ -340,7 +340,7 @@ button:focus-visible { outline: 3px solid var(--blue); outline-offset: 2px; }
 /* 前払いの履歴 */
 .adv { display: flex; flex-direction: column; }
 .adv-list { display: flex; flex-direction: column; }
-.adv-row { display: grid; grid-template-columns: 4em 1fr auto; align-items: center; gap: 8px; padding: 6px 16px; border-top: 1px solid var(--line-soft); font-variant-numeric: tabular-nums; }
+.adv-row { display: grid; grid-template-columns: 5.5em 1fr auto; align-items: center; gap: 8px; padding: 6px 16px; border-top: 1px solid var(--line-soft); font-variant-numeric: tabular-nums; }
 .adv-row b { text-align: right; font-size: 16px; }
 .adv-row .btn-text { min-height: 40px; }
 .adv-sum { display: grid; grid-template-columns: 1fr 1fr; border-top: 1px solid var(--line-soft); }

@@ -105,8 +105,16 @@ export function advanceOf(settings, y, m) {
 }
 
 // 受けた前払いの履歴（月ごと。キーは 'YYYY-MM'）[{ id, date, amount }]
+// このアプリを使う前に、その月にすでに受けた前払い（設定で入れた分）は prior: true として先頭に入れる
+export function priorAdvance(settings, y, m) {
+  if (settings.advanceBefore !== 'yes' || settings.priorAdvanceMonth !== advanceKey(y, m)) return null;
+  const amount = num(settings.priorAdvance);
+  return amount > 0 ? { id: 'prior', date: `${advanceKey(y, m)}-01`, amount, prior: true } : null;
+}
 export function advanceHistory(settings, y, m) {
-  return [...((settings.advanceHistory || {})[advanceKey(y, m)] || [])].sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0));
+  const list = [...((settings.advanceHistory || {})[advanceKey(y, m)] || [])].sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0));
+  const prior = priorAdvance(settings, y, m);
+  return prior ? [prior, ...list] : list;
 }
 export function advanceTotal(settings, y, m) {
   return advanceHistory(settings, y, m).reduce((t, a) => t + (num(a.amount) || 0), 0);
@@ -115,7 +123,7 @@ export function advanceTotal(settings, y, m) {
 // ---- 前払いの対象額 ----
 // 対象額 ＝（その月の売上 − 留保額）× 50%
 //   はじめての前払いの月（稼働を開始した月だけ）：リース車両を利用している方は10万円、それ以外の方は5万円を留保
-//   2回目以降の月：前月の売上が40万円未満なら5万円を留保（前月の記録がないときも念のため5万円）
+//   2回目以降の月：前月の売上が40万円未満なら留保（前月の記録がないときも念のため）。リース車両は10万円、それ以外は5万円
 export const ADVANCE_RATE = 0.5;
 
 // はじめての前払いの月か（このアプリを使う前に前払いを行ったことがあれば、はじめてではない）
@@ -135,11 +143,11 @@ export function advanceLimit({ sales, prevSales, first, lease }) {
     reserve = lease ? 100000 : 50000;
     reason = lease ? 'はじめての前払い（リース車両）' : 'はじめての前払い（車両持ち込み）';
   } else if (prevSales == null) {
-    reserve = 50000;
-    reason = '前月の記録がないため';
+    reserve = lease ? 100000 : 50000;
+    reason = `前月の記録がないため${lease ? '（リース車両）' : ''}`;
   } else if (prevSales < 400000) {
-    reserve = 50000;
-    reason = '前月の売上が40万円未満';
+    reserve = lease ? 100000 : 50000;
+    reason = `前月の売上が40万円未満${lease ? '（リース車両）' : ''}`;
   }
   const base = Math.max(0, sales - reserve);
   return { reserve, reason, base, target: Math.floor(base * ADVANCE_RATE) };

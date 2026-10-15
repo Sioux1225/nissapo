@@ -17,7 +17,7 @@ import {
   KINDS, COLLISIONS, ROAD_TYPES, SLOPES, SHAPES, SURFACES
 } from './accident.js';
 
-export const APP_VERSION = '0.11.9';
+export const APP_VERSION = '0.12.0';
 
 const app = document.getElementById('app');
 const state = {
@@ -138,7 +138,12 @@ const head = (title, back = 'home') =>
 
 // ---- 画面：はじめての設定・設定 ----
 
+// 今月（'YYYY-MM'）
+const thisMonthKey = () => todayKey().slice(0, 7);
+
 function settingsForm(s) {
+  // 以前に受けた前払いは今月の分だけを入れる（前の月に入れた金額は出さない）
+  if (s.priorAdvanceMonth !== thisMonthKey()) s = { ...s, priorAdvance: '' };
   const f = (key, text, attrs = '', note = '') =>
     field(text, `<input data-setting="${key}" value="${e(s[key] ?? '')}" ${attrs}>`, note);
   return `
@@ -176,7 +181,8 @@ function settingsForm(s) {
       ${s.salesType ? `
       <div class="field"><span class="field-label">リース車両</span>${[['yes', '利用している'], ['no', '利用していない']].map(([v, t]) => `<button type="button" class="chip" data-setting-seg="leaseCar" data-value="${v}" aria-pressed="${s.leaseCar === v}">${t}</button>`).join('')}</div>
       <div class="field"><span class="field-label">このアプリを使う前に、前払いを行ったこと</span>${[['yes', 'ある'], ['no', 'ない']].map(([v, t]) => `<button type="button" class="chip" data-setting-seg="advanceBefore" data-value="${v}" aria-pressed="${s.advanceBefore === v}">${t}</button>`).join('')}</div>
-      <p class="field-note pad-note">前払いの対象額の計算に使います（稼働を開始した月のはじめての前払いは、リース車両なら10万円、それ以外は5万円を留保）。</p>` : ''}
+      ${s.advanceBefore === 'yes' ? f('priorAdvance', `今月（${Number(thisMonthKey().slice(5))}月）すでに受けた前払いの金額（円）`, 'type="number" inputmode="numeric" min="0" placeholder="例：20000"', '売上表の前払いの合計に入り、前払い可能額から差し引きます。') : ''}
+      <p class="field-note pad-note">前払いの対象額の計算に使います（稼働を開始した月のはじめての前払いは、リース車両なら10万円、それ以外は5万円を留保。前月の売上が40万円未満のときも同じ額を留保）。</p>` : ''}
     </div>`;
 }
 
@@ -940,7 +946,7 @@ function advanceSection(s, y, m, salesAmount, today) {
   return `<section class="card adv">
     <h2 class="card-title">${m}月の前払い</h2>
     <div class="adv-list">${list.map((a) => `<div class="adv-row">
-        <span>${Number(a.date.slice(5, 7))}/${Number(a.date.slice(8))}</span><b>${yen(a.amount)}</b>
+        <span>${a.prior ? 'アプリ以前' : `${Number(a.date.slice(5, 7))}/${Number(a.date.slice(8))}`}</span><b>${yen(a.amount)}</b>
         <button type="button" class="btn-text danger" data-action="delete-advance" data-id="${e(a.id)}">消す</button>
       </div>`).join('') || '<p class="empty">まだ前払いの記録はありません</p>'}</div>
     <div class="adv-target">
@@ -1151,7 +1157,7 @@ function renderAdvanceRules() {
         <ul class="rule-list">
           <li><b>稼働を開始した月のはじめての前払い</b>は、まず売上のうち<b>留保額</b>を差し引きます。留保額は、<b>リース車両を利用している方は10万円</b>、<b>車両持ち込みの方は5万円</b>です。それを超えた売上の<b>50%</b>が前払いの対象額です。</li>
           <li><b>翌月以降</b>は、その月の売上の<b>50%</b>が前払いの対象額です（支払いは2か月サイトのため、まだ支払われていない売上があるので、はじめての留保はいりません）。</li>
-          <li>ただし、<b>前月の売上が40万円に届かなかった場合</b>は、<b>5万円の留保</b>が必要です。</li>
+          <li>ただし、<b>前月の売上が40万円に届かなかった場合</b>は、留保が必要です（<b>リース車両は10万円</b>、<b>車両持ち込みは5万円</b>）。</li>
           <li>前払いは<b>当月分を当月中にだけ</b>申請できます。月が変わるとリセットされ、元には戻せません。</li>
           <li>このアプリでは、<b>売上表（前払い）</b>の画面で、前払いの対象額と前払い可能額を自動で計算します（リース車両かどうかは設定で選びます）。</li>
         </ul>
@@ -1467,7 +1473,7 @@ app.addEventListener('click', async (ev) => {
   if (setSeg) {
     state.settings[setSeg.dataset.settingSeg] = setSeg.dataset.value;
     setSeg.parentElement.querySelectorAll('[data-setting-seg]').forEach((b) => b.setAttribute('aria-pressed', b === setSeg));
-    if (setSeg.dataset.settingSeg === 'salesType') {
+    if (setSeg.dataset.settingSeg === 'salesType' || setSeg.dataset.settingSeg === 'advanceBefore') {
       // 案件の種類で入力欄が変わるので描き直す
       const y = window.scrollY;
       render();
@@ -1514,6 +1520,15 @@ app.addEventListener('click', async (ev) => {
   } else if (action === 'delete-advance') {
     const s = state.settings;
     const key = advanceKey(state.salesMonth.y, state.salesMonth.m);
+    if (el.dataset.id === 'prior') {
+      if (!(await ask(`このアプリを使う前に受けた前払い ${yen(s.priorAdvance)} を消します。`, '消す', true))) return;
+      s.priorAdvance = '';
+      await db.putSettings(s);
+      const sy = window.scrollY;
+      renderSales();
+      window.scrollTo(0, sy);
+      return;
+    }
     const item = (s.advanceHistory?.[key] || []).find((a) => a.id === el.dataset.id);
     if (!item || !(await ask(`${Number(item.date.slice(5, 7))}/${Number(item.date.slice(8))} の前払い ${yen(item.amount)} の記録を消します。`, '消す', true))) return;
     s.advanceHistory = { ...s.advanceHistory, [key]: s.advanceHistory[key].filter((a) => a.id !== item.id) };
@@ -1637,6 +1652,8 @@ app.addEventListener('input', (ev) => {
     if (out) out.value = odo;
   } else if (t.dataset.setting) {
     state.settings[t.dataset.setting] = t.value;
+    // 以前に受けた前払いは、入力した月の分として数える
+    if (t.dataset.setting === 'priorAdvance') state.settings.priorAdvanceMonth = thisMonthKey();
     // 営業所・稼働を開始した日を変えたら、単価・新人保証の表示を描き直す
     if (t.dataset.setting === 'salesOffice' || t.dataset.setting === 'salesStartDate') {
       const y = window.scrollY;
