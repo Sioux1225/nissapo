@@ -17,7 +17,7 @@ import {
   KINDS, COLLISIONS, ROAD_TYPES, SLOPES, SHAPES, SURFACES
 } from './accident.js';
 
-export const APP_VERSION = '0.12.3';
+export const APP_VERSION = '0.12.4';
 
 const app = document.getElementById('app');
 const state = {
@@ -181,7 +181,7 @@ function settingsForm(s) {
       ${s.salesType ? `
       <div class="field"><span class="field-label">リース車両</span>${[['yes', '利用している'], ['no', '利用していない']].map(([v, t]) => `<button type="button" class="chip" data-setting-seg="leaseCar" data-value="${v}" aria-pressed="${s.leaseCar === v}">${t}</button>`).join('')}</div>
       <div class="field"><span class="field-label">このアプリを使う前に、前払いを行ったこと</span>${[['yes', 'ある'], ['no', 'ない']].map(([v, t]) => `<button type="button" class="chip" data-setting-seg="advanceBefore" data-value="${v}" aria-pressed="${s.advanceBefore === v}">${t}</button>`).join('')}</div>
-      ${s.advanceBefore === 'yes' ? f('priorAdvance', `今月（${Number(thisMonthKey().slice(5))}月）すでに受けた前払いの金額（円）`, 'type="number" inputmode="numeric" min="0" placeholder="例：20000"', '売上表の前払いの合計に入り、前払い可能額から差し引きます。') : ''}
+      ${s.advanceBefore === 'yes' ? f('priorAdvance', `今月（${Number(thisMonthKey().slice(5))}月）すでに受けた前払いの金額（円）`, 'type="number" inputmode="numeric" min="0" placeholder="例：20000"', '売上表の「前払い済み」に入り、前払い可能額の計算で売上から差し引きます。') : ''}
       <p class="field-note pad-note">前払いの対象額の計算に使います（稼働を開始した月のはじめての前払いは、リース車両なら10万円、それ以外は5万円を留保。前月の売上が40万円未満のときも同じ額を留保）。</p>` : ''}
     </div>`;
 }
@@ -955,7 +955,7 @@ function advanceSection(s, y, m, salesAmount, today) {
       <span class="small">${info.reason ? `留保：${info.reason}${info.prevSales != null && !info.first ? `（${info.pm}月の売上 ${yen(info.prevSales)}）` : ''}` : info.prevSales != null ? `${info.pm}月の売上 ${yen(info.prevSales)}（40万円以上のため留保なし）` : ''}</span>
     </div>
     <div class="adv-sum">
-      <div><span class="muted">前払いの合計</span><b>${yen(total)}</b></div>
+      <div><span class="muted">前払い済み</span><b>${yen(total)}</b></div>
       <div class="adv-rest"><span class="muted">前払い可能額</span><b>${yen(info.remaining)}</b></div>
     </div>
     <div class="adv-add">
