@@ -339,7 +339,7 @@ export function renderPhotoPage({ title, sub, items }) {
 
 // 売上表（月報）：A4縦。紙の月報と同じ並び（日・曜日・開始・終了・宅配・商業・集荷・稼働距離・金額）
 // head：[{ text, w }]（w は幅の割合）、rows：31行分の文字の配列、foot：合計の行、info：右上・左上の文
-export function renderSalesSheet({ title, ym, name, sub, head, rows, foot, summary, request = null, note }) {
+export function renderSalesSheet({ title, ym, name, sub, head, rows, foot, summary, paid = null, request = null, note }) {
   const W = 1654;
   const H = 2339;
   const canvas = document.createElement('canvas');
@@ -388,28 +388,29 @@ export function renderSalesSheet({ title, ym, name, sub, head, rows, foot, summa
   // 前払いの判断用のまとめ
   const sy = footY + rowH + 60;
   ctx.textAlign = 'left';
-  // 売上合計（左）と希望する前払い額（右）を枠で並べる。上に項目名、下に大きく金額
-  // summary・request：{ label, value }
-  const boxes = [summary, ...(request ? [request] : [])];
+  // 1段目：売上合計（左）と前払い済み（右）。2段目：前払い済みの下に希望する前払い額、左に注意書き・作成日
+  // 枠は上に項目名、下に大きく金額。summary・paid・request：{ label, value }
   const gap = 30;
-  const bw = (W - m * 2 - gap * (boxes.length - 1)) / boxes.length;
-  const bh = 130;
+  const bw = (W - m * 2 - gap) / 2;
+  const bh = 120;
   const by = sy - 30;
-  boxes.forEach((b, i) => {
-    const x = m + i * (bw + gap);
+  const box = (b, x, y) => {
     ctx.lineWidth = 3;
-    ctx.strokeRect(x, by, bw, bh);
+    ctx.strokeRect(x, y, bw, bh);
     ctx.textAlign = 'left';
     ctx.font = `700 28px ${FONT}`;
-    ctx.fillText(b.label, x + 24, by + 34);
+    ctx.fillText(b.label, x + 24, y + 32);
     ctx.textAlign = 'right';
-    ctx.font = `800 56px ${FONT}`;
-    ctx.fillText(b.value, x + bw - 24, by + 88);
-  });
+    ctx.font = `800 54px ${FONT}`;
+    ctx.fillText(b.value, x + bw - 24, y + 84);
+  };
+  box(summary, m, by);
+  if (paid) box(paid, m + bw + gap, by);
+  const by2 = by + bh + 16;
+  if (request) box(request, m + bw + gap, by2);
   ctx.textAlign = 'left';
-  let ny = by + bh + 44;
   ctx.font = `400 24px ${FONT}`;
-  note.forEach((t, i) => ctx.fillText(t, m, ny + i * 36));
+  note.forEach((t, i) => ctx.fillText(t, m, by2 + 24 + i * 36));
   return canvas;
 }
 

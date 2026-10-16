@@ -17,7 +17,7 @@ import {
   KINDS, COLLISIONS, ROAD_TYPES, SLOPES, SHAPES, SURFACES
 } from './accident.js';
 
-export const APP_VERSION = '0.12.1';
+export const APP_VERSION = '0.12.2';
 
 const app = document.getElementById('app');
 const state = {
@@ -1045,6 +1045,7 @@ function salesCanvas() {
     rows,
     foot,
     summary: { label: thisMonth ? `${m}月1日〜${td}日の売上合計` : `${m}月の売上合計`, value: yen(t.amount) },
+    paid: { label: '前払い済み', value: yen(advanceTotal(s, y, m)) },
     request: advanceOf(s, y, m) != null ? { label: '希望する前払い額', value: yen(advanceOf(s, y, m)) } : null,
     note: [
       ...(sagawa ? ['＊大型貨物料金は省略とさせていただきます'] : []),
