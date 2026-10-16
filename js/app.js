@@ -17,7 +17,7 @@ import {
   KINDS, COLLISIONS, ROAD_TYPES, SLOPES, SHAPES, SURFACES
 } from './accident.js';
 
-export const APP_VERSION = '0.12.5';
+export const APP_VERSION = '0.12.6';
 
 const app = document.getElementById('app');
 const state = {
@@ -961,7 +961,7 @@ function advanceSection(s, y, m, salesAmount, today) {
     <div class="adv-add">
       <input id="adv-date" type="date" value="${def}" aria-label="前払いを受けた日">
       <input id="adv-amount" type="number" inputmode="numeric" min="0" placeholder="金額（円）" aria-label="前払いの金額">
-      <p class="field-note adv-note"><b>口座に振り込まれたら</b>、今回の前払いの金額を入れて「前払いを記録する」を押してください。</p>
+      <p class="field-note adv-note"><b>申請が承認されたら</b>、今回の前払い金額を入力して「前払いを記録する」を押してください。</p>
       <button type="button" class="btn-outline" data-action="add-advance">前払いを記録する</button>
     </div>
   </section>`;
