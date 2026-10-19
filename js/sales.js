@@ -124,7 +124,7 @@ export function advanceTotal(settings, y, m) {
 // 前払い可能額 ＝（その月の売上 − その月にすでに受けた前払い − 留保額）× 50%
 //   （前払いを受けた分は売上から先に差し引き、残りの売上の50%をもう一度前払いできる）
 //   はじめての前払いの月（稼働を開始した月だけ）：リース車両を利用している方は10万円、それ以外の方は5万円を留保
-//   2回目以降の月：前月の売上が40万円未満なら留保（前月の記録がないときも念のため）。リース車両は10万円、それ以外は5万円
+//   2回目以降の月：前月の売上が40万円未満なら5万円を留保（前月の記録がないときも念のため）。リース車両も5万円
 export const ADVANCE_RATE = 0.5;
 
 // 以前から稼働していた方が設定で選んだ、前月（アプリを使う前）の売上：'over'（40万円以上）・'under'（40万円未満）・null
@@ -155,14 +155,14 @@ export function advanceLimit({ sales, advanced = 0, prevSales, prevLevel = null,
   } else if (prevSales == null && prevLevel === 'over') {
     // 留保なし
   } else if (prevSales == null && prevLevel === 'under') {
-    reserve = lease ? 100000 : 50000;
-    reason = `前月の売上が40万円未満${lease ? '（リース車両）' : ''}`;
+    reserve = 50000;
+    reason = '前月の売上が40万円未満';
   } else if (prevSales == null) {
-    reserve = lease ? 100000 : 50000;
-    reason = `前月の記録がないため${lease ? '（リース車両）' : ''}`;
+    reserve = 50000;
+    reason = '前月の記録がないため';
   } else if (prevSales < 400000) {
-    reserve = lease ? 100000 : 50000;
-    reason = `前月の売上が40万円未満${lease ? '（リース車両）' : ''}`;
+    reserve = 50000;
+    reason = '前月の売上が40万円未満';
   }
   const base = Math.max(0, sales - advanced - reserve);
   return { reserve, reason, base, target: Math.floor(base * ADVANCE_RATE) };

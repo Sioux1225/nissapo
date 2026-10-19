@@ -390,12 +390,12 @@ test('前払いの対象額：留保額と50%', async () => {
   assert.equal(advanceLimit({ sales: 300000, prevSales: 400000, first: false }).target, 150000);
   assert.equal(advanceLimit({ sales: 300000, prevSales: 399999, first: false }).target, 125000);
   assert.equal(advanceLimit({ sales: 300000, prevSales: null, first: false }).reserve, 50000);
-  // リース車両は、前月の売上が40万円未満・記録なしでも10万円を留保
-  assert.equal(advanceLimit({ sales: 300000, prevSales: 399999, first: false, lease: true }).reserve, 100000);
-  assert.equal(advanceLimit({ sales: 300000, prevSales: null, first: false, lease: true }).target, 100000);
+  // リース車両も、2か月目以降（前月の売上が40万円未満・記録なし）は5万円を留保
+  assert.equal(advanceLimit({ sales: 300000, prevSales: 399999, first: false, lease: true }).reserve, 50000);
+  assert.equal(advanceLimit({ sales: 300000, prevSales: null, first: false, lease: true }).target, 125000);
   assert.equal(advanceLimit({ sales: 300000, prevSales: 400000, first: false, lease: true }).reserve, 0);
   // すでに受けた前払いは売上から先に差し引く：（304,000 − 20,000 − 100,000）× 50% ＝ 92,000
-  assert.equal(advanceLimit({ sales: 304000, advanced: 20000, prevSales: null, first: false, lease: true }).target, 92000);
+  assert.equal(advanceLimit({ sales: 304000, advanced: 20000, prevSales: null, first: true, lease: true }).target, 92000);
   // 売上が留保額より少なければ0
   assert.equal(advanceLimit({ sales: 40000, prevSales: null, first: true, lease: false }).target, 0);
   assert.equal(advanceLimit({ sales: 100001, prevSales: 500000, first: false }).target, 50000); // 円未満は切り捨て
@@ -427,7 +427,7 @@ test('前月の記録がないとき：設定で選んだ前月の売上で留�
   const { advanceLimit } = await import('../js/sales.js');
   assert.equal(advanceLimit({ sales: 300000, prevSales: null, prevLevel: 'over', first: false, lease: true }).reserve, 0);
   assert.equal(advanceLimit({ sales: 300000, prevSales: null, prevLevel: 'under', first: false, lease: false }).reserve, 50000);
-  assert.equal(advanceLimit({ sales: 300000, prevSales: null, prevLevel: 'under', first: false, lease: true }).reserve, 100000);
+  assert.equal(advanceLimit({ sales: 300000, prevSales: null, prevLevel: 'under', first: false, lease: true }).reserve, 50000);
   // アプリに前月の記録があれば、記録の売上を使う
   assert.equal(advanceLimit({ sales: 300000, prevSales: 300000, prevLevel: 'over', first: false }).reserve, 50000);
 });
