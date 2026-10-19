@@ -32,7 +32,8 @@ export const DEFAULT_SETTINGS = {
   leaseCar: '',        // リース車両を利用しているか（'yes'・'no'）
   priorAdvance: '',      // このアプリを使う前に、今月すでに受けた前払いの金額
   priorAdvanceMonth: '', // その金額の月（'YYYY-MM'。入力した月）
-  advanceBefore: '',   // このアプリを使う前に前払いを行ったことがあるか（'yes'・'no'）
+  prevSalesLevel: '',  // 以前から稼働していた方の、アプリを使う前の前月の売上（'over'：40万円以上・'under'：40万円未満）
+  prevSalesMonth: '',  // その前月（'YYYY-MM'。選んだときの前月）
   lastVersion: '',     // 最後に開いたアプリの版（アップデートのお知らせ用）
   retention: '1年間'
 };
@@ -107,7 +108,12 @@ export function timeToSerial(s) {
 
 // ---- 走行距離 ----
 
-export const num = (v) => (v === '' || v == null || Number.isNaN(Number(v)) ? null : Number(v));
+// 数字（全角の数字・カンマ入りも読む）
+export const num = (v) => {
+  if (v == null) return null;
+  const t = String(v).replace(/[０-９]/g, (c) => String.fromCharCode(c.charCodeAt(0) - 0xFEE0)).replace(/[,，\s　]/g, '');
+  return t === '' || Number.isNaN(Number(t)) ? null : Number(t);
+};
 
 export function distanceOf(rec) {
   const a = num(rec?.start?.odo);

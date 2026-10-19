@@ -3,7 +3,7 @@
 
 import { db, requestPersist } from './db.js';
 import { shrinkImage, newPhoto, blobToDataUrl, dataUrlToBlob } from './photo.js';
-import { SALES_TYPES, COUNT_KEYS, unitPrices, salesReady, monthSales, yen, defaultShogyo, defaultShuka, advanceKey, advanceOf, advanceHistory, advanceTotal, advanceLimit, isFirstAdvanceMonth, OFFICES, OTHER_OFFICE, PRICE_TABLE_DATE, officeEntry, officeName, newbiePeriod, newbieSpan } from './sales.js';
+import { SALES_TYPES, COUNT_KEYS, unitPrices, salesReady, monthSales, yen, defaultShogyo, defaultShuka, advanceKey, advanceOf, advanceHistory, advanceTotal, advanceLimit, isFirstAdvanceMonth, prevSalesLevel, OFFICES, OTHER_OFFICE, PRICE_TABLE_DATE, officeEntry, officeName, newbiePeriod, newbieSpan } from './sales.js';
 import { EXPIRED, expiryStatus, expiryMessage, expiryAlertsToShow } from './expiry.js';
 import { OIL_LIMIT, OIL_STEPS, newOilChange, currentOdo, oilStatus, oilMessage, oilAlertToShow, sortOilChanges } from './oil.js';
 import {
@@ -17,7 +17,7 @@ import {
   KINDS, COLLISIONS, ROAD_TYPES, SLOPES, SHAPES, SURFACES
 } from './accident.js';
 
-export const APP_VERSION = '0.12.7';
+export const APP_VERSION = '0.13.0';
 
 const app = document.getElementById('app');
 const state = {
@@ -138,8 +138,12 @@ const head = (title, back = 'home') =>
 
 // ---- 画面：はじめての設定・設定 ----
 
-// 今月（'YYYY-MM'）
+// 今月（'YYYY-MM'）・前月
 const thisMonthKey = () => todayKey().slice(0, 7);
+const prevMonthKey = () => { const d = new Date(); d.setDate(1); d.setMonth(d.getMonth() - 1); return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}`; };
+const prevMonthNum = () => Number(prevMonthKey().slice(5));
+// 設定の「前月の売上」は、選んだときの前月が今の前月と同じときだけ選ばれている
+const prevLevelNow = (s) => (s.prevSalesMonth === prevMonthKey() ? s.prevSalesLevel || '' : '');
 
 function settingsForm(s) {
   // 以前に受けた前払いは今月の分だけを入れる（前の月に入れた金額は出さない）
@@ -180,8 +184,9 @@ function settingsForm(s) {
         <p class="field-note pad-note">運転日報で乗務を記録した日を、日極1日分として数えます。</p>` : ''}
       ${s.salesType ? `
       <div class="field"><span class="field-label">リース車両</span>${[['yes', '利用している'], ['no', '利用していない']].map(([v, t]) => `<button type="button" class="chip" data-setting-seg="leaseCar" data-value="${v}" aria-pressed="${s.leaseCar === v}">${t}</button>`).join('')}</div>
-      <div class="field"><span class="field-label">このアプリを使う前に、前払いを行ったこと</span>${[['yes', 'ある'], ['no', 'ない']].map(([v, t]) => `<button type="button" class="chip" data-setting-seg="advanceBefore" data-value="${v}" aria-pressed="${s.advanceBefore === v}">${t}</button>`).join('')}</div>
-      ${s.advanceBefore === 'yes' ? f('priorAdvance', `今月（${Number(thisMonthKey().slice(5))}月）すでに受けた前払いの金額（円）`, 'type="number" inputmode="numeric" min="0" placeholder="例：20000"', '売上表の前払いの合計に入り、前払い可能額から差し引きます。') : ''}
+      <div class="field"><span class="field-label">前月（${prevMonthNum()}月）の売上（以前から稼働していた方）</span>${[['over', '40万円以上'], ['under', '40万円未満']].map(([v, t]) => `<button type="button" class="chip" data-setting-seg="prevSalesLevel" data-value="${v}" aria-pressed="${prevLevelNow(s) === v}">${t}</button>`).join('')}</div>
+      <p class="field-note pad-note">このアプリを使う前から稼働していた方は選んでください（もう一度押すと取り消し）。前月の記録がアプリにないときに、留保がいるかどうかの判断に使います（40万円未満なら留保）。</p>
+      ${f('priorAdvance', `今月（${Number(thisMonthKey().slice(5))}月）すでに受けた前払いの金額（円）`, 'type="text" inputmode="numeric" placeholder="例：20000"', 'このアプリを使う前に、今月受けた前払いがあれば入れてください。売上表の前払いの合計に入り、前払い可能額の計算で差し引きます。')}
       <p class="field-note pad-note">前払いの対象額の計算に使います（稼働を開始した月のはじめての前払いは、リース車両なら10万円、それ以外は5万円を留保。前月の売上が40万円未満のときも同じ額を留保）。</p>` : ''}
     </div>`;
 }
@@ -932,10 +937,11 @@ function advanceInfo(s, y, m, salesAmount) {
   const py = pd.getFullYear();
   const pm = pd.getMonth() + 1;
   const prevSales = hasMonth(state.records, py, pm) ? monthSales(state.records, py, pm, s).total.amount : null;
+  const prevLevel = prevSales == null ? prevSalesLevel(s, y, m) : null;
   const first = isFirstAdvanceMonth(s, y, m);
   const total = advanceTotal(s, y, m);
-  const lim = advanceLimit({ sales: salesAmount, advanced: total, prevSales, first, lease: s.leaseCar === 'yes' });
-  return { ...lim, first, prevSales, pm, total, remaining: lim.target };
+  const lim = advanceLimit({ sales: salesAmount, advanced: total, prevSales, prevLevel, first, lease: s.leaseCar === 'yes' });
+  return { ...lim, first, prevSales, prevLevel, pm, total, remaining: lim.target };
 }
 
 function advanceSection(s, y, m, salesAmount, today) {
@@ -952,7 +958,7 @@ function advanceSection(s, y, m, salesAmount, today) {
     <div class="adv-target">
       <span class="muted">前払い可能額の計算</span>
       <span class="adv-formula">（売上 ${yen(salesAmount)}${total ? ` − 前払い済み ${yen(total)}` : ''}${info.reserve ? ` − 留保 ${yen(info.reserve)}` : ''}）× 50% ＝ <b>${yen(info.target)}</b></span>
-      <span class="small">${info.reason ? `留保：${info.reason}${info.prevSales != null && !info.first ? `（${info.pm}月の売上 ${yen(info.prevSales)}）` : ''}` : info.prevSales != null ? `${info.pm}月の売上 ${yen(info.prevSales)}（40万円以上のため留保なし）` : ''}</span>
+      <span class="small">${info.reason ? `留保：${info.reason}${info.prevSales != null && !info.first ? `（${info.pm}月の売上 ${yen(info.prevSales)}）` : info.prevLevel ? '（設定で選んだ前月の売上）' : ''}` : info.prevSales != null ? `${info.pm}月の売上 ${yen(info.prevSales)}（40万円以上のため留保なし）` : info.prevLevel === 'over' ? `${info.pm}月の売上 40万円以上（設定で選択）のため留保なし` : ''}</span>
     </div>
     <div class="adv-sum">
       <div><span class="muted">前払いの合計</span><b>${yen(total)}</b></div>
@@ -1474,9 +1480,12 @@ app.addEventListener('click', async (ev) => {
   }
   const setSeg = ev.target.closest('[data-setting-seg]');
   if (setSeg) {
-    state.settings[setSeg.dataset.settingSeg] = setSeg.dataset.value;
-    setSeg.parentElement.querySelectorAll('[data-setting-seg]').forEach((b) => b.setAttribute('aria-pressed', b === setSeg));
-    if (setSeg.dataset.settingSeg === 'salesType' || setSeg.dataset.settingSeg === 'advanceBefore') {
+    // 前月の売上は、選んでいるものをもう一度押すと取り消し
+    const off = setSeg.dataset.settingSeg === 'prevSalesLevel' && setSeg.getAttribute('aria-pressed') === 'true';
+    state.settings[setSeg.dataset.settingSeg] = off ? '' : setSeg.dataset.value;
+    setSeg.parentElement.querySelectorAll('[data-setting-seg]').forEach((b) => b.setAttribute('aria-pressed', !off && b === setSeg));
+    if (setSeg.dataset.settingSeg === 'prevSalesLevel') state.settings.prevSalesMonth = prevMonthKey();
+    if (setSeg.dataset.settingSeg === 'salesType') {
       // 案件の種類で入力欄が変わるので描き直す
       const y = window.scrollY;
       render();

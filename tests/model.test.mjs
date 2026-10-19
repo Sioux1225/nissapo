@@ -404,7 +404,9 @@ test('前払いの対象額：留保額と50%', async () => {
   assert.equal(isFirstAdvanceMonth(h, 2026, 9), true); // 9月が最初の前払いの月
   assert.equal(isFirstAdvanceMonth(h, 2026, 10), false);
   assert.equal(isFirstAdvanceMonth({}, 2026, 10), true);
-  assert.equal(isFirstAdvanceMonth({ advanceBefore: 'yes' }, 2026, 10), false);
+  // 以前から稼働していて前月の売上を選んだ方は、はじめてではない
+  assert.equal(isFirstAdvanceMonth({ prevSalesLevel: 'over', prevSalesMonth: '2026-09' }, 2026, 10), false);
+  assert.equal(isFirstAdvanceMonth({ prevSalesLevel: 'over', prevSalesMonth: '2026-08' }, 2026, 10), true); // 選んだ月が古ければ使わない
   // 稼働を開始した月だけがはじめての留保の対象（2か月サイトのため、翌月以降は留保なし）
   const st = { salesStartDate: '2026-10-13' };
   assert.equal(isFirstAdvanceMonth(st, 2026, 10), true);
@@ -415,9 +417,25 @@ test('前払いの対象額：留保額と50%', async () => {
 
 test('このアプリを使う前に受けた前払い：入れた月の合計に入る', async () => {
   const { advanceHistory, advanceTotal } = await import('../js/sales.js');
-  const s = { advanceBefore: 'yes', priorAdvance: '20000', priorAdvanceMonth: '2026-10', advanceHistory: { '2026-10': [{ id: 'a', date: '2026-10-20', amount: 30000 }] } };
+  const s = { priorAdvance: '20000', priorAdvanceMonth: '2026-10', advanceHistory: { '2026-10': [{ id: 'a', date: '2026-10-20', amount: 30000 }] } };
   assert.equal(advanceTotal(s, 2026, 10), 50000);
   assert.equal(advanceHistory(s, 2026, 10)[0].prior, true);
   assert.equal(advanceTotal(s, 2026, 11), 0); // 次の月には入らない
-  assert.equal(advanceTotal({ ...s, advanceBefore: 'no' }, 2026, 10), 30000); // 「ない」にしたら数えない
+});
+
+test('前月の記録がないとき：設定で選んだ前月の売上で留保を決める', async () => {
+  const { advanceLimit } = await import('../js/sales.js');
+  assert.equal(advanceLimit({ sales: 300000, prevSales: null, prevLevel: 'over', first: false, lease: true }).reserve, 0);
+  assert.equal(advanceLimit({ sales: 300000, prevSales: null, prevLevel: 'under', first: false, lease: false }).reserve, 50000);
+  assert.equal(advanceLimit({ sales: 300000, prevSales: null, prevLevel: 'under', first: false, lease: true }).reserve, 100000);
+  // アプリに前月の記録があれば、記録の売上を使う
+  assert.equal(advanceLimit({ sales: 300000, prevSales: 300000, prevLevel: 'over', first: false }).reserve, 50000);
+});
+
+test('数字：全角・カンマ入りも読む', async () => {
+  const { num } = await import('../js/model.js');
+  assert.equal(num('２００００'), 20000);
+  assert.equal(num('20,000'), 20000);
+  assert.equal(num(''), null);
+  assert.equal(num('abc'), null);
 });

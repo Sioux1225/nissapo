@@ -107,7 +107,7 @@ export function advanceOf(settings, y, m) {
 // 受けた前払いの履歴（月ごと。キーは 'YYYY-MM'）[{ id, date, amount }]
 // このアプリを使う前に、その月にすでに受けた前払い（設定で入れた分）は prior: true として先頭に入れる
 export function priorAdvance(settings, y, m) {
-  if (settings.advanceBefore !== 'yes' || settings.priorAdvanceMonth !== advanceKey(y, m)) return null;
+  if (settings.priorAdvanceMonth !== advanceKey(y, m)) return null;
   const amount = num(settings.priorAdvance);
   return amount > 0 ? { id: 'prior', date: `${advanceKey(y, m)}-01`, amount, prior: true } : null;
 }
@@ -127,22 +127,36 @@ export function advanceTotal(settings, y, m) {
 //   2回目以降の月：前月の売上が40万円未満なら留保（前月の記録がないときも念のため）。リース車両は10万円、それ以外は5万円
 export const ADVANCE_RATE = 0.5;
 
-// はじめての前払いの月か（このアプリを使う前に前払いを行ったことがあれば、はじめてではない）
+// 以前から稼働していた方が設定で選んだ、前月（アプリを使う前）の売上：'over'（40万円以上）・'under'（40万円未満）・null
+// 選んだときの前月（prevSalesMonth）の分だけに使う
+export function prevSalesLevel(settings, y, m) {
+  const pd = new Date(y, m - 2, 1);
+  const pk = advanceKey(pd.getFullYear(), pd.getMonth() + 1);
+  return settings.prevSalesMonth === pk && ['over', 'under'].includes(settings.prevSalesLevel) ? settings.prevSalesLevel : null;
+}
+
+// はじめての前払いの月か（以前から稼働していて前月の売上を選んだ方は、はじめてではない）
 // 支払いは2か月サイトなので、稼働を開始した月より後の月は、まだ支払われていない売上があり、はじめての留保はいらない
 export function isFirstAdvanceMonth(settings, y, m) {
-  if (settings.advanceBefore === 'yes') return false;
+  if (prevSalesLevel(settings, y, m)) return false;
   const key = advanceKey(y, m);
   if (isDate(settings.salesStartDate) && key > settings.salesStartDate.slice(0, 7)) return false;
   return !Object.entries(settings.advanceHistory || {}).some(([k, list]) => k < key && (list || []).length > 0);
 }
 
 // sales：その月の売上、advanced：その月にすでに受けた前払い、prevSales：前月の売上（記録がなければ null）
-export function advanceLimit({ sales, advanced = 0, prevSales, first, lease }) {
+// prevLevel：前月の記録がないときに、設定で選んだ前月の売上（'over'・'under'）
+export function advanceLimit({ sales, advanced = 0, prevSales, prevLevel = null, first, lease }) {
   let reserve = 0;
   let reason = '';
   if (first) {
     reserve = lease ? 100000 : 50000;
     reason = lease ? 'はじめての前払い（リース車両）' : 'はじめての前払い（車両持ち込み）';
+  } else if (prevSales == null && prevLevel === 'over') {
+    // 留保なし
+  } else if (prevSales == null && prevLevel === 'under') {
+    reserve = lease ? 100000 : 50000;
+    reason = `前月の売上が40万円未満${lease ? '（リース車両）' : ''}`;
   } else if (prevSales == null) {
     reserve = lease ? 100000 : 50000;
     reason = `前月の記録がないため${lease ? '（リース車両）' : ''}`;
