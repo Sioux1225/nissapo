@@ -17,7 +17,7 @@ import {
   KINDS, COLLISIONS, ROAD_TYPES, SLOPES, SHAPES, SURFACES
 } from './accident.js';
 
-export const APP_VERSION = '0.14.4';
+export const APP_VERSION = '0.14.5';
 
 const app = document.getElementById('app');
 const state = {
