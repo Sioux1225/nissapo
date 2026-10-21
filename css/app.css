@@ -390,3 +390,8 @@ button:focus-visible { outline: 3px solid var(--blue); outline-offset: 2px; }
 /* バックアップ：クラウドへの保存をすすめる */
 .cloud-note { color: var(--orange-text); background: var(--orange-tint); border-radius: 12px; padding: 10px 12px; }
 .cloud-note b { color: var(--orange-text); }
+
+/* ホームのボタンの頭のマーク */
+.btn-outline:has(> .btn-mark) { display: flex; align-items: center; justify-content: center; gap: 8px; }
+.btn-mark { width: 28px; height: 28px; flex: none; border-radius: 9px; display: grid; place-items: center; background: var(--orange-tint); color: #E08A00; }
+.btn-row.two .btn-outline:has(> .btn-mark) { padding: 0 8px; gap: 6px; white-space: nowrap; }

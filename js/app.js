@@ -17,7 +17,7 @@ import {
   KINDS, COLLISIONS, ROAD_TYPES, SLOPES, SHAPES, SURFACES
 } from './accident.js';
 
-export const APP_VERSION = '0.14.7';
+export const APP_VERSION = '0.14.8';
 
 const app = document.getElementById('app');
 const state = {
@@ -102,6 +102,15 @@ const LOGO = (size) => `<svg width="${size}" height="${size}" viewBox="0 0 160 1
 </svg>`;
 
 const WORDMARK = '<span class="wordmark" aria-label="日報サポート"><span class="g">日報</span><span class="o">サポート</span></span>';
+
+// ホームのボタンの頭に付けるマーク（薄いオレンジの角丸の中に、オレンジの線のマーク）
+const mark = (path) => `<span class="btn-mark" aria-hidden="true"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">${path}</svg></span>`;
+const MARK = {
+  list: mark('<path d="M8 6h12M8 12h12M8 18h12"/><circle cx="4" cy="6" r="1"/><circle cx="4" cy="12" r="1"/><circle cx="4" cy="18" r="1"/>'),
+  share: mark('<path d="M12 3v12M7 8l5-5 5 5"/><path d="M5 13v6a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-6"/>'),
+  yen: mark('<path d="M6 4l6 8 6-8M12 12v8M7 13h10M7 17h10"/>'),
+  warn: mark('<path d="M12 3l10 18H2z"/><path d="M12 10v5M12 18v.01"/>')
+};
 
 const ICON = {
   gear: '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>',
@@ -324,11 +333,11 @@ function renderHome() {
         <div><span class="muted">${m}月の走行</span><b>${km.toLocaleString('ja-JP')}<small>km</small></b></div>
       </section>
       <div class="btn-row two">
-        <button type="button" class="btn-outline" data-action="go" data-view="list">記録の一覧</button>
-        <button type="button" class="btn-outline" data-action="go" data-view="export">書き出し・共有</button>
+        <button type="button" class="btn-outline" data-action="go" data-view="list">${MARK.list}記録の一覧</button>
+        <button type="button" class="btn-outline" data-action="go" data-view="export">${MARK.share}書き出し・共有</button>
       </div>
-      <button type="button" class="btn-outline" data-action="go" data-view="sales">売上表（前払い）</button>
-      <button type="button" class="btn-outline" data-action="go" data-view="accidents">事故の記録${state.accidents.length ? `（${state.accidents.length}件）` : ''}</button>
+      <button type="button" class="btn-outline" data-action="go" data-view="sales">${MARK.yen}売上表（前払い）</button>
+      <button type="button" class="btn-outline" data-action="go" data-view="accidents">${MARK.warn}事故の記録${state.accidents.length ? `（${state.accidents.length}件）` : ''}</button>
       <div class="link-stack">
         <button type="button" class="link-btn" data-action="go" data-view="rules">記録の決まり（保存期間・点呼で確かめること）</button>
         <button type="button" class="link-btn" data-action="go" data-view="advrules">前払いのルールと注意事項</button>
