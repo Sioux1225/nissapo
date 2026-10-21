@@ -439,3 +439,32 @@ test('数字：全角・カンマ入りも読む', async () => {
   assert.equal(num(''), null);
   assert.equal(num('abc'), null);
 });
+
+test('その他（日極）：その日に選んだ案件の金額の合計', async () => {
+  const { dayAmount, countsMissing, jobsOf, monthSales } = await import('../js/sales.js');
+  const s = { salesType: 'daily', jobs: [{ id: 'a', name: 'チャーター便', price: '' }, { id: 'b', name: '医薬品配達', price: 9000 }, { id: 'c', name: '', price: '' }] };
+  assert.equal(jobsOf(s).length, 2); // 名前のない行は数えない
+  const start = { time: '08:00' };
+  const rec = { date: '2026-10-01', start, jobs: [{ name: 'チャーター便', amount: 15000, memo: '横浜' }, { name: '医薬品配達', amount: 9000 }] };
+  assert.equal(dayAmount(rec, s), 24000);
+  assert.equal(countsMissing(rec, s), false);
+  // 金額が空の案件があれば「金額まだ」（入っている分だけ数える）
+  const rec2 = { date: '2026-10-02', start, jobs: [{ name: 'チャーター便', amount: null }, { name: '医薬品配達', amount: 9000 }] };
+  assert.equal(dayAmount(rec2, s), 9000);
+  assert.equal(countsMissing(rec2, s), true);
+  // 案件を選んでいない日は、案件が2つ以上なら売上なし（金額まだ）
+  const rec3 = { date: '2026-10-03', start };
+  assert.equal(dayAmount(rec3, s), null);
+  assert.equal(countsMissing(rec3, s), true);
+  const t = monthSales([rec, rec2, rec3], 2026, 10, s, '2026-10-31', '2026-10-31').total;
+  assert.equal(t.amount, 33000);
+  assert.equal(t.missing, 2);
+});
+
+test('その他（日極）：以前の版の「所属・日極」は1つ目の案件として読む', async () => {
+  const { dayAmount, jobsOf } = await import('../js/sales.js');
+  const s = { salesType: 'daily', salesProject: 'Amazon', dailyRate: 19000, jobs: [] };
+  assert.deepEqual(jobsOf(s).map((j) => j.name), ['Amazon']);
+  assert.equal(dayAmount({ date: '2026-10-01', start: { time: '08:00' } }, s), 19000);
+});
+

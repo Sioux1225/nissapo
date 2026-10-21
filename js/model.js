@@ -25,8 +25,9 @@ export const DEFAULT_SETTINGS = {
   priceTakuhai: '',    // 単価（円/個）宅配
   priceShogyo: '',     // 単価 商業（空なら宅配と同じ）
   priceShuka: '',      // 単価 集荷（空なら宅配と同じ）
-  salesProject: '',    // 日極の案件の所属（案件名）
-  dailyRate: '',       // 日極（円）
+  salesProject: '',    // 以前の版の、日極の案件の所属（案件名）。いまは jobs を使う
+  dailyRate: '',       // 以前の版の、日極（円）。いまは jobs を使う
+  jobs: [],            // その他（日極）の案件 [{ id, name, price }]（price：いつもの金額。毎回変わる案件は空）
   advance: {},         // 希望する前払い額 { 'YYYY-MM': 円 }
   advanceHistory: {},  // 受けた前払いの履歴 { 'YYYY-MM': [{ id, date, amount }] }
   leaseCar: '',        // リース車両を利用しているか（'yes'・'no'）

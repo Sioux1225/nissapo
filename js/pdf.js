@@ -414,6 +414,69 @@ export function renderSalesSheet({ title, ym, name, sub, head, rows, foot, summa
   return canvas;
 }
 
+// 売上の内訳（その他（日極）で「内訳も付ける」を選んだとき）：A4縦。1ページに入りきらなければ次のページへ
+// rows：[日, 案件, 金額, メモ]、sums：[案件, 日数, 金額の合計]、total：売上合計
+export function renderSalesDetail({ title, ym, name, sub, rows, sums, total }) {
+  const W = 1654;
+  const H = 2339;
+  const m = 110;
+  const rowH = 52;
+  const cols = [{ w: 14, align: 'center' }, { w: 30, align: 'left' }, { w: 18, align: 'right' }, { w: 38, align: 'left' }];
+  const sumCols = [{ w: 44, align: 'left' }, { w: 18, align: 'center' }, { w: 38, align: 'right' }];
+  const pages = [];
+  let ctx;
+  let y;
+  const newPage = () => {
+    const canvas = document.createElement('canvas');
+    canvas.width = W;
+    canvas.height = H;
+    ctx = canvas.getContext('2d');
+    ctx.fillStyle = '#FFFFFF';
+    ctx.fillRect(0, 0, W, H);
+    ctx.fillStyle = '#000000';
+    ctx.strokeStyle = '#000000';
+    ctx.textBaseline = 'middle';
+    ctx.font = `700 54px ${FONT}`;
+    ctx.textAlign = 'left';
+    ctx.fillText(title, m, 150);
+    ctx.font = `400 34px ${FONT}`;
+    ctx.textAlign = 'right';
+    ctx.fillText(ym, W - m, 150);
+    ctx.fillText(`氏名：${name}`, W - m, 220);
+    ctx.font = `400 26px ${FONT}`;
+    ctx.textAlign = 'left';
+    ctx.fillText(sub, m, 220);
+    pages.push(canvas);
+    y = 270;
+  };
+  const row = (spec, cells, { bold = false, fill = null } = {}) => {
+    const total = spec.reduce((t, c) => t + c.w, 0);
+    let x = m;
+    ctx.lineWidth = 2;
+    cells.forEach((v, i) => {
+      const w = (spec[i].w / total) * (W - m * 2);
+      if (fill) { ctx.fillStyle = fill; ctx.fillRect(x, y, w, rowH); ctx.fillStyle = '#000000'; }
+      ctx.strokeRect(x, y, w, rowH);
+      if (v) drawLines(ctx, String(v), x, y, w, rowH, { size: 26, weight: bold ? 700 : 400, align: bold ? 'center' : spec[i].align });
+      x += w;
+    });
+    y += rowH;
+  };
+  const bottom = H - 140;
+  newPage();
+  row(cols, ['日', '案件', '金額', 'メモ'], { bold: true, fill: '#EFEFEF' });
+  for (const r of rows) {
+    if (y + rowH > bottom) { newPage(); row(cols, ['日', '案件', '金額', 'メモ'], { bold: true, fill: '#EFEFEF' }); }
+    row(cols, r);
+  }
+  // 案件ごとの合計
+  if (y + rowH * (sums.length + 3) > bottom) newPage(); else y += 40;
+  row(sumCols, ['案件', '日数', '金額の合計'], { bold: true, fill: '#EFEFEF' });
+  sums.forEach((r) => row(sumCols, r));
+  row(sumCols, ['合計', '', total], { bold: true, fill: '#FFF3E0' });
+  return pages;
+}
+
 function canvasJpeg(canvas) {
   return new Promise((resolve, reject) => {
     canvas.toBlob(async (blob) => {

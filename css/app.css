@@ -359,3 +359,30 @@ button:focus-visible { outline: 3px solid var(--blue); outline-offset: 2px; }
 .adv-target { display: flex; flex-direction: column; gap: 2px; padding: 10px 16px; border-top: 1px solid var(--line-soft); background: var(--orange-tint); }
 .adv-formula { font-size: 15px; font-variant-numeric: tabular-nums; }
 .adv-formula b { font-size: 18px; }
+
+/* その他（日極）：案件の登録・今日の案件・売上表の内訳 */
+.job-head { padding-bottom: 2px; }
+.job-row { display: grid; grid-template-columns: minmax(0, 1fr) 7.5em auto; gap: 8px; align-items: center; padding: 6px 16px; }
+.job-row input { min-width: 0; width: 100%; min-height: 46px; border: 1px solid var(--line-strong); border-radius: 12px; background: var(--card); padding: 0 10px; font-size: 16px; font-weight: 600; }
+.job-row input::placeholder { color: #B5B5B5; font-weight: 400; }
+.job-row .btn-text { min-height: 44px; font-size: 14px; }
+.picks { display: flex; gap: 6px; flex-wrap: wrap; }
+.picks .chip { flex: none; white-space: nowrap; padding-inline: 16px; }
+.picked { display: flex; flex-direction: column; gap: 8px; padding: 0 16px 12px; }
+.pj { display: grid; grid-template-columns: minmax(0, 1fr) 8.5em; gap: 6px 8px; align-items: center; padding: 10px 12px; border: 1px solid var(--line); border-radius: 14px; background: var(--card); }
+.pj b { font-size: 15px; }
+.pj input { min-width: 0; width: 100%; min-height: 44px; border: 1px solid var(--line-strong); border-radius: 10px; background: var(--card); padding: 0 10px; font-size: 16px; font-weight: 700; text-align: right; font-variant-numeric: tabular-nums; }
+.pj input::placeholder { color: #B5B5B5; font-weight: 400; }
+.pj input.memo { grid-column: 1 / -1; text-align: left; font-weight: 400; font-size: 15px; }
+.pj input.need { border-color: var(--warn); }
+.pj .ex { grid-column: 1 / -1; font-size: 12px; color: var(--sub); margin-top: -2px; }
+.daytotal { display: flex; justify-content: space-between; align-items: baseline; padding: 12px 16px; border-top: 1px solid var(--line-soft); background: var(--orange-tint); }
+.daytotal b { font-size: 22px; font-variant-numeric: tabular-nums; }
+.jobs-line { display: block; font-size: 13px; color: var(--sub); margin-top: 2px; }
+.tag.warn-tag { color: var(--warn); background: var(--warn-bg); }
+.day-detail { padding: 0 16px 8px 64px; display: flex; flex-direction: column; gap: 6px; font-size: 14px; }
+.day-detail > div { display: flex; justify-content: space-between; gap: 8px; }
+.day-detail b { white-space: nowrap; }
+.day-detail .btn-text { align-self: flex-start; min-height: 40px; font-size: 14px; color: var(--orange-text); padding: 0; }
+.field-inline { display: flex; justify-content: center; }
+.field-inline .chip { white-space: normal; padding: 8px 14px; }
