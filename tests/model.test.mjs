@@ -440,7 +440,7 @@ test('数字：全角・カンマ入りも読む', async () => {
   assert.equal(num('abc'), null);
 });
 
-test('その他（日極）：その日に選んだ案件の金額の合計', async () => {
+test('法人（日極）：その日に選んだ案件の金額の合計', async () => {
   const { dayAmount, countsMissing, jobsOf, monthSales } = await import('../js/sales.js');
   const s = { salesType: 'daily', jobs: [{ id: 'a', name: 'チャーター便', price: '' }, { id: 'b', name: '医薬品配達', price: 9000 }, { id: 'c', name: '', price: '' }] };
   assert.equal(jobsOf(s).length, 2); // 名前のない行は数えない
@@ -461,7 +461,7 @@ test('その他（日極）：その日に選んだ案件の金額の合計', as
   assert.equal(t.missing, 2);
 });
 
-test('その他（日極）：以前の版の「所属・日極」は1つ目の案件として読む', async () => {
+test('法人（日極）：以前の版の「所属・日極」は1つ目の案件として読む', async () => {
   const { dayAmount, jobsOf } = await import('../js/sales.js');
   const s = { salesType: 'daily', salesProject: 'Amazon', dailyRate: 19000, jobs: [] };
   assert.deepEqual(jobsOf(s).map((j) => j.name), ['Amazon']);

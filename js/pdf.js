@@ -414,7 +414,7 @@ export function renderSalesSheet({ title, ym, name, sub, head, rows, foot, summa
   return canvas;
 }
 
-// 売上の内訳（その他（日極）で「内訳も付ける」を選んだとき）：A4縦。1ページに入りきらなければ次のページへ
+// 売上の内訳（法人（日極）で「内訳も付ける」を選んだとき）：A4縦。1ページに入りきらなければ次のページへ
 // rows：[日, 案件, 金額, メモ]、sums：[案件, 日数, 金額の合計]、total：売上合計
 export function renderSalesDetail({ title, ym, name, sub, rows, sums, total }) {
   const W = 1654;

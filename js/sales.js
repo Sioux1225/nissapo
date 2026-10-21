@@ -1,10 +1,10 @@
 // 売上表（月報・前払い用）
-// 佐川急便：その日の配達個数（宅配・商業・集荷）× 単価。その他（日極）：その日に選んだ案件の金額の合計。
+// 佐川急便：その日の配達個数（宅配・商業・集荷）× 単価。法人（日極）：その日に選んだ案件の金額の合計。
 // 前払いは月初めからの売上で計算するため、合計はその月の分だけ（前月の分は含めない）。
 
 import { num, daysInMonth, dateKey, weekday, distanceOf, isOff, isOffDay, todayKey } from './model.js';
 
-export const SALES_TYPES = [['sagawa', '佐川急便'], ['daily', 'その他（日極）']];
+export const SALES_TYPES = [['sagawa', '佐川急便'], ['daily', '法人（日極）']];
 export const COUNT_KEYS = [['takuhai', '宅配'], ['shogyo', '商業'], ['shuka', '集荷']];
 
 // 佐川急便の商業・集荷の決まった単価（営業所で変わる）
@@ -168,7 +168,7 @@ export function advanceLimit({ sales, advanced = 0, prevSales, prevLevel = null,
   return { reserve, reason, base, target: Math.floor(base * ADVANCE_RATE) };
 }
 
-// ---- その他（日極）の案件 ----
+// ---- 法人（日極）の案件 ----
 // 1日にいくつかの案件（午前はチャーター便、午後は医薬品の配達など）をこなす方のため、案件をいくつか登録し、
 // 乗務後点呼でその日の案件を選ぶ。その日の金額は、選んだ案件の金額の合計。
 // 登録した案件の一覧（入力中の空の行も含む）。以前の版の「所属・日極」1組だけの設定は、1つ目の案件として読み替える

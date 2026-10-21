@@ -17,7 +17,7 @@ import {
   KINDS, COLLISIONS, ROAD_TYPES, SLOPES, SHAPES, SURFACES
 } from './accident.js';
 
-export const APP_VERSION = '0.14.5';
+export const APP_VERSION = '0.14.6';
 
 const app = document.getElementById('app');
 const state = {
@@ -145,7 +145,7 @@ const prevMonthNum = () => Number(prevMonthKey().slice(5));
 // 設定の「前月の売上」は、選んだときの前月が今の前月と同じときだけ選ばれている
 const prevLevelNow = (s) => (s.prevSalesMonth === prevMonthKey() ? s.prevSalesLevel || '' : '');
 
-// その他（日極）の案件の登録（案件名・いつもの金額）。空の行が1つもなければ、空の行を1つ出す
+// 法人（日極）の案件の登録（案件名・いつもの金額）。空の行が1つもなければ、空の行を1つ出す
 function jobsFields(s) {
   const list = jobList(s).length ? jobList(s) : [{ name: '', price: '' }];
   return `<div class="field job-head"><span class="field-label">登録している案件（案件名・いつもの金額）</span></div>
@@ -930,7 +930,7 @@ function countFields() {
   </div>`;
 }
 
-// 乗務後点呼の画面に出す「今日の案件」（その他（日極）のとき）
+// 乗務後点呼の画面に出す「今日の案件」（法人（日極）のとき）
 function jobsPickField() {
   const s = state.settings;
   if (s.salesType !== 'daily') return '';
@@ -1113,10 +1113,10 @@ function renderSales() {
     </main>`;
 }
 
-// その他（日極）の表題：案件が1つならその名前、いくつかなら「その他（日極）」
+// 法人（日極）の表題：案件が1つならその名前、いくつかなら「法人（日極）」
 function dailyTitle(s) {
   const jobs = jobsOf(s);
-  return jobs.length === 1 ? jobs[0].name : 'その他（日極）';
+  return jobs.length === 1 ? jobs[0].name : '法人（日極）';
 }
 
 // 送る売上表のページ：1枚目は1日の合計だけ。「内訳も付ける」なら、案件ごとの内訳のページを足す
@@ -1380,7 +1380,7 @@ function openEntry(date, mode, back = 'home') {
     draft.start = newStart(s, prevOdo(state.records, date, s), '');
     draft.end = newEnd(s, '');
   }
-  // その他（日極）：乗務後点呼に「今日の案件」を出す
+  // 法人（日極）：乗務後点呼に「今日の案件」を出す
   if (s.salesType === 'daily' && draft.end && !Array.isArray(draft.jobs)) {
     draft.jobs = rec?.end ? dayJobs(rec, s) : defaultDayJobs(date);
   }

@@ -360,7 +360,7 @@ button:focus-visible { outline: 3px solid var(--blue); outline-offset: 2px; }
 .adv-formula { font-size: 15px; font-variant-numeric: tabular-nums; }
 .adv-formula b { font-size: 18px; }
 
-/* その他（日極）：案件の登録・今日の案件・売上表の内訳 */
+/* 法人（日極）：案件の登録・今日の案件・売上表の内訳 */
 .job-head { padding-bottom: 2px; }
 .job-row { display: grid; grid-template-columns: minmax(0, 1fr) 7.5em auto; gap: 8px; align-items: center; padding: 6px 16px; }
 .job-row input { min-width: 0; width: 100%; min-height: 46px; border: 1px solid var(--line-strong); border-radius: 12px; background: var(--card); padding: 0 10px; font-size: 16px; font-weight: 600; }
