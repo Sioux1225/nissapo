@@ -383,9 +383,9 @@ test('前払いの履歴と合計（月ごと）', async () => {
 
 test('前払いの対象額：留保額と50%', async () => {
   const { advanceLimit, isFirstAdvanceMonth } = await import('../js/sales.js');
-  // はじめて：リース車両は10万円、それ以外は5万円を留保
+  // はじめて：リース車両は10万円、車両持ち込みは6万円を留保
   assert.deepEqual(advanceLimit({ sales: 300000, prevSales: null, first: true, lease: true }), { reserve: 100000, reason: 'はじめての前払い（リース車両）', base: 200000, target: 100000 });
-  assert.equal(advanceLimit({ sales: 300000, prevSales: null, first: true, lease: false }).target, 125000);
+  assert.equal(advanceLimit({ sales: 300000, prevSales: null, first: true, lease: false }).target, 120000);
   // 2回目以降：前月40万円以上は留保なし、未満・記録なしは5万円
   assert.equal(advanceLimit({ sales: 300000, prevSales: 400000, first: false }).target, 150000);
   assert.equal(advanceLimit({ sales: 300000, prevSales: 399999, first: false }).target, 125000);

@@ -123,7 +123,7 @@ export function advanceTotal(settings, y, m) {
 // ---- 前払いの対象額 ----
 // 前払い可能額 ＝（その月の売上 − その月にすでに受けた前払い − 留保額）× 50%
 //   （前払いを受けた分は売上から先に差し引き、残りの売上の50%をもう一度前払いできる）
-//   はじめての前払いの月（稼働を開始した月だけ）：リース車両を利用している方は10万円、それ以外の方は5万円を留保
+//   はじめての前払いの月（稼働を開始した月だけ）：リース車両を利用している方は10万円、それ以外の方（車両持ち込み）は6万円を留保
 //   2回目以降の月：前月の売上が40万円未満なら5万円を留保（前月の記録がないときも念のため）。リース車両も5万円
 export const ADVANCE_RATE = 0.5;
 
@@ -150,7 +150,7 @@ export function advanceLimit({ sales, advanced = 0, prevSales, prevLevel = null,
   let reserve = 0;
   let reason = '';
   if (first) {
-    reserve = lease ? 100000 : 50000;
+    reserve = lease ? 100000 : 60000;
     reason = lease ? 'はじめての前払い（リース車両）' : 'はじめての前払い（車両持ち込み）';
   } else if (prevSales == null && prevLevel === 'over') {
     // 留保なし

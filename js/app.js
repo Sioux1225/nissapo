@@ -17,7 +17,7 @@ import {
   KINDS, COLLISIONS, ROAD_TYPES, SLOPES, SHAPES, SURFACES
 } from './accident.js';
 
-export const APP_VERSION = '0.13.1';
+export const APP_VERSION = '0.13.2';
 
 const app = document.getElementById('app');
 const state = {
@@ -187,7 +187,7 @@ function settingsForm(s) {
       <div class="field"><span class="field-label">前月（${prevMonthNum()}月）の売上（以前から稼働していた方）</span>${[['over', '40万円以上'], ['under', '40万円未満']].map(([v, t]) => `<button type="button" class="chip" data-setting-seg="prevSalesLevel" data-value="${v}" aria-pressed="${prevLevelNow(s) === v}">${t}</button>`).join('')}</div>
       <p class="field-note pad-note">このアプリを使う前から稼働していた方は選んでください（もう一度押すと取り消し）。前月の記録がアプリにないときに、留保がいるかどうかの判断に使います（40万円未満なら留保）。</p>
       ${f('priorAdvance', `今月（${Number(thisMonthKey().slice(5))}月）すでに受けた前払いの金額（円）`, 'type="text" inputmode="numeric" placeholder="例：20000"', 'このアプリを使う前に、今月受けた前払いがあれば入れてください。売上表の前払いの合計に入り、前払い可能額の計算で差し引きます。')}
-      <p class="field-note pad-note">前払いの対象額の計算に使います（稼働を開始した月のはじめての前払いは、リース車両なら10万円、それ以外は5万円を留保。翌月からは、前月の売上が40万円未満のときに5万円を留保）。</p>` : ''}
+      <p class="field-note pad-note">前払いの対象額の計算に使います（稼働を開始した月のはじめての前払いは、リース車両なら10万円、車両持ち込みは6万円を留保。翌月からは、前月の売上が40万円未満のときに5万円を留保）。</p>` : ''}
     </div>`;
 }
 
@@ -1163,7 +1163,7 @@ function renderAdvanceRules() {
       <h2 class="section-title">前払いできる金額（対象額）</h2>
       <div class="card pad">
         <ul class="rule-list">
-          <li><b>稼働を開始した月のはじめての前払い</b>は、まず売上のうち<b>留保額</b>を差し引きます。留保額は、<b>リース車両を利用している方は10万円</b>、<b>車両持ち込みの方は5万円</b>です。それを超えた売上の<b>50%</b>が前払いの対象額です。</li>
+          <li><b>稼働を開始した月のはじめての前払い</b>は、まず売上のうち<b>留保額</b>を差し引きます。留保額は、<b>リース車両を利用している方は10万円</b>、<b>車両持ち込みの方は6万円</b>です。それを超えた売上の<b>50%</b>が前払いの対象額です。</li>
           <li><b>2回目からの前払い</b>は、売上から<b>すでに受けた前払いの額</b>を差し引き、残りの売上の<b>50%</b>が前払いできる額です（留保がある月は、留保額も差し引きます）。</li>
           <li><b>翌月以降</b>は、その月の売上の<b>50%</b>が前払いの対象額です（支払いは2か月サイトのため、まだ支払われていない売上があるので、はじめての留保はいりません）。</li>
           <li>ただし、<b>前月の売上が40万円に届かなかった場合</b>は、<b>5万円の留保</b>が必要です（リース車両も5万円）。</li>
