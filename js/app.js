@@ -17,7 +17,7 @@ import {
   KINDS, COLLISIONS, ROAD_TYPES, SLOPES, SHAPES, SURFACES
 } from './accident.js';
 
-export const APP_VERSION = '0.14.1';
+export const APP_VERSION = '0.14.2';
 
 const app = document.getElementById('app');
 const state = {
@@ -165,9 +165,16 @@ function editableJobs() {
   return s.jobs;
 }
 
-function settingsForm(s) {
+function settingsForm(s, fresh = false) {
   // 以前に受けた前払いは今月の分だけを入れる（前の月に入れた金額は出さない）
   if (s.priorAdvanceMonth !== thisMonthKey()) s = { ...s, priorAdvance: '' };
+  // はじめての設定では、はじめから入っている事業者名・休憩時間も、ほかの欄と同じく「例」の薄い文字で見せる
+  // （空のまま「はじめる」を押すと、この値になる）
+  if (fresh) {
+    s = { ...s };
+    if (s.company === DEFAULT_SETTINGS.company) s.company = '';
+    if (num(s.restMin) === DEFAULT_SETTINGS.restMin) s.restMin = '';
+  }
   const f = (key, text, attrs = '', note = '') =>
     field(text, `<input data-setting="${key}" value="${e(s[key] ?? '')}" ${attrs}>`, note);
   return `
@@ -175,14 +182,14 @@ function settingsForm(s) {
       ${f('driverName', '運転者名 <b class="req">必須</b>', 'autocomplete="name" placeholder="例：配送 太郎"')}
       ${f('office', '営業所（勤務先）', 'placeholder="例：○○"')}
       ${f('vehicleNo', '車両番号', 'placeholder="例：品川 000 あ 1234"')}
-      ${f('company', '事業者名')}
+      ${f('company', '事業者名', `placeholder="例：${e(DEFAULT_SETTINGS.company)}"`)}
     </div>
     <h2 class="section-title">毎日ほぼ同じ内容（入力の初期値になります）</h2>
     <div class="card fields">
       ${f('startPlace', '乗務開始・終了地点', 'placeholder="例：○○営業所"')}
       ${f('via', '主な経過地点（集荷・納品先など）', 'placeholder="例：○○町1丁目、△△町2丁目"')}
       ${f('restPlace', '休憩地点', 'placeholder="例：○○公園駐車場"')}
-      ${f('restMin', '休憩時間（分）', 'type="number" inputmode="numeric" min="0"')}
+      ${f('restMin', '休憩時間（分）', `type="number" inputmode="numeric" min="0" placeholder="例：${DEFAULT_SETTINGS.restMin}"`)}
       ${f('rollcaller', '点呼実施者名', 'placeholder="例：運行 花子"', '点呼をしてくれる人（運行管理者）の名前')}
       <div class="field"><span class="field-label">点呼方法</span>${METHODS.map((m) => `<button type="button" class="chip" data-setting-seg="method" data-value="${m}" aria-pressed="${s.method === m}">${m}</button>`).join('')}</div>
       ${f('initialOdo', '今のメーターの距離（km）', 'type="number" inputmode="numeric" min="0" placeholder="例：12345"', '最初の日の「開始時走行距離」になります。あとは前の日の終了距離が自動で入ります')}
@@ -237,7 +244,7 @@ function renderSetup() {
         <p class="lead">運転日報と点呼記録簿を、スマホで簡単に。</p>
         <p class="muted">はじめに、毎日同じになる内容を登録します。あとから設定でいつでも変えられます。</p>
       </div>
-      ${settingsForm(state.settings)}
+      ${settingsForm(state.settings, true)}
       <p class="info">記録はこのスマホの中だけに保存されます。保管用のファイルや事務所に送るファイルは、「書き出し・共有」から Excel・PDF・CSV で作れます。</p>
       <button type="button" class="btn-primary" data-action="save-settings" data-next="home">はじめる</button>
     </main>`;
@@ -1776,7 +1783,9 @@ app.addEventListener('click', async (ev) => {
   } else if (action === 'save-settings') {
     const s = state.settings;
     if (!String(s.driverName).trim()) { toast('運転者名を入れてください'); return; }
-    s.restMin = num(s.restMin) ?? 60;
+    s.restMin = num(s.restMin) ?? DEFAULT_SETTINGS.restMin;
+    // 事業者名が空なら、はじめからの事業者名にする
+    if (!String(s.company || '').trim()) s.company = DEFAULT_SETTINGS.company;
     s.initialOdo = num(s.initialOdo);
     await db.putSettings(s);
     toast('保存しました');
