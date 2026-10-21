@@ -17,7 +17,7 @@ import {
   KINDS, COLLISIONS, ROAD_TYPES, SLOPES, SHAPES, SURFACES
 } from './accident.js';
 
-export const APP_VERSION = '0.14.6';
+export const APP_VERSION = '0.14.7';
 
 const app = document.getElementById('app');
 const state = {
@@ -948,7 +948,7 @@ function jobsPickField() {
       return `<div class="pj"><b>${e(p.name)}</b>
         <input data-jobamt="${i}" value="${num(p.amount) ?? ''}" inputmode="numeric" placeholder="${last != null ? `例：${last.toLocaleString('ja-JP')}` : '金額（円）'}" class="${num(p.amount) == null ? 'need' : ''}" aria-label="${e(p.name)}の金額">
         ${fixed ? '' : `<span class="ex">金額は毎回入れます${last != null ? `（前回 ${yen(last)}）` : ''}</span>`}
-        <input class="memo" data-jobmemo="${i}" value="${e(p.memo || '')}" placeholder="メモ（任意）例：横浜まで往復 85km" aria-label="${e(p.name)}のメモ">
+        <input class="memo" data-jobmemo="${i}" value="${e(p.memo || '')}" placeholder="メモ（任意）" aria-label="${e(p.name)}のメモ">
       </div>`;
     }).join('')}</div>
     <div class="daytotal"><span class="muted">今日の金額</span><b id="daytotal">${yen(total)}</b></div>` : ''}`;
