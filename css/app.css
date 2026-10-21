@@ -386,3 +386,7 @@ button:focus-visible { outline: 3px solid var(--blue); outline-offset: 2px; }
 .day-detail .btn-text { align-self: flex-start; min-height: 40px; font-size: 14px; color: var(--orange-text); padding: 0; }
 .field-inline { display: flex; justify-content: center; }
 .field-inline .chip { white-space: normal; padding: 8px 14px; }
+
+/* バックアップ：クラウドへの保存をすすめる */
+.cloud-note { color: var(--blue); background: var(--blue-tint); border-radius: 12px; padding: 10px 12px; }
+.cloud-note b { color: var(--blue); }

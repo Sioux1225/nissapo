@@ -17,7 +17,7 @@ import {
   KINDS, COLLISIONS, ROAD_TYPES, SLOPES, SHAPES, SURFACES
 } from './accident.js';
 
-export const APP_VERSION = '0.14.3';
+export const APP_VERSION = '0.14.4';
 
 const app = document.getElementById('app');
 const state = {
@@ -259,6 +259,7 @@ function renderSettings() {
       <h2 class="section-title">バックアップ</h2>
       <div class="card pad">
         <p class="small">記録はこのスマホの中だけにあります。スマホを替える・アプリを消す前に、バックアップを作って保存してください。</p>
+        <p class="small cloud-note"><b>保存先は、クラウド（iPhone は iCloud Drive、Android は Google ドライブ）がいちばん安心です。</b>スマホをなくしたり壊れたりしても、クラウドに残ります。「バックアップを作る」を押したら、iPhone は「"ファイル"に保存」→ iCloud Drive、Android は「ドライブ」を選んでください。</p>
         <button type="button" class="btn-outline" data-action="backup">バックアップを作る</button>
         <button type="button" class="btn-outline" data-action="restore">バックアップから戻す</button>
       </div>
