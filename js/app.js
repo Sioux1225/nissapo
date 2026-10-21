@@ -17,7 +17,7 @@ import {
   KINDS, COLLISIONS, ROAD_TYPES, SLOPES, SHAPES, SURFACES
 } from './accident.js';
 
-export const APP_VERSION = '0.14.0';
+export const APP_VERSION = '0.14.1';
 
 const app = document.getElementById('app');
 const state = {
@@ -150,8 +150,8 @@ function jobsFields(s) {
   const list = jobList(s).length ? jobList(s) : [{ name: '', price: '' }];
   return `<div class="field job-head"><span class="field-label">登録している案件（案件名・いつもの金額）</span></div>
     ${list.map((j, i) => `<div class="job-row">
-      <input data-job-i="${i}" data-job-k="name" value="${e(j.name)}" placeholder="例：チャーター便" aria-label="案件名">
-      <input data-job-i="${i}" data-job-k="price" value="${e(j.price ?? '')}" inputmode="numeric" placeholder="毎回入力" aria-label="いつもの金額（円）">
+      <input data-job-i="${i}" data-job-k="name" value="${e(j.name)}" placeholder="例：Amazon" aria-label="案件名">
+      <input data-job-i="${i}" data-job-k="price" value="${e(j.price ?? '')}" inputmode="numeric" placeholder="例：19000" aria-label="いつもの金額（円）">
       <button type="button" class="btn-text danger" data-action="del-job" data-i="${i}">消す</button>
     </div>`).join('')}
     <div class="field"><button type="button" class="btn-outline" data-action="add-job">＋ 案件を追加</button>
