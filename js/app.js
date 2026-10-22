@@ -17,7 +17,7 @@ import {
   KINDS, COLLISIONS, ROAD_TYPES, SLOPES, SHAPES, SURFACES
 } from './accident.js';
 
-export const APP_VERSION = '0.16.2';
+export const APP_VERSION = '0.16.3';
 
 const app = document.getElementById('app');
 const state = {
@@ -138,7 +138,9 @@ function segField(labelText, path, options) {
 }
 
 function input(path, attrs = '') {
-  const v = getPath(state.draft, path);
+  let v = getPath(state.draft, path);
+  // 時刻の欄は「07:10」の形でないと空に見えるので、「7:10」のような記録も前に0を付けて出す
+  if (attrs.includes('type="time"') && /^\d:\d\d$/.test(v ?? '')) v = `0${v}`;
   return `<input data-bind="${e(path)}" value="${e(v)}" ${attrs}>`;
 }
 
