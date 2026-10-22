@@ -178,7 +178,8 @@ export const UNIT_SLOTS = 3;
 
 // 以前の版の案件（法人（日極）の { name, price }）を、いまの形に読み替える
 function normalizeJob(j) {
-  if (j.kind === 'sagawa' || j.kind === 'corp') return j;
+  // 種類（佐川急便・法人）を選ぶ前の新しい案件は、そのまま（以前の版の案件だけ読み替える）
+  if (j.kind === 'sagawa' || j.kind === 'corp' || ('kind' in j && !('name' in j))) return j;
   return { id: j.id, kind: 'corp', company: j.name || '', branch: '', pay: 'daily', price: j.price ?? '', units: [] };
 }
 
