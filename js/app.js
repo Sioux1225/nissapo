@@ -17,7 +17,7 @@ import {
   KINDS, COLLISIONS, ROAD_TYPES, SLOPES, SHAPES, SURFACES
 } from './accident.js';
 
-export const APP_VERSION = '0.16.5';
+export const APP_VERSION = '0.16.6';
 
 const app = document.getElementById('app');
 const state = {
@@ -145,7 +145,7 @@ function input(path, attrs = '') {
 }
 
 const head = (title, back = 'home') =>
-  `<div class="form-head"><button type="button" class="icon-btn plain" data-action="go" data-view="${back}" aria-label="戻る">${ICON.back}</button><h1>${title}</h1></div>`;
+  `<div class="form-head"><button type="button" class="icon-btn plain" data-action="go" data-view="${back}" data-back-btn aria-label="戻る">${ICON.back}</button><h1>${title}</h1></div>`;
 
 // ---- 画面：はじめての設定・設定 ----
 
@@ -1472,6 +1472,7 @@ function render() {
 
 function go(view, { push = true } = {}) {
   state.view = view;
+  if (view === 'home') state.back = 'home'; // ホームに戻ったら、どこから来たかは忘れる
   if (view === 'oil') state.oilElement = null; // エレメントの選択は、開くたびに初期値から
   if (view === 'list' && !state.month) {
     const n = new Date();
@@ -1776,7 +1777,9 @@ app.addEventListener('click', async (ev) => {
   if (!el) return;
   const { action } = el.dataset;
   if (action === 'go') {
-    if (el.dataset.view === 'home' || el.dataset.view === state.back) history.back();
+    // 戻るのボタン（画面の左上）とホームへのボタンだけ、ひとつ前の画面に戻る。
+    // ホームの「記録の一覧」などは、前に開いた画面に関係なく、その画面を開く
+    if ('backBtn' in el.dataset || el.dataset.view === 'home') history.back();
     else go(el.dataset.view);
   } else if (action === 'open-start') openEntry(el.dataset.date, 'start');
   else if (action === 'open-end') openEntry(el.dataset.date, 'end');
