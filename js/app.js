@@ -17,7 +17,7 @@ import {
   KINDS, COLLISIONS, ROAD_TYPES, SLOPES, SHAPES, SURFACES
 } from './accident.js';
 
-export const APP_VERSION = '0.16.6';
+export const APP_VERSION = '0.16.7';
 
 const app = document.getElementById('app');
 const state = {
@@ -1493,11 +1493,13 @@ function go(view, { push = true } = {}) {
   window.scrollTo(0, 0);
 }
 
-window.addEventListener('popstate', () => {
-  if (state.view === 'entry' && state.back === 'list') go('list', { push: false });
-  else if (state.view === 'entry' && state.back === 'sales') go('sales', { push: false });
-  else if (state.view === 'accident') go('accidents', { push: false });
-  else if (state.view !== 'home' && state.view !== 'setup') go('home', { push: false });
+// スマホの「戻る」や画面左上の「＜」：ひとつ前に開いていた画面に戻る（開いた順は履歴に残してある）
+window.addEventListener('popstate', (ev) => {
+  if (state.view === 'setup') return;
+  let to = ev.state?.view || 'home';
+  // 入力の途中の画面（点呼・事故の記録）には、戻るで入り直さない
+  if (to === 'entry' || to === 'accident' || to === 'setup') to = state.view === 'accident' ? 'accidents' : 'home';
+  go(to, { push: false });
 });
 
 // ---- 入力の開始 ----
