@@ -399,3 +399,10 @@ button:focus-visible { outline: 3px solid var(--blue); outline-offset: 2px; }
 /* 書き込めない欄（点呼実施者名など） */
 .field input[readonly] { background: var(--bg); color: var(--sub); }
 .field input[readonly]:focus { outline: none; border-color: var(--line-strong); }
+
+/* 設定：入っていない項目があるときは保存を押せない／今月すでに受けた前払い（金額か「なし」） */
+.btn-primary:disabled { opacity: 0.45; cursor: not-allowed; }
+.save-hint { font-size: 13px; line-height: 1.6; padding: 0 4px; }
+.prior-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; align-items: center; }
+.prior-row input:disabled { background: var(--bg); color: var(--sub); }
+.prior-row .chip { flex: none; padding-inline: 18px; }

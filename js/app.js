@@ -17,7 +17,7 @@ import {
   KINDS, COLLISIONS, ROAD_TYPES, SLOPES, SHAPES, SURFACES
 } from './accident.js';
 
-export const APP_VERSION = '0.15.0';
+export const APP_VERSION = '0.15.1';
 
 const app = document.getElementById('app');
 const state = {
@@ -147,6 +147,55 @@ const head = (title, back = 'home') =>
 
 // ---- 画面：はじめての設定・設定 ----
 
+// 設定：このアプリを使う前に今月すでに受けた前払い（金額を入れるか「なし」を選ぶ）
+function priorAdvanceField(s) {
+  const none = s.priorAdvanceNone === thisMonthKey();
+  return `<div class="field"><span class="field-label">今月（${Number(thisMonthKey().slice(5))}月）すでに受けた前払いの金額（円）</span>
+    <div class="prior-row">
+      <input data-setting="priorAdvance" value="${none ? '' : e(s.priorAdvance ?? '')}" type="text" inputmode="numeric" placeholder="例：20000" aria-label="今月すでに受けた前払いの金額" ${none ? 'disabled' : ''}>
+      <button type="button" class="chip" data-action="prior-none" aria-pressed="${none}">なし</button>
+    </div>
+    <span class="field-note">このアプリを使う前に、今月受けた前払いがあれば金額を、なければ「なし」を選んでください。売上表の前払いの合計に入り、前払い可能額の計算で差し引きます。</span></div>`;
+}
+
+// 設定の「保存する」を押す前に入っていない項目（期限のお知らせ・前月の売上は任意）
+function settingsMissing(s) {
+  const has = (v) => String(v ?? '').trim() !== '';
+  const miss = [];
+  [['driverName', '運転者名'], ['office', '営業所（勤務先）'], ['vehicleNo', '車両番号'], ['company', '事業者名'],
+    ['startPlace', '乗務開始・終了地点'], ['via', '主な経過地点'], ['restPlace', '休憩地点'], ['restMin', '休憩時間'], ['initialOdo', '今のメーターの距離']]
+    .forEach(([k, label]) => { if (!has(s[k])) miss.push(label); });
+  if (!s.salesType) miss.push('売上表の案件');
+  if (s.salesType === 'sagawa') {
+    if (!has(s.salesOffice)) miss.push('営業所');
+    if (s.salesOffice === OTHER_OFFICE) {
+      if (!has(s.salesOfficeName)) miss.push('営業所名');
+      if (!has(s.priceTakuhai)) miss.push('単価：宅配');
+    }
+  }
+  if (s.salesType === 'daily' && !jobsOf(s).length) miss.push('案件名');
+  if (s.salesType && !has(s.salesStartDate)) miss.push('稼働を開始した日');
+  if (s.salesType && !s.leaseCar) miss.push('リース車両');
+  if (s.salesType && !(s.priorAdvanceNone === thisMonthKey() || (s.priorAdvanceMonth === thisMonthKey() && num(s.priorAdvance) > 0))) miss.push('今月すでに受けた前払い（金額か「なし」）');
+  return miss;
+}
+
+// 保存のボタン（入っていない項目があるときは押せない）
+function saveSettingsButton(label) {
+  const miss = settingsMissing(state.settings);
+  return `<p class="save-hint warn-text" id="save-hint" ${miss.length ? '' : 'hidden'}>まだ入っていない項目：${e(miss.join('、'))}</p>
+    <button type="button" class="btn-primary" data-action="save-settings" data-next="home" ${miss.length ? 'disabled' : ''}>${label}</button>`;
+}
+function updateSaveState() {
+  const btn = app.querySelector('[data-action="save-settings"]');
+  const hint = app.querySelector('#save-hint');
+  if (!btn || !hint) return;
+  const miss = settingsMissing(state.settings);
+  btn.disabled = miss.length > 0;
+  hint.hidden = !miss.length;
+  hint.textContent = `まだ入っていない項目：${miss.join('、')}`;
+}
+
 // 今月（'YYYY-MM'）・前月
 const thisMonthKey = () => todayKey().slice(0, 7);
 const prevMonthKey = () => { const d = new Date(); d.setDate(1); d.setMonth(d.getMonth() - 1); return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}`; };
@@ -208,7 +257,7 @@ function settingsForm(s, fresh = false) {
       ${f('licenseDate', '運転免許証の有効期限', 'type="date"', '免許証に書いてある「○年○月○日まで有効」の日')}
       <p class="field-note pad-note">期限の60日前・30日前・14日前・7日前と、期限を過ぎたときにお知らせします。更新したら、新しい日付に入れ直してください。</p>
     </div>
-    <h2 class="section-title">売上表・前払い（任意）</h2>
+    <h2 class="section-title">売上表</h2>
     <div class="card fields">
       <div class="field"><span class="field-label">案件</span>${SALES_TYPES.map(([v, t]) => `<button type="button" class="chip" data-setting-seg="salesType" data-value="${v}" aria-pressed="${s.salesType === v}">${t}</button>`).join('')}</div>
       ${s.salesType === 'sagawa' ? sagawaFields(s, f) : ''}
@@ -219,7 +268,7 @@ function settingsForm(s, fresh = false) {
       <div class="field"><span class="field-label">リース車両</span>${[['yes', '利用している'], ['no', '利用していない']].map(([v, t]) => `<button type="button" class="chip" data-setting-seg="leaseCar" data-value="${v}" aria-pressed="${s.leaseCar === v}">${t}</button>`).join('')}</div>
       <div class="field"><span class="field-label">前月（${prevMonthNum()}月）の売上（以前から稼働していた方）</span>${[['over', '40万円以上'], ['under', '40万円未満']].map(([v, t]) => `<button type="button" class="chip" data-setting-seg="prevSalesLevel" data-value="${v}" aria-pressed="${prevLevelNow(s) === v}">${t}</button>`).join('')}</div>
       <p class="field-note pad-note">このアプリを使う前から稼働していた方は選んでください（もう一度押すと取り消し）。前月の記録がアプリにないときに、留保がいるかどうかの判断に使います（40万円未満なら留保）。</p>
-      ${f('priorAdvance', `今月（${Number(thisMonthKey().slice(5))}月）すでに受けた前払いの金額（円）`, 'type="text" inputmode="numeric" placeholder="例：20000"', 'このアプリを使う前に、今月受けた前払いがあれば入れてください。売上表の前払いの合計に入り、前払い可能額の計算で差し引きます。')}
+      ${priorAdvanceField(s)}
       ` : ''}
     </div>`;
 }
@@ -245,6 +294,12 @@ function sagawaFields(s, f) {
 }
 
 function renderSetup() {
+  // はじめての設定では、はじめから入っている事業者名・休憩時間も空にして、ほかの欄と同じく自分で入れてもらう（欄には「例」を薄く出す）
+  if (!state.setupCleared) {
+    if (state.settings.company === DEFAULT_SETTINGS.company) state.settings.company = '';
+    if (num(state.settings.restMin) === DEFAULT_SETTINGS.restMin) state.settings.restMin = '';
+    state.setupCleared = true;
+  }
   app.innerHTML = `
     <main class="screen form">
       <div class="hero">
@@ -254,7 +309,7 @@ function renderSetup() {
       </div>
       ${settingsForm(state.settings, true)}
       <p class="info">記録はこのスマホの中だけに保存されます。保管用のファイルや事務所に送るファイルは、「書き出し・共有」から Excel・PDF・CSV で作れます。</p>
-      <button type="button" class="btn-primary" data-action="save-settings" data-next="home">はじめる</button>
+      ${saveSettingsButton('はじめる')}
     </main>`;
 }
 
@@ -263,7 +318,7 @@ function renderSettings() {
     <main class="screen form">
       ${head('設定')}
       ${settingsForm(state.settings)}
-      <button type="button" class="btn-primary" data-action="save-settings" data-next="home">保存する</button>
+      ${saveSettingsButton('保存する')}
       <h2 class="section-title">バックアップ</h2>
       <div class="card pad">
         <p class="small">記録はこのスマホの中だけにあります。スマホを替える・アプリを消す前に、バックアップを作って保存してください。</p>
@@ -1642,6 +1697,7 @@ app.addEventListener('click', async (ev) => {
       render();
       window.scrollTo(0, y);
     }
+    updateSaveState();
     return;
   }
   const expBtn = ev.target.closest('[data-exp]');
@@ -1700,7 +1756,16 @@ app.addEventListener('click', async (ev) => {
     renderSales();
     window.scrollTo(0, sy);
   }
-  else if (action === 'add-job' || action === 'del-job') {
+  else if (action === 'prior-none') {
+    // 今月すでに受けた前払い：「なし」（もう一度押すと取り消し）
+    const s = state.settings;
+    const on = s.priorAdvanceNone !== thisMonthKey();
+    s.priorAdvanceNone = on ? thisMonthKey() : '';
+    if (on) s.priorAdvance = '';
+    const y = window.scrollY;
+    render();
+    window.scrollTo(0, y);
+  } else if (action === 'add-job' || action === 'del-job') {
     const jobs = editableJobs();
     if (action === 'add-job') jobs.push({ id: `job-${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`, name: '', price: '' });
     else jobs.splice(Number(el.dataset.i), 1);
@@ -1789,7 +1854,8 @@ app.addEventListener('click', async (ev) => {
     history.back();
   } else if (action === 'save-settings') {
     const s = state.settings;
-    if (!String(s.driverName).trim()) { toast('運転者名を入れてください'); return; }
+    const miss = settingsMissing(s);
+    if (miss.length) { toast(`まだ入っていない項目があります：${miss[0]}`); updateSaveState(); return; }
     s.restMin = num(s.restMin) ?? DEFAULT_SETTINGS.restMin;
     // 点呼は自分で行う：点呼実施者名は運転者名、点呼方法は「自身」
     s.rollcaller = String(s.driverName).trim();
@@ -1862,7 +1928,7 @@ app.addEventListener('input', (ev) => {
       if (rv) rv.value = t.value;
     }
     // 以前に受けた前払いは、入力した月の分として数える
-    if (t.dataset.setting === 'priorAdvance') state.settings.priorAdvanceMonth = thisMonthKey();
+    if (t.dataset.setting === 'priorAdvance') { state.settings.priorAdvanceMonth = thisMonthKey(); state.settings.priorAdvanceNone = ''; }
     // 営業所・稼働を開始した日を変えたら、単価・新人保証の表示を描き直す
     if (t.dataset.setting === 'salesOffice' || t.dataset.setting === 'salesStartDate') {
       const y = window.scrollY;
@@ -1877,6 +1943,7 @@ app.addEventListener('input', (ev) => {
       if (sk) sk.placeholder = `空なら ${defaultShuka(t.value)}円`;
     }
   }
+  updateSaveState();
 });
 
 app.addEventListener('change', async (ev) => {
