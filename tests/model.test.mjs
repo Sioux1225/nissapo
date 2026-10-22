@@ -469,3 +469,10 @@ test('法人（日極）：以前の版の「所属・日極」は1つ目の案�
   assert.equal(dayAmount({ date: '2026-10-01', start: { time: '08:00' } }, s), 19000);
 });
 
+
+test('前月の売上「なし」：はじめて稼働する方は、はじめての前払いの留保のまま', async () => {
+  const { prevSalesLevel, isFirstAdvanceMonth } = await import('../js/sales.js');
+  const s = { prevSalesLevel: 'none', prevSalesMonth: '2026-09', salesStartDate: '2026-10-01' };
+  assert.equal(prevSalesLevel(s, 2026, 10), null); // 留保の判断には使わない
+  assert.equal(isFirstAdvanceMonth(s, 2026, 10), true);
+});

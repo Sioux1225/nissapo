@@ -406,3 +406,5 @@ button:focus-visible { outline: 3px solid var(--blue); outline-offset: 2px; }
 .prior-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; align-items: center; }
 .prior-row input:disabled { background: var(--bg); color: var(--sub); }
 .prior-row .chip { flex: none; padding-inline: 18px; }
+.picks.three { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.picks.three .chip { padding-inline: 6px; }

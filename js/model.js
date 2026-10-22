@@ -34,8 +34,9 @@ export const DEFAULT_SETTINGS = {
   priorAdvance: '',      // このアプリを使う前に、今月すでに受けた前払いの金額
   priorAdvanceMonth: '', // その金額の月（'YYYY-MM'。入力した月）
   priorAdvanceNone: '',  // 今月すでに受けた前払いが「なし」の月（'YYYY-MM'）
-  prevSalesLevel: '',  // 以前から稼働していた方の、アプリを使う前の前月の売上（'over'：40万円以上・'under'：40万円未満）
+  prevSalesLevel: '',  // アプリを使う前の前月の売上（'over'：40万円以上・'under'：40万円未満・'none'：なし）
   prevSalesMonth: '',  // その前月（'YYYY-MM'。選んだときの前月）
+  appStartMonth: '',   // アプリを使い始めた月（'YYYY-MM'。はじめて設定を保存した月）
   lastVersion: '',     // 最後に開いたアプリの版（アップデートのお知らせ用）
   retention: '1年間'
 };

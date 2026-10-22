@@ -17,7 +17,7 @@ import {
   KINDS, COLLISIONS, ROAD_TYPES, SLOPES, SHAPES, SURFACES
 } from './accident.js';
 
-export const APP_VERSION = '0.15.1';
+export const APP_VERSION = '0.15.2';
 
 const app = document.getElementById('app');
 const state = {
@@ -147,8 +147,25 @@ const head = (title, back = 'home') =>
 
 // ---- 画面：はじめての設定・設定 ----
 
-// 設定：このアプリを使う前に今月すでに受けた前払い（金額を入れるか「なし」を選ぶ）
+// 設定：アプリを使う前の前月の売上（40万円以上・40万円未満・なし）。使い始めた月が過ぎたら「なし」
+function prevSalesField(s) {
+  const start = isStartMonth(s);
+  const cur = start ? prevLevelNow(s) : 'none';
+  return `<div class="field"><span class="field-label">前月（${prevMonthNum()}月）の売上（アプリを使う前）</span>
+      <div class="picks three">${[['over', '40万円以上'], ['under', '40万円未満'], ['none', 'なし']].map(([v, t]) => `<button type="button" class="chip" data-setting-seg="prevSalesLevel" data-value="${v}" aria-pressed="${cur === v}" ${start ? '' : 'disabled'}>${t}</button>`).join('')}</div>
+      <span class="field-note">${start
+        ? 'アプリを使う前から稼働していた方は前月の売上を、はじめて稼働する方は「なし」を選んでください。前月の記録がアプリにないときに、留保がいるかどうかの判断に使います（40万円未満なら留保）。'
+        : 'アプリを使い始めた月が過ぎたので「なし」になっています（前月の売上は、アプリの記録から計算します）。'}</span></div>`;
+}
+
+// 設定：このアプリを使う前に今月すでに受けた前払い（金額を入れるか「なし」を選ぶ）。使い始めた月が過ぎたら「なし」
 function priorAdvanceField(s) {
+  const start = isStartMonth(s);
+  if (!start) {
+    return `<div class="field"><span class="field-label">アプリを使う前に受けた前払い</span>
+      <div class="prior-row"><input value="" placeholder="なし" disabled aria-label="アプリを使う前に受けた前払い"><button type="button" class="chip" aria-pressed="true" disabled>なし</button></div>
+      <span class="field-note">アプリを使い始めた月が過ぎたので「なし」になっています。前払いを受けたら、売上表の「前払いを記録する」から入れてください。</span></div>`;
+  }
   const none = s.priorAdvanceNone === thisMonthKey();
   return `<div class="field"><span class="field-label">今月（${Number(thisMonthKey().slice(5))}月）すでに受けた前払いの金額（円）</span>
     <div class="prior-row">
@@ -176,7 +193,10 @@ function settingsMissing(s) {
   if (s.salesType === 'daily' && !jobsOf(s).length) miss.push('案件名');
   if (s.salesType && !has(s.salesStartDate)) miss.push('稼働を開始した日');
   if (s.salesType && !s.leaseCar) miss.push('リース車両');
-  if (s.salesType && !(s.priorAdvanceNone === thisMonthKey() || (s.priorAdvanceMonth === thisMonthKey() && num(s.priorAdvance) > 0))) miss.push('今月すでに受けた前払い（金額か「なし」）');
+  if (s.salesType && isStartMonth(s)) {
+    if (!['over', 'under', 'none'].includes(prevLevelNow(s))) miss.push('前月の売上（40万円以上・未満か「なし」）');
+    if (!(s.priorAdvanceNone === thisMonthKey() || (s.priorAdvanceMonth === thisMonthKey() && num(s.priorAdvance) > 0))) miss.push('今月すでに受けた前払い（金額か「なし」）');
+  }
   return miss;
 }
 
@@ -202,6 +222,10 @@ const prevMonthKey = () => { const d = new Date(); d.setDate(1); d.setMonth(d.ge
 const prevMonthNum = () => Number(prevMonthKey().slice(5));
 // 設定の「前月の売上」は、選んだときの前月が今の前月と同じときだけ選ばれている
 const prevLevelNow = (s) => (s.prevSalesMonth === prevMonthKey() ? s.prevSalesLevel || '' : '');
+// 「前月の売上」と「今月すでに受けた前払い」は、アプリを使い始める前のことを聞く欄。
+// 使い始めた月（はじめて設定を保存した月）だけ入れてもらい、月が変わったら自動で「なし」にする
+const startMonth = (s) => s.appStartMonth || thisMonthKey();
+const isStartMonth = (s) => startMonth(s) === thisMonthKey();
 
 // 法人（日極）の案件の登録（案件名・いつもの金額）。空の行が1つもなければ、空の行を1つ出す
 function jobsFields(s) {
@@ -266,8 +290,7 @@ function settingsForm(s, fresh = false) {
         ${f('salesStartDate', '稼働を開始した日', 'type="date"')}` : ''}
       ${s.salesType ? `
       <div class="field"><span class="field-label">リース車両</span>${[['yes', '利用している'], ['no', '利用していない']].map(([v, t]) => `<button type="button" class="chip" data-setting-seg="leaseCar" data-value="${v}" aria-pressed="${s.leaseCar === v}">${t}</button>`).join('')}</div>
-      <div class="field"><span class="field-label">前月（${prevMonthNum()}月）の売上（以前から稼働していた方）</span>${[['over', '40万円以上'], ['under', '40万円未満']].map(([v, t]) => `<button type="button" class="chip" data-setting-seg="prevSalesLevel" data-value="${v}" aria-pressed="${prevLevelNow(s) === v}">${t}</button>`).join('')}</div>
-      <p class="field-note pad-note">このアプリを使う前から稼働していた方は選んでください（もう一度押すと取り消し）。前月の記録がアプリにないときに、留保がいるかどうかの判断に使います（40万円未満なら留保）。</p>
+      ${prevSalesField(s)}
       ${priorAdvanceField(s)}
       ` : ''}
     </div>`;
@@ -1859,6 +1882,7 @@ app.addEventListener('click', async (ev) => {
     s.restMin = num(s.restMin) ?? DEFAULT_SETTINGS.restMin;
     // 点呼は自分で行う：点呼実施者名は運転者名、点呼方法は「自身」
     s.rollcaller = String(s.driverName).trim();
+    if (!s.appStartMonth) s.appStartMonth = thisMonthKey(); // アプリを使い始めた月
     s.method = '自身';
     // 事業者名が空なら、はじめからの事業者名にする
     if (!String(s.company || '').trim()) s.company = DEFAULT_SETTINGS.company;
@@ -2026,6 +2050,10 @@ photoInput.addEventListener('change', () => {
 async function start() {
   state.settings = await db.getSettings();
   await reload();
+  if (state.settings.driverName && !state.settings.appStartMonth) {
+    state.settings.appStartMonth = state.records[0]?.date.slice(0, 7) || thisMonthKey();
+    await db.putSettings(state.settings);
+  }
   cleanupPhotos();
   state.view = state.settings.driverName ? 'home' : 'setup';
   history.replaceState({ view: 'home' }, '');
