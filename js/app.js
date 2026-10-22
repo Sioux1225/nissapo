@@ -3,7 +3,7 @@
 
 import { db, requestPersist } from './db.js';
 import { shrinkImage, newPhoto, blobToDataUrl, dataUrlToBlob } from './photo.js';
-import { SALES_TYPES, COUNT_KEYS, unitPrices, salesReady, monthSales, yen, defaultShogyo, defaultShuka, advanceKey, advanceOf, advanceHistory, advanceTotal, advanceLimit, isFirstAdvanceMonth, prevSalesLevel, OFFICES, OTHER_OFFICE, PRICE_TABLE_DATE, officeEntry, officeName, newbiePeriod, newbieSpan, jobList, jobsOf, dayJobs } from './sales.js';
+import { COUNT_KEYS, unitPrices, salesReady, monthSales, yen, defaultShogyo, defaultShuka, advanceKey, advanceOf, advanceHistory, advanceTotal, advanceLimit, isFirstAdvanceMonth, prevSalesLevel, OFFICES, OTHER_OFFICE, PRICE_TABLE_DATE, officeEntry, officeName, newbiePeriod, newbieSpan, jobList, jobsOf, dayJobs, jobLabel, jobReady, jobUnits, sagawaSettings, hasSagawa, UNIT_SLOTS } from './sales.js';
 import { EXPIRED, expiryStatus, expiryMessage, expiryAlertsToShow } from './expiry.js';
 import { OIL_LIMIT, OIL_STEPS, newOilChange, currentOdo, oilStatus, oilMessage, oilAlertToShow, sortOilChanges } from './oil.js';
 import {
@@ -17,7 +17,7 @@ import {
   KINDS, COLLISIONS, ROAD_TYPES, SLOPES, SHAPES, SURFACES
 } from './accident.js';
 
-export const APP_VERSION = '0.15.3';
+export const APP_VERSION = '0.16.0';
 
 const app = document.getElementById('app');
 const state = {
@@ -182,18 +182,12 @@ function settingsMissing(s) {
   [['driverName', '運転者名'], ['office', '営業所（勤務先）'], ['vehicleNo', '車両番号'], ['company', '事業者名'],
     ['startPlace', '乗務開始・終了地点'], ['via', '主な経過地点'], ['restPlace', '休憩地点'], ['restMin', '休憩時間'], ['initialOdo', '今のメーターの距離']]
     .forEach(([k, label]) => { if (!has(s[k])) miss.push(label); });
-  if (!s.salesType) miss.push('売上表の案件');
-  if (s.salesType === 'sagawa') {
-    if (!has(s.salesOffice)) miss.push('営業所');
-    if (s.salesOffice === OTHER_OFFICE) {
-      if (!has(s.salesOfficeName)) miss.push('営業所名');
-      if (!has(s.priceTakuhai)) miss.push('単価：宅配');
-    }
-  }
-  if (s.salesType === 'daily' && !jobsOf(s).length) miss.push('案件名');
-  if (s.salesType && !has(s.salesStartDate)) miss.push('稼働を開始した日');
-  if (s.salesType && !s.leaseCar) miss.push('リース車両');
-  if (s.salesType && isStartMonth(s)) {
+  const jobs = jobList(s);
+  if (!jobs.length) miss.push('案件');
+  jobs.forEach((j, i) => { if (!jobReady(j)) miss.push(`案件${i + 1}（${jobMissing(j)}）`); });
+  if (!has(s.salesStartDate)) miss.push('稼働を開始した日');
+  if (!s.leaseCar) miss.push('リース車両');
+  if (isStartMonth(s)) {
     if (!['over', 'under', 'none'].includes(prevLevelNow(s))) miss.push('前月の売上（40万円以上・未満か「なし」）');
     if (!(s.priorAdvanceNone === thisMonthKey() || (s.priorAdvanceMonth === thisMonthKey() && num(s.priorAdvance) > 0))) miss.push('今月すでに受けた前払い（金額か「なし」）');
   }
@@ -227,23 +221,70 @@ const prevLevelNow = (s) => (s.prevSalesMonth === prevMonthKey() ? s.prevSalesLe
 const startMonth = (s) => s.appStartMonth || thisMonthKey();
 const isStartMonth = (s) => startMonth(s) === thisMonthKey();
 
-// 法人（日極）の案件の登録（案件名・いつもの金額）。空の行が1つもなければ、空の行を1つ出す
-function jobsFields(s) {
-  const list = jobList(s).length ? jobList(s) : [{ name: '', price: '' }];
-  return `<div class="field job-head"><span class="field-label">登録している案件（案件名・いつもの金額）</span></div>
-    ${list.map((j, i) => `<div class="job-row">
-      <input data-job-i="${i}" data-job-k="name" value="${e(j.name)}" placeholder="例：Amazon" aria-label="案件名">
-      <input data-job-i="${i}" data-job-k="price" value="${e(j.price ?? '')}" inputmode="numeric" placeholder="例：19000" aria-label="いつもの金額（円）">
-      <button type="button" class="btn-text danger" data-action="del-job" data-i="${i}">消す</button>
-    </div>`).join('')}
-    <div class="field"><button type="button" class="btn-outline" data-action="add-job">＋ 案件を追加</button>
-      <span class="field-note">乗務後点呼で、その日の案件を選びます（いくつでも）。決まった金額の案件は自動で入り、金額が毎回変わる案件（距離で変わるチャーター便など）は、金額を空にしておくと毎回入れられます。</span></div>`;
+// 案件の足りない入力（「保存する」の上に出す）
+function jobMissing(j) {
+  if (j.kind !== 'sagawa' && j.kind !== 'corp') return '佐川急便か法人か';
+  if (j.kind === 'sagawa') return !j.office ? '営業所' : '営業所名・単価：宅配';
+  if (!String(j.company || '').trim()) return '会社名';
+  if (j.pay !== 'daily' && j.pay !== 'unit') return '日極か単価か';
+  return '品目と単価';
 }
 
-// 設定の案件を書き換える前に、以前の版の「所属・日極」も含めた一覧を settings.jobs に入れる
+// 売上表の案件（佐川急便・法人をまとめて登録）。1つもなければ、空の案件を1つ出す
+function jobsFields(s) {
+  const list = jobList(s).length ? jobList(s) : [{ kind: '' }];
+  return `<div class="field job-head"><span class="field-label">案件（佐川急便・法人をいくつでも登録できます）</span></div>
+    ${list.map((j, i) => jobCard(s, j, i)).join('')}
+    <div class="field"><button type="button" class="btn-outline" data-action="add-job">＋ 案件を追加</button>
+      <span class="field-note">乗務後点呼で、その日の案件を選びます（いくつでも）。朝は法人・午後は佐川急便のように、組み合わせても数えられます。</span></div>`;
+}
+
+function jobCard(s, j, i) {
+  const kinds = [['sagawa', '佐川急便'], ['corp', '法人']].map(([v, t]) => `<button type="button" class="chip" data-action="job-kind" data-i="${i}" data-value="${v}" aria-pressed="${j.kind === v}">${t}</button>`).join('');
+  const inp = (k, label, attrs = '', note = '') => field(label, `<input data-job-i="${i}" data-job-k="${k}" value="${e(getPath(j, k) ?? '')}" ${attrs}>`, note);
+  let body = '';
+  if (j.kind === 'sagawa') {
+    const entry = officeEntry(j.office);
+    const selected = entry ? entry.name : j.office === OTHER_OFFICE ? OTHER_OFFICE : '';
+    const ss = sagawaSettings(j, s);
+    const p = unitPrices(ss);
+    const nb = newbiePeriod(ss);
+    const opts = ['<option value="">選んでください</option>',
+      ...OFFICES.map(([o]) => `<option value="${o}" ${o === selected ? 'selected' : ''}>${o}</option>`),
+      `<option value="${OTHER_OFFICE}" ${selected === OTHER_OFFICE ? 'selected' : ''}>一覧にない営業所（単価を入力）</option>`].join('');
+    body = `${field('営業所', `<select class="select" data-job-i="${i}" data-job-k="office">${opts}</select>`)}
+      ${entry ? `<p class="field-note pad-note price-line">単価：<b>宅配 ${yen(p.takuhai)}・商業 ${yen(p.shogyo)}・集荷 ${yen(p.shuka)}${p.daily ? `＋1日 ${yen(p.daily)}` : ''}</b>${entry.newbie ? `<br>新人保証：<b>この営業所で働き始めた日から${newbieSpan(entry.newbie)}、1日 ${yen(entry.newbie.perDay)}をプラス</b>` : ''}<br>（佐川単価表 ${PRICE_TABLE_DATE}更新）</p>` : ''}
+      ${entry?.newbie ? inp('startDate', 'この営業所で働き始めた日', 'type="date"', nb ? `新人保証は ${nb.to.replace(/-/g, '/')} まで（空なら下の「稼働を開始した日」）` : '新人保証の期間を数えるのに使います（空なら下の「稼働を開始した日」）') : ''}
+      ${selected === OTHER_OFFICE ? `
+        ${inp('officeName', '営業所名', 'placeholder="例：○○"')}
+        ${inp('priceTakuhai', '単価：宅配（円/個）', 'type="number" inputmode="numeric" min="0" placeholder="例：170"')}
+        ${inp('priceShogyo', '単価：商業（円/個）', `type="number" inputmode="numeric" min="0" placeholder="空なら ${defaultShogyo(j.officeName)}円"`, '入れなければ 100円（三多摩・八王子は 80円）')}
+        ${inp('priceShuka', '単価：集荷（円/個）', `type="number" inputmode="numeric" min="0" placeholder="空なら ${defaultShuka(j.officeName)}円"`, '入れなければ 100円（台東は 70円）')}` : ''}`;
+  } else if (j.kind === 'corp') {
+    const pays = [['daily', '日極'], ['unit', '単価']].map(([v, t]) => `<button type="button" class="chip" data-action="job-pay" data-i="${i}" data-value="${v}" aria-pressed="${j.pay === v}">${t}</button>`).join('');
+    const EX = [['宅配', '170'], ['ネコポス', '40'], ['○○', '○○']];
+    body = `${inp('company', '会社名', 'placeholder="例：○○運送"')}
+      ${inp('branch', '営業所名', 'placeholder="例：△△営業所"')}
+      <div class="field"><span class="field-label">支払い</span><div class="picks">${pays}</div></div>
+      ${j.pay === 'daily' ? inp('price', 'いつもの金額（日極・円）', 'inputmode="numeric" placeholder="例：19000"', '金額が毎回変わる案件（距離で変わるチャーター便など）は、空にしておくと毎回入れられます') : ''}
+      ${j.pay === 'unit' ? `<div class="field"><span class="field-label">品目と単価（3つまで）</span>
+        ${Array.from({ length: UNIT_SLOTS }, (_, k) => `<div class="unit-row">
+          <input data-job-i="${i}" data-job-k="units.${k}.label" value="${e(j.units?.[k]?.label ?? '')}" placeholder="例：${EX[k][0]}" aria-label="品目${k + 1}">
+          <input data-job-i="${i}" data-job-k="units.${k}.price" value="${e(j.units?.[k]?.price ?? '')}" inputmode="numeric" placeholder="例：${EX[k][1]}円" aria-label="品目${k + 1}の単価（円）">
+        </div>`).join('')}
+        <span class="field-note">乗務後点呼で、品目ごとの個数を入れます。</span></div>` : ''}`;
+  }
+  return `<div class="job-card">
+    <div class="job-top"><b>案件 ${i + 1}</b><button type="button" class="btn-text danger" data-action="del-job" data-i="${i}">消す</button></div>
+    <div class="field"><div class="picks">${kinds}</div></div>
+    ${body}
+  </div>`;
+}
+
+// 設定の案件を書き換える前に、以前の版の設定も含めた一覧を settings.jobs に入れる
 function editableJobs() {
   const s = state.settings;
-  if (!Array.isArray(s.jobs) || !s.jobs.length) s.jobs = jobList(s).map((j) => ({ ...j }));
+  s.jobs = jobList(s).map((j) => ({ ...j, units: (j.units || []).map((u) => ({ ...u })) }));
   return s.jobs;
 }
 
@@ -277,16 +318,11 @@ function settingsForm(s, fresh = false) {
     </div>
     <h2 class="section-title">売上表</h2>
     <div class="card fields">
-      <div class="field"><span class="field-label">案件</span>${SALES_TYPES.map(([v, t]) => `<button type="button" class="chip" data-setting-seg="salesType" data-value="${v}" aria-pressed="${s.salesType === v}">${t}</button>`).join('')}</div>
-      ${s.salesType === 'sagawa' ? sagawaFields(s, f) : ''}
-      ${s.salesType === 'daily' ? `
-        ${jobsFields(s)}
-        ${f('salesStartDate', '稼働を開始した日', 'type="date"')}` : ''}
-      ${s.salesType ? `
+      ${jobsFields(s)}
+      ${f('salesStartDate', '稼働を開始した日', 'type="date"', 'はじめて稼働した日（前払いの「はじめての月」の判断に使います）')}
       <div class="field"><span class="field-label">リース車両</span>${[['yes', '利用している'], ['no', '利用していない']].map(([v, t]) => `<button type="button" class="chip" data-setting-seg="leaseCar" data-value="${v}" aria-pressed="${s.leaseCar === v}">${t}</button>`).join('')}</div>
       ${prevSalesField(s)}
       ${priorAdvanceField(s)}
-      ` : ''}
     </div>
     <h2 class="section-title">期限のお知らせ（任意）</h2>
     <div class="card fields">
@@ -294,26 +330,6 @@ function settingsForm(s, fresh = false) {
       ${f('licenseDate', '運転免許証の有効期限', 'type="date"', '免許証に書いてある「○年○月○日まで有効」の日')}
       <p class="field-note pad-note">期限の60日前・30日前・14日前・7日前と、期限を過ぎたときにお知らせします。更新したら、新しい日付に入れ直してください。</p>
     </div>`;
-}
-
-// 佐川急便：営業所を選ぶだけで単価が決まる（一覧にない営業所は単価を入力）
-function sagawaFields(s, f) {
-  const entry = officeEntry(s.salesOffice);
-  const selected = entry ? entry.name : s.salesOffice === OTHER_OFFICE ? OTHER_OFFICE : '';
-  const p = unitPrices(s);
-  const opts = ['<option value="">選んでください</option>',
-    ...OFFICES.map(([o]) => `<option value="${o}" ${o === selected ? 'selected' : ''}>${o}</option>`),
-    `<option value="${OTHER_OFFICE}" ${selected === OTHER_OFFICE ? 'selected' : ''}>一覧にない営業所（単価を入力）</option>`].join('');
-  return `
-    ${field('営業所', `<select class="select" data-setting="salesOffice">${opts}</select>`)}
-    ${entry ? `<p class="field-note pad-note price-line">単価：<b>宅配 ${yen(p.takuhai)}・商業 ${yen(p.shogyo)}・集荷 ${yen(p.shuka)}${p.daily ? `＋1日 ${yen(p.daily)}` : ''}</b>${entry.newbie ? `<br>新人保証：<b>稼働を開始した日から${newbieSpan(entry.newbie)}、1日 ${yen(entry.newbie.perDay)}をプラス</b>` : ''}<br>（佐川単価表 ${PRICE_TABLE_DATE}更新）</p>` : ''}
-    ${f('salesStartDate', '稼働を開始した日', 'type="date"', entry?.newbie ? (newbiePeriod(s) ? `新人保証は ${newbiePeriod(s).to.replace(/-/g, '/')} まで` : '新人保証の期間を数えるのに使います。入れてください') : '新人保証の期間を数えるのに使います')}
-    ${selected === OTHER_OFFICE ? `
-      ${f('salesOfficeName', '営業所名', 'placeholder="例：○○"')}
-      ${f('priceTakuhai', '単価：宅配（円/個）', 'type="number" inputmode="numeric" min="0" placeholder="例：170"')}
-      ${f('priceShogyo', '単価：商業（円/個）', `type="number" inputmode="numeric" min="0" placeholder="空なら ${defaultShogyo(s.salesOfficeName)}円"`, '入れなければ 100円（三多摩・八王子は 80円）')}
-      ${f('priceShuka', '単価：集荷（円/個）', `type="number" inputmode="numeric" min="0" placeholder="空なら ${defaultShuka(s.salesOfficeName)}円"`, '入れなければ 100円（台東は 70円）')}` : ''}
-    <p class="field-note pad-note">毎日の配達個数を入れるだけで、売上の合計が出ます。</p>`;
 }
 
 function renderSetup() {
@@ -477,7 +493,6 @@ function endSection(full) {
       ${segField('酒気帯び', 'end.drunk', ['無', '有'])}
       ${segField('車両の異常', 'end.vehicle', ['無', '有'])}
       ${warn}
-      ${countFields()}
       ${jobsPickField()}
       <details class="more" ${full ? 'open' : ''}>
         <summary>そのほかの項目（ふだんは変更不要）</summary>
@@ -1006,62 +1021,74 @@ async function checkOil() {
 
 // ---- 売上表（前払い） ----
 
-// 乗務後点呼の画面に出す配達個数の欄（佐川急便のとき）
-function countFields() {
-  if (state.settings.salesType !== 'sagawa') return '';
-  return `<div class="field"><span class="field-label">配達個数（売上表）</span>
-    <div class="counts">${COUNT_KEYS.map(([k, t]) => `<label><span>${t}</span>${input(`sales.${k}`, 'type="number" inputmode="numeric" min="0"')}</label>`).join('')}</div>
-  </div>`;
-}
-
-// 乗務後点呼の画面に出す「今日の案件」（法人（日極）のとき）
+// 乗務後点呼の画面に出す「今日の案件」：佐川急便は配達個数、法人の単価は品目ごとの個数、法人の日極は金額
 function jobsPickField() {
   const s = state.settings;
-  if (s.salesType !== 'daily') return '';
   const jobs = jobsOf(s);
   if (!jobs.length) return '';
   const picked = state.draft.jobs || [];
-  const total = picked.reduce((t, j) => t + (num(j.amount) || 0), 0);
+  const unitInput = (i, k, label, v) => `<label><span>${e(label)}</span><input data-jobcnt="${i}" data-k="${k}" value="${v ?? ''}" type="number" inputmode="numeric" min="0"></label>`;
   return `<div class="field"><span class="field-label">今日の案件（いくつでも選べます）</span>
-      <div class="picks">${jobs.map((j) => `<button type="button" class="chip" data-pick-job="${e(j.name)}" aria-pressed="${picked.some((p) => p.name === j.name)}">${e(j.name)}</button>`).join('')}</div>
+      <div class="picks">${jobs.map((j) => `<button type="button" class="chip" data-pick-job="${e(j.id)}" aria-pressed="${picked.some((p) => p.id === j.id)}">${e(jobLabel(j))}</button>`).join('')}</div>
       <span class="field-note">前回と同じ組み合わせが、はじめから選ばれています。</span></div>
     ${picked.length ? `<div class="picked">${picked.map((p, i) => {
-      const reg = jobs.find((j) => j.name === p.name);
-      const fixed = reg && num(reg.price) != null;
-      const last = fixed ? null : lastJobAmount(p.name, state.draft.date);
-      return `<div class="pj"><b>${e(p.name)}</b>
-        <input data-jobamt="${i}" value="${num(p.amount) ?? ''}" inputmode="numeric" placeholder="${last != null ? `例：${last.toLocaleString('ja-JP')}` : '金額（円）'}" class="${num(p.amount) == null ? 'need' : ''}" aria-label="${e(p.name)}の金額">
-        ${fixed ? '' : `<span class="ex">金額は毎回入れます${last != null ? `（前回 ${yen(last)}）` : ''}</span>`}
-        <input class="memo" data-jobmemo="${i}" value="${e(p.memo || '')}" placeholder="メモ（任意）" aria-label="${e(p.name)}のメモ">
-      </div>`;
+      const j = jobs.find((x) => x.id === p.id);
+      if (!j) return '';
+      let inputs;
+      if (j.kind === 'sagawa') {
+        inputs = `<div class="counts pj-counts">${COUNT_KEYS.map(([k, t]) => unitInput(i, k, t, num(p.counts?.[k]))).join('')}</div>`;
+      } else if (j.pay === 'unit') {
+        inputs = `<div class="counts pj-counts">${jobUnits(j).map((u) => unitInput(i, u.i, `${u.label}（${yen(u.price)}）`, num(p.counts?.[u.i]))).join('')}</div>`;
+      } else {
+        const fixed = num(j.price) != null;
+        const last = fixed ? null : lastJobAmount(j.id, state.draft.date);
+        inputs = `<input class="pj-amount ${num(p.amount) == null ? 'need' : ''}" data-jobamt="${i}" value="${num(p.amount) ?? ''}" inputmode="numeric" placeholder="${last != null ? `例：${last.toLocaleString('ja-JP')}` : '金額（円）'}" aria-label="${e(jobLabel(j))}の金額">
+          ${fixed ? '' : `<span class="ex">金額は毎回入れます${last != null ? `（前回 ${yen(last)}）` : ''}</span>`}`;
+      }
+      return `<div class="pj"><b class="${j.kind === 'corp' && j.pay === 'daily' ? '' : 'pj-wide'}">${e(jobLabel(j))}</b>${inputs}
+        <input class="memo" data-jobmemo="${i}" value="${e(p.memo || '')}" placeholder="メモ（任意）" aria-label="${e(jobLabel(j))}のメモ"></div>`;
     }).join('')}</div>
-    <div class="daytotal"><span class="muted">今日の金額</span><b id="daytotal">${yen(total)}</b></div>` : ''}`;
+    <div class="daytotal"><span class="muted">今日の金額</span><b id="daytotal">${yen(draftDayTotal())}</b></div>` : ''}`;
 }
 
-// その案件の、前回入れた金額（金額が毎回変わる案件の入力欄に「例」として出す）
-function lastJobAmount(name, date) {
+// 入力中の「今日の金額」
+function draftDayTotal() {
+  const d = state.draft;
+  return dayJobs({ date: d.date, jobs: d.jobs || [] }, state.settings).reduce((t, j) => t + (j.amount || 0), 0);
+}
+
+// その案件の、前回入れた金額（金額が毎回変わる日極の案件の入力欄に「例」として出す）
+function lastJobAmount(id, date) {
   for (let i = state.records.length - 1; i >= 0; i--) {
     const r = state.records[i];
     if (r.date >= date || !Array.isArray(r.jobs)) continue;
-    const j = r.jobs.find((x) => x.name === name && num(x.amount) != null);
+    const j = r.jobs.find((x) => x.id === id && num(x.amount) != null);
     if (j) return num(j.amount);
   }
   return null;
 }
 
-// 新しく乗務後点呼を入れるときの「今日の案件」：前回と同じ組み合わせ（決まった金額は入れ、毎回変わる金額は空）
+// 今日の案件の入力の初期値（決まった日極の金額は入れ、個数・毎回変わる金額は空）
+function newDayJob(j) {
+  return j.kind === 'sagawa' ? { id: j.id, counts: {}, memo: '' }
+    : j.pay === 'unit' ? { id: j.id, counts: [], memo: '' }
+      : { id: j.id, amount: num(j.price), memo: '' };
+}
+
+// 新しく乗務後点呼を入れるときの「今日の案件」：前回と同じ組み合わせ
 function defaultDayJobs(date) {
-  const s = state.settings;
-  const jobs = jobsOf(s);
-  const price = (name) => num(jobs.find((j) => j.name === name)?.price);
+  const jobs = jobsOf(state.settings);
   for (let i = state.records.length - 1; i >= 0; i--) {
     const r = state.records[i];
-    if (r.date >= date || !Array.isArray(r.jobs) || !r.jobs.length) continue;
-    const names = r.jobs.map((j) => j.name).filter((n) => jobs.some((j) => j.name === n));
-    if (names.length) return names.map((name) => ({ name, amount: price(name), memo: '' }));
+    if (r.date >= date) continue;
+    const prev = dayJobs(r, state.settings).filter((x) => x.job);
+    if (prev.length) return prev.map((x) => newDayJob(x.job));
   }
-  return jobs.length === 1 ? [{ name: jobs[0].name, amount: price(jobs[0].name), memo: '' }] : [];
+  return jobs.length === 1 ? [newDayJob(jobs[0])] : [];
 }
+
+// 記録の「その日の案件」を、入力用の形にする
+const toDayEntry = (x) => ({ id: x.id, counts: x.counts, amount: x.job?.kind === 'corp' && x.job.pay === 'daily' ? x.amount : undefined, memo: x.memo || '' });
 
 function salesContext() {
   const s = state.settings;
@@ -1072,25 +1099,38 @@ function salesContext() {
   return { s, y, m, today, thisMonth, upto, data: monthSales(state.records, y, m, s, upto) };
 }
 
-// 「八王子」→「八王子営業所」、「八王子（代走）」→「八王子営業所（代走）」
-function officeTitle(name) {
-  if (!name || /営業所/.test(name)) return name || '';
-  return name.replace(/^([^（]+)(（.*）)?$/, '$1営業所$2');
-}
 
 // withOffice：false なら営業所名を書かない（PDF では表題の「佐川急便」の右に書くため）
 function salesSub(s, y, m, withOffice = true) {
-  if (s.salesType === 'daily') {
-    const jobs = jobsOf(s);
-    return `所属：${jobs.map((j) => j.name).join('・')}${jobs.length === 1 && num(jobs[0].price) != null ? `　日極：${yen(jobs[0].price)}` : ''}`;
+  const jobs = jobsOf(s);
+  // 佐川急便の営業所1つだけ：単価と新人保証
+  if (jobs.length === 1 && jobs[0].kind === 'sagawa') {
+    const ss = sagawaSettings(jobs[0], s);
+    const p = unitPrices(ss);
+    const nb = newbiePeriod(ss);
+    const monthFrom = y ? `${y}-${pad2(m)}-01` : '';
+    const monthTo = y ? `${y}-${pad2(m)}-31` : '';
+    const nbText = nb && (!y || (nb.from <= monthTo && nb.to >= monthFrom)) ? `　新人保証：1日 ${yen(nb.perDay)}（〜${Number(nb.to.slice(5, 7))}/${Number(nb.to.slice(8))}）` : '';
+    return `${withOffice ? `営業所：${officeName(ss)}　` : ''}単価：宅配 ${yen(p.takuhai)}・商業 ${yen(p.shogyo)}・集荷 ${yen(p.shuka)}${p.daily ? `＋1日 ${yen(p.daily)}` : ''}${nbText}`;
   }
-  const p = unitPrices(s);
-  // その月に新人保証の期間がかかっていれば書く
-  const nb = newbiePeriod(s);
-  const monthFrom = y ? `${y}-${pad2(m)}-01` : '';
-  const monthTo = y ? `${y}-${pad2(m)}-31` : '';
-  const nbText = nb && (!y || (nb.from <= monthTo && nb.to >= monthFrom)) ? `　新人保証：1日 ${yen(nb.perDay)}（〜${Number(nb.to.slice(5, 7))}/${Number(nb.to.slice(8))}）` : '';
-  return `${withOffice ? `営業所：${officeName(s)}　` : ''}単価：宅配 ${yen(p.takuhai)}・商業 ${yen(p.shogyo)}・集荷 ${yen(p.shuka)}${p.daily ? `＋1日 ${yen(p.daily)}` : ''}${nbText}`;
+  // 法人の日極1つだけ：日極
+  if (jobs.length === 1 && jobs[0].pay === 'daily' && num(jobs[0].price) != null) return `所属：${jobLabel(jobs[0])}　日極：${yen(jobs[0].price)}`;
+  return `案件：${jobs.map(jobLabel).join('・')}`;
+}
+
+// 売上表の表題：案件が1つならその名前（佐川急便は「佐川急便　八王子営業所」）、いくつかなら「売上表」
+function salesTitle(s) {
+  const jobs = jobsOf(s);
+  if (jobs.length !== 1) return '売上表';
+  return jobs[0].kind === 'sagawa' ? jobLabel(jobs[0]).replace(/^佐川急便 /, '佐川急便　') : jobLabel(jobs[0]);
+}
+
+// その日の案件の個数（佐川急便：宅配・商業・集荷、法人の単価：品目ごと）を文字にする
+function jobCountsText(j) {
+  if (!j.job) return '';
+  if (j.job.kind === 'sagawa') return COUNT_KEYS.filter(([k]) => num(j.counts?.[k]) != null).map(([k, t]) => `${t}${num(j.counts[k])}`).join('・');
+  if (j.job.pay === 'unit') return jobUnits(j.job).filter((u) => num(j.counts?.[u.i]) != null).map((u) => `${u.label}${num(j.counts[u.i])}`).join('・');
+  return '';
 }
 
 // その月に受けた前払いの履歴・合計・残り（希望する前払い額の欄の上）
@@ -1139,30 +1179,33 @@ function advanceSection(s, y, m, salesAmount, today) {
 function renderSales() {
   const { s, y, m, today, thisMonth, upto, data } = salesContext();
   const ready = salesReady(s);
-  const sagawa = s.salesType === 'sagawa';
+  const sagawa = hasSagawa(s);
   const t = data.total;
-  const open = state.salesOpen || new Set();
-  const rows = data.rows.filter((r) => r.worked && r.inRange).reverse().map((r) => sagawa ? `
-    <div class="row sales-row">
-      <span class="row-day ${r.week === '日' ? 'sun' : r.week === '土' ? 'sat' : ''}"><b>${r.day}</b><span>${r.week}</span></span>
-      <span class="row-main">
-        <span class="row-sub">${e(hm(r.start))} → ${e(hm(r.end) || '--:--')}　${r.km != null ? kmText(r.km) : ''}</span>
-        ${sagawa ? `<span class="counts small-counts">${COUNT_KEYS.map(([k, tx]) => `<label><span>${tx}</span><input data-sales-date="${r.date}" data-sales-key="${k}" value="${r.counts[k] ?? ''}" type="number" inputmode="numeric" min="0"></label>`).join('')}</span>` : ''}
-      </span>
-      <span class="row-km">${r.amount != null ? yen(r.amount) : ''}${r.newbie ? `<span class="nb-line">新人保証 ${yen(r.newbie)}</span>` : ''}${r.missing ? '<span class="tag">個数まだ</span>' : ''}</span>
-    </div>` : `
-    <button type="button" class="row sales-row" data-action="toggle-day" data-date="${r.date}" aria-expanded="${open.has(r.date)}">
+  // 入力がまだの日は、はじめから開いておく（押すと閉じる）
+  const isOpen = (r) => (state.salesOpen?.has(r.date)) || (r.missing && !state.salesClosed?.has(r.date));
+  const rows = data.rows.filter((r) => r.worked && r.inRange).reverse().map((r) => {
+    const miss = r.jobs.find((j) => j.missing);
+    const tag = !r.missing ? '' : !r.jobs.length || (miss && miss.job?.kind === 'corp' && miss.job.pay === 'daily') ? '金額まだ' : '個数まだ';
+    return `
+    <button type="button" class="row sales-row" data-action="toggle-day" data-date="${r.date}" aria-expanded="${isOpen(r)}">
       <span class="row-day ${r.week === '日' ? 'sun' : r.week === '土' ? 'sat' : ''}"><b>${r.day}</b><span>${r.week}</span></span>
       <span class="row-main">
         <span class="row-sub">${e(hm(r.start))} → ${e(hm(r.end) || '--:--')}　${r.km != null ? kmText(r.km) : ''}</span>
         <span class="jobs-line">${r.jobs.length ? e(r.jobs.map((j) => j.name).join('・')) : '案件を選んでいません'}</span>
       </span>
-      <span class="row-km">${r.amount != null ? yen(r.amount) : ''}${r.missing ? '<span class="tag warn-tag">金額まだ</span>' : ''}</span>
+      <span class="row-km">${r.amount != null ? yen(r.amount) : ''}${r.newbie ? `<span class="nb-line">新人保証 ${yen(r.newbie)}</span>` : ''}${tag ? `<span class="tag warn-tag">${tag}</span>` : ''}</span>
     </button>
-    ${open.has(r.date) ? `<div class="day-detail">
-      ${r.jobs.map((j) => `<div><span>${e(j.name)}${j.memo ? `　<span class="muted">${e(j.memo)}</span>` : ''}</span><b>${j.amount == null ? '<span class="warn-text">金額まだ</span>' : yen(j.amount)}</b></div>`).join('')}
+    ${isOpen(r) ? `<div class="day-detail">
+      ${r.jobs.map((j) => {
+        // 佐川急便・法人の単価は、ここで個数を入れられる
+        const cnt = j.job?.kind === 'sagawa' ? COUNT_KEYS.map(([k, tx]) => [k, tx, j.counts?.[k]])
+          : j.job?.pay === 'unit' ? jobUnits(j.job).map((u) => [u.i, u.label, j.counts?.[u.i]]) : null;
+        return `<div class="dj"><div><span>${e(j.name)}${j.memo ? `　<span class="muted">${e(j.memo)}</span>` : ''}</span><b>${j.amount == null ? '<span class="warn-text">まだ</span>' : yen(j.amount)}</b></div>
+          ${cnt ? `<span class="counts small-counts">${cnt.map(([k, tx, v]) => `<label><span>${e(tx)}</span><input data-sales-date="${r.date}" data-sales-job="${e(j.id)}" data-sales-key="${k}" value="${num(v) ?? ''}" type="number" inputmode="numeric" min="0"></label>`).join('')}</span>` : ''}</div>`;
+      }).join('')}
       <button type="button" class="btn-text" data-action="open-day" data-date="${r.date}" data-back="sales">この日の案件・金額を直す</button>
-    </div>` : ''}`).join('');
+    </div>` : ''}`;
+  }).join('');
   app.innerHTML = `
     <main class="screen">
       ${head('売上表（前払い）')}
@@ -1172,14 +1215,14 @@ function renderSales() {
         <button type="button" class="icon-btn" data-action="sales-month" data-step="1" aria-label="次の月">${ICON.next}</button>
       </div>
       ${!ready ? `<section class="card pad warn-card">
-        <p><b>はじめに、設定で案件と単価（または日極）を入れてください。</b></p>
+        <p><b>はじめに、設定で案件（佐川急便・法人）を登録してください。</b></p>
         <button type="button" class="btn-outline" data-action="go" data-view="settings">設定を開く</button>
       </section>` : `
       <section class="card pad sales-total">
         <span class="muted">${thisMonth ? `${m}月1日〜今日（${Number(today.slice(8))}日）の売上` : `${m}月の売上`}</span>
         <b class="oil-big">${yen(t.amount)}</b>
         <span class="small">稼働 ${t.days}日${sagawa ? `・宅配 ${t.takuhai}個・商業 ${t.shogyo}個・集荷 ${t.shuka}個` : ''}・${kmText(t.km)}</span>
-        ${t.missing ? `<span class="small warn-text">${sagawa ? '配達個数' : '案件の金額'}がまだの日が ${t.missing}日あります</span>` : ''}
+        ${t.missing ? `<span class="small warn-text">個数・金額がまだの日が ${t.missing}日あります</span>` : ''}
         <span class="small muted">${e(salesSub(s, y, m))}</span>
       </section>
       ${advanceSection(s, y, m, t.amount, today)}
@@ -1188,8 +1231,8 @@ function renderSales() {
           advanceOf(s, y, m) != null && advanceOf(s, y, m) > advanceInfo(s, y, m, t.amount).remaining
             ? '<span class="warn-text">前払い可能額より多い額です</span>' : '')}
       </section>
-      <p class="info">前払いは<b>月初めからの売上</b>で計算します。${sagawa ? '日ごとの配達個数は、乗務後点呼の画面か、下の一覧で入れられます。' : '乗務後点呼で選んだ案件の金額の合計を、その日の売上として数えます。日付を押すと内訳が見られます。'}</p>
-      ${sagawa ? '' : `<div class="field-inline"><button type="button" class="chip" data-action="sales-detail" aria-pressed="${!!state.salesDetail}">PDFに内訳（案件ごとの金額・メモ）も付ける</button></div>`}
+      <p class="info">前払いは<b>月初めからの売上</b>で計算します。乗務後点呼で選んだ案件の売上の合計を、その日の売上として数えます。日付を押すと内訳が見られ、個数もここで入れられます。</p>
+      <div class="field-inline"><button type="button" class="chip" data-action="sales-detail" aria-pressed="${!!state.salesDetail}">PDFに内訳（案件ごとの金額・メモ）も付ける</button></div>
       <button type="button" class="btn-primary" data-action="share-sales">PDFにしてLINEで送る</button>
       <button type="button" class="btn-text" data-action="preview-sales">プレビューで確認する</button>
       <div class="card list">${rows || '<p class="empty">この月はまだ乗務の記録がありません</p>'}</div>
@@ -1197,22 +1240,17 @@ function renderSales() {
     </main>`;
 }
 
-// 法人（日極）の表題：案件が1つならその名前、いくつかなら「法人（日極）」
-function dailyTitle(s) {
-  const jobs = jobsOf(s);
-  return jobs.length === 1 ? jobs[0].name : '法人（日極）';
-}
-
 // 送る売上表のページ：1枚目は1日の合計だけ。「内訳も付ける」なら、案件ごとの内訳のページを足す
 function salesCanvases() {
   const s = state.settings;
-  if (s.salesType !== 'daily' || !state.salesDetail) return [salesCanvas()];
+  if (!state.salesDetail) return [salesCanvas()];
   const { y, m, data } = salesContext();
   const rows = [];
   const sums = new Map();
   for (const r of data.rows.filter((x) => x.worked && x.inRange)) {
     r.jobs.forEach((j, i) => {
-      rows.push([i ? '' : `${r.day}（${r.week}）`, j.name, j.amount == null ? '金額まだ' : yen(j.amount), j.memo || '']);
+      const note = [jobCountsText(j), j.memo].filter(Boolean).join('　');
+      rows.push([i ? '' : `${r.day}（${r.week}）`, j.name, j.amount == null ? 'まだ' : yen(j.amount), note]);
       const t = sums.get(j.name) || { days: 0, amount: 0 };
       t.days++;
       t.amount += j.amount || 0;
@@ -1221,7 +1259,7 @@ function salesCanvases() {
     if (!r.jobs.length) rows.push([`${r.day}（${r.week}）`, '（案件を選んでいません）', '', '']);
   }
   return [salesCanvas(), ...renderSalesDetail({
-    title: '売上の内訳', ym: `${y}年 ${m}月`, name: s.driverName, sub: dailyTitle(s),
+    title: '売上の内訳', ym: `${y}年 ${m}月`, name: s.driverName, sub: jobsOf(s).length > 1 ? `案件：${jobsOf(s).map(jobLabel).join('・')}` : salesTitle(s),
     rows, sums: [...sums].map(([k, v]) => [k, `${v.days}日`, yen(v.amount)]),
     total: yen(data.total.amount)
   })];
@@ -1229,8 +1267,9 @@ function salesCanvases() {
 
 function salesCanvas() {
   const { s, y, m, today, thisMonth, data } = salesContext();
-  const sagawa = s.salesType === 'sagawa';
-  // 佐川急便は個数の列あり。日極の案件は個数の列を出さない
+  const sagawa = hasSagawa(s);
+  const single = jobsOf(s).length === 1;
+  // 佐川急便の案件があれば個数の列あり（法人の分は数えない）。佐川急便がなければ個数の列を出さない
   const countHead = sagawa ? COUNT_KEYS.map(([, tx]) => ({ text: tx, w: 9 })) : [];
   // 新人保証の期間がかかっている月は「新人保証」の列を足す（金額には新人保証を含む）
   const nbCol = sagawa && data.hasNewbie;
@@ -1251,10 +1290,10 @@ function salesCanvas() {
   const foot = ['合計', '', `${t.days}日`, '', ...(sagawa ? [`${t.takuhai}`, `${t.shogyo}`, `${t.shuka}`] : []), kmText(t.km), ...(nbCol ? [yen(t.newbie)] : []), yen(t.amount)];
   const [ty, tm, td] = today.split('-').map(Number);
   return renderSalesSheet({
-    title: sagawa ? `佐川急便　${officeTitle(officeName(s))}` : dailyTitle(s),
+    title: salesTitle(s),
     ym: `${y}年 ${m}月`,
     name: s.driverName,
-    sub: salesSub(s, y, m, !sagawa),
+    sub: salesSub(s, y, m, !(sagawa && single)),
     head,
     rows,
     foot,
@@ -1464,9 +1503,9 @@ function openEntry(date, mode, back = 'home') {
     draft.start = newStart(s, prevOdo(state.records, date, s), '');
     draft.end = newEnd(s, '');
   }
-  // 法人（日極）：乗務後点呼に「今日の案件」を出す
-  if (s.salesType === 'daily' && draft.end && !Array.isArray(draft.jobs)) {
-    draft.jobs = rec?.end ? dayJobs(rec, s) : defaultDayJobs(date);
+  // 乗務後点呼に「今日の案件」を出す（以前の版の記録の配達個数は、その日の案件に読み替える）
+  if (salesReady(s) && draft.end && !Array.isArray(draft.jobs)) {
+    draft.jobs = rec?.end ? dayJobs(rec, s).filter((x) => x.job).map(toDayEntry) : defaultDayJobs(date);
   }
   state.draft = draft;
   state.mode = mode;
@@ -1693,13 +1732,11 @@ app.addEventListener('click', async (ev) => {
   const pickJob = ev.target.closest('[data-pick-job]');
   if (pickJob) {
     // 今日の案件を選ぶ・外す（登録した順に並べる）
-    const name = pickJob.dataset.pickJob;
+    const id = pickJob.dataset.pickJob;
     const jobs = jobsOf(state.settings);
     const cur = state.draft.jobs || [];
-    const next = cur.some((p) => p.name === name)
-      ? cur.filter((p) => p.name !== name)
-      : [...cur, { name, amount: num(jobs.find((j) => j.name === name)?.price), memo: '' }];
-    state.draft.jobs = jobs.map((j) => next.find((p) => p.name === j.name)).filter(Boolean);
+    const next = cur.some((p) => p.id === id) ? cur.filter((p) => p.id !== id) : [...cur, newDayJob(jobs.find((j) => j.id === id))];
+    state.draft.jobs = jobs.map((j) => next.find((p) => p.id === j.id)).filter(Boolean);
     const opened = [...app.querySelectorAll('details')].map((d) => d.open);
     const y = window.scrollY;
     renderEntry();
@@ -1714,12 +1751,6 @@ app.addEventListener('click', async (ev) => {
     state.settings[setSeg.dataset.settingSeg] = off ? '' : setSeg.dataset.value;
     setSeg.parentElement.querySelectorAll('[data-setting-seg]').forEach((b) => b.setAttribute('aria-pressed', !off && b === setSeg));
     if (setSeg.dataset.settingSeg === 'prevSalesLevel') state.settings.prevSalesMonth = prevMonthKey();
-    if (setSeg.dataset.settingSeg === 'salesType') {
-      // 案件の種類で入力欄が変わるので描き直す
-      const y = window.scrollY;
-      render();
-      window.scrollTo(0, y);
-    }
     updateSaveState();
     return;
   }
@@ -1788,10 +1819,22 @@ app.addEventListener('click', async (ev) => {
     const y = window.scrollY;
     render();
     window.scrollTo(0, y);
-  } else if (action === 'add-job' || action === 'del-job') {
+  } else if (['add-job', 'del-job', 'job-kind', 'job-pay'].includes(action)) {
     const jobs = editableJobs();
-    if (action === 'add-job') jobs.push({ id: `job-${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`, name: '', price: '' });
-    else jobs.splice(Number(el.dataset.i), 1);
+    const i = Number(el.dataset.i);
+    if (action === 'add-job') jobs.push({ id: `job-${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`, kind: '' });
+    else if (action === 'del-job') jobs.splice(i, 1);
+    else {
+      if (!jobs[i]) jobs[i] = { id: `job-${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`, kind: '' };
+      const j = jobs[i];
+      if (!j.id) j.id = `job-${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
+      if (action === 'job-kind') {
+        j.kind = el.dataset.value;
+        if (j.kind === 'sagawa') j.office ??= '';
+        else { j.company ??= ''; j.branch ??= ''; j.pay ??= ''; }
+      } else j.pay = el.dataset.value;
+      if (j.kind === 'corp') j.units = Array.from({ length: UNIT_SLOTS }, (_, k) => j.units?.[k] || { label: '', price: '' });
+    }
     const y = window.scrollY;
     render();
     window.scrollTo(0, y);
@@ -1799,7 +1842,8 @@ app.addEventListener('click', async (ev) => {
     // 売上表の一覧：日付を押すと、その日の案件の内訳を開く
     const d = el.dataset.date;
     state.salesOpen = state.salesOpen || new Set();
-    if (state.salesOpen.has(d)) state.salesOpen.delete(d); else state.salesOpen.add(d);
+    state.salesClosed = state.salesClosed || new Set();
+    if (el.getAttribute('aria-expanded') === 'true') { state.salesOpen.delete(d); state.salesClosed.add(d); } else { state.salesOpen.add(d); state.salesClosed.delete(d); }
     const y = window.scrollY;
     renderSales();
     window.scrollTo(0, y);
@@ -1930,18 +1974,32 @@ app.addEventListener('input', (ev) => {
     const out = app.querySelector('[data-bind="end.odo"]');
     if (out) out.value = odo;
   } else if (t.dataset.jobI) {
-    // 設定：案件名・いつもの金額
+    // 設定：案件の入力（営業所・会社名・単価など）
     const jobs = editableJobs();
     const i = Number(t.dataset.jobI);
-    if (!jobs[i]) jobs[i] = { id: `job-${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`, name: '', price: '' };
-    jobs[i][t.dataset.jobK] = t.dataset.jobK === 'price' ? (num(t.value) ?? '') : t.value;
-  } else if (t.dataset.jobamt) {
-    // 乗務後点呼：その日の案件の金額
-    const j = state.draft.jobs[Number(t.dataset.jobamt)];
-    j.amount = num(t.value);
-    t.classList.toggle('need', j.amount == null);
+    if (!jobs[i]) jobs[i] = { id: `job-${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`, kind: '' };
+    if (!jobs[i].id) jobs[i].id = `job-${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
+    setPath(jobs[i], t.dataset.jobK, t.value);
+    // 営業所・働き始めた日を変えたら、単価・新人保証の表示を描き直す
+    if (t.dataset.jobK === 'office' || t.dataset.jobK === 'startDate') {
+      const y = window.scrollY;
+      render();
+      window.scrollTo(0, y);
+    }
+  } else if (t.dataset.jobamt || t.dataset.jobcnt) {
+    // 乗務後点呼：その日の案件の金額・個数
+    if (t.dataset.jobamt) {
+      const j = state.draft.jobs[Number(t.dataset.jobamt)];
+      j.amount = num(t.value);
+      t.classList.toggle('need', j.amount == null);
+    } else {
+      const j = state.draft.jobs[Number(t.dataset.jobcnt)];
+      const k = t.dataset.k;
+      if (/^\d+$/.test(k)) { j.counts = Array.isArray(j.counts) ? j.counts : []; j.counts[Number(k)] = num(t.value); }
+      else { j.counts = { ...(j.counts || {}), [k]: num(t.value) }; }
+    }
     const out = app.querySelector('#daytotal');
-    if (out) out.textContent = yen(state.draft.jobs.reduce((s, x) => s + (num(x.amount) || 0), 0));
+    if (out) out.textContent = yen(draftDayTotal());
   } else if (t.dataset.jobmemo) {
     state.draft.jobs[Number(t.dataset.jobmemo)].memo = t.value;
   } else if (t.dataset.setting) {
@@ -1984,10 +2042,15 @@ app.addEventListener('change', async (ev) => {
     return;
   }
   if (t.dataset.salesDate) {
-    // 売上表の一覧で入れた配達個数を、その日の記録に保存する
+    // 売上表の一覧で入れた個数を、その日の記録の案件に保存する（以前の版の記録は、その日の案件に読み替えてから）
     const rec = findRecord(t.dataset.salesDate);
     if (!rec) return;
-    rec.sales = { ...(rec.sales || {}), [t.dataset.salesKey]: t.value === '' ? '' : Number(t.value) };
+    if (!Array.isArray(rec.jobs)) rec.jobs = dayJobs(rec, state.settings).filter((x) => x.job).map(toDayEntry);
+    const j = rec.jobs.find((x) => x.id === t.dataset.salesJob);
+    if (!j) return;
+    const k = t.dataset.salesKey;
+    if (/^\d+$/.test(k)) { j.counts = Array.isArray(j.counts) ? j.counts : []; j.counts[Number(k)] = num(t.value); }
+    else j.counts = { ...(j.counts || {}), [k]: num(t.value) };
     await db.putRecord(rec);
     await reload();
     const y = window.scrollY;

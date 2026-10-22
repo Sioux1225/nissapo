@@ -463,9 +463,9 @@ test('法人（日極）：その日に選んだ案件の金額の合計', async
 });
 
 test('法人（日極）：以前の版の「所属・日極」は1つ目の案件として読む', async () => {
-  const { dayAmount, jobsOf } = await import('../js/sales.js');
+  const { dayAmount, jobsOf, jobLabel } = await import('../js/sales.js');
   const s = { salesType: 'daily', salesProject: 'Amazon', dailyRate: 19000, jobs: [] };
-  assert.deepEqual(jobsOf(s).map((j) => j.name), ['Amazon']);
+  assert.deepEqual(jobsOf(s).map(jobLabel), ['Amazon']);
   assert.equal(dayAmount({ date: '2026-10-01', start: { time: '08:00' } }, s), 19000);
 });
 
@@ -476,3 +476,45 @@ test('前月の売上「なし」：はじめて稼働する方は、はじめ�
   assert.equal(prevSalesLevel(s, 2026, 10), null); // 留保の判断には使わない
   assert.equal(isFirstAdvanceMonth(s, 2026, 10), true);
 });
+
+test('案件をまとめて登録：佐川急便と法人（日極・単価）を1日に組み合わせる', async () => {
+  const { dayAmount, countsMissing, monthSales, jobLabel, jobsOf } = await import('../js/sales.js');
+  const s = { salesStartDate: '2026-09-01', jobs: [
+    { id: 's', kind: 'sagawa', office: '八王子', startDate: '2026-09-01' },
+    { id: 'c', kind: 'corp', company: '○○運送', branch: '△△営業所', pay: 'unit', units: [{ label: '宅配', price: '170' }, { label: 'ネコポス', price: '40' }, { label: '', price: '' }] },
+    { id: 'd', kind: 'corp', company: '□□便', branch: '', pay: 'daily', price: '' }
+  ] };
+  assert.deepEqual(jobsOf(s).map(jobLabel), ['佐川急便 八王子営業所', '○○運送 △△営業所', '□□便']);
+  const start = { time: '07:00' };
+  // 朝は法人の単価（宅配10個・ネコポス20個）、午後は佐川急便（宅配50・商業1・集荷2）
+  const rec = { date: '2026-10-05', start, jobs: [{ id: 'c', counts: [10, 20] }, { id: 's', counts: { takuhai: 50, shogyo: 1, shuka: 2 } }] };
+  assert.equal(dayAmount(rec, s), 10 * 170 + 20 * 40 + (50 * 178 + 1 * 80 + 2 * 100));
+  assert.equal(countsMissing(rec, s), false);
+  // 日極の金額が空なら入力まだ
+  const rec2 = { date: '2026-10-06', start, jobs: [{ id: 'd', amount: null }] };
+  assert.equal(countsMissing(rec2, s), true);
+  // 佐川急便の個数は、表の宅配・商業・集荷に数える（法人の分は数えない）
+  const t = monthSales([rec, rec2], 2026, 10, s, '2026-10-31', '2026-10-31').total;
+  assert.equal(t.takuhai, 50);
+  assert.equal(t.missing, 1);
+});
+
+test('以前の版の佐川急便の設定と配達個数は、そのまま数える', async () => {
+  const { dayAmount, jobsOf } = await import('../js/sales.js');
+  const s = { salesType: 'sagawa', salesOffice: '八王子', salesStartDate: '2026-09-01', jobs: [] };
+  assert.equal(jobsOf(s).length, 1);
+  const rec = { date: '2026-10-05', start: { time: '07:00' }, sales: { takuhai: 100, shogyo: 1, shuka: 2 } };
+  assert.equal(dayAmount(rec, s), 100 * 178 + 80 + 200);
+});
+
+test('以前の版の佐川急便の記録は、あとから法人の案件を足しても佐川急便の分として数える', async () => {
+  const { dayAmount, jobsOf } = await import('../js/sales.js');
+  const s = { salesType: 'sagawa', salesStartDate: '2026-09-01', jobs: [
+    { id: 'job-sagawa', kind: 'sagawa', office: '八王子' },
+    { id: 'c', kind: 'corp', company: '○○運送', pay: 'daily', price: '15000' }
+  ] };
+  assert.equal(jobsOf(s).length, 2);
+  const rec = { date: '2026-10-20', start: { time: '07:00' }, sales: { takuhai: 100, shogyo: 1, shuka: 2 } };
+  assert.equal(dayAmount(rec, s), 100 * 178 + 80 + 200);
+});
+

@@ -1,10 +1,9 @@
 // 売上表（月報・前払い用）
-// 佐川急便：その日の配達個数（宅配・商業・集荷）× 単価。法人（日極）：その日に選んだ案件の金額の合計。
+// 佐川急便：その日の配達個数（宅配・商業・集荷）× 単価。法人：日極か、品目ごとの個数 × 単価。案件はいくつでも登録し、その日に選んだ案件の金額の合計。
 // 前払いは月初めからの売上で計算するため、合計はその月の分だけ（前月の分は含めない）。
 
 import { num, daysInMonth, dateKey, weekday, distanceOf, isOff, isOffDay, todayKey } from './model.js';
 
-export const SALES_TYPES = [['sagawa', '佐川急便'], ['daily', '法人（日極）']];
 export const COUNT_KEYS = [['takuhai', '宅配'], ['shogyo', '商業'], ['shuka', '集荷']];
 
 // 佐川急便の商業・集荷の決まった単価（営業所で変わる）
@@ -168,59 +167,129 @@ export function advanceLimit({ sales, advanced = 0, prevSales, prevLevel = null,
   return { reserve, reason, base, target: Math.floor(base * ADVANCE_RATE) };
 }
 
-// ---- 法人（日極）の案件 ----
-// 1日にいくつかの案件（午前はチャーター便、午後は医薬品の配達など）をこなす方のため、案件をいくつか登録し、
+// ---- 案件（佐川急便・法人をまとめて登録する） ----
+// 佐川急便から法人へ移った方や、朝は法人・午後は佐川急便のように組み合わせる方のため、案件をいくつでも登録し、
 // 乗務後点呼でその日の案件を選ぶ。その日の金額は、選んだ案件の金額の合計。
-// 登録した案件の一覧（入力中の空の行も含む）。以前の版の「所属・日極」1組だけの設定は、1つ目の案件として読み替える
+//   佐川急便：営業所を選ぶ（単価は単価表から）。新人保証はその営業所で働き始めた日（startDate）から数える
+//   法人：会社名・営業所名。支払いは「日極」（1日いくら。空なら毎回入力）か「単価」（品目と単価を3つまで）
+// settings.jobs：[{ id, kind: 'sagawa', office, officeName, priceTakuhai, priceShogyo, priceShuka, startDate }
+//                 | { id, kind: 'corp', company, branch, pay: 'daily' | 'unit', price, units: [{ label, price }] }]
+export const UNIT_SLOTS = 3;
+
+// 以前の版の案件（法人（日極）の { name, price }）を、いまの形に読み替える
+function normalizeJob(j) {
+  if (j.kind === 'sagawa' || j.kind === 'corp') return j;
+  return { id: j.id, kind: 'corp', company: j.name || '', branch: '', pay: 'daily', price: j.price ?? '', units: [] };
+}
+
+// 登録した案件の一覧（入力中のものも含む）。以前の版の設定（佐川急便の営業所1つ・法人（日極）の所属1つ）も読み替える
 export function jobList(settings) {
-  if (Array.isArray(settings.jobs) && settings.jobs.length) return settings.jobs;
-  if (settings.salesProject || num(settings.dailyRate) != null) return [{ id: 'j1', name: settings.salesProject || '案件', price: settings.dailyRate ?? '' }];
+  if (Array.isArray(settings.jobs) && settings.jobs.length) return settings.jobs.map(normalizeJob);
+  if (settings.salesType === 'sagawa' && settings.salesOffice) {
+    return [{ id: 'job-sagawa', kind: 'sagawa', office: settings.salesOffice, officeName: settings.salesOfficeName || '', priceTakuhai: settings.priceTakuhai ?? '', priceShogyo: settings.priceShogyo ?? '', priceShuka: settings.priceShuka ?? '', startDate: settings.salesStartDate || '' }];
+  }
+  if (settings.salesProject || num(settings.dailyRate) != null) {
+    return [{ id: 'j1', kind: 'corp', company: settings.salesProject || '案件', branch: '', pay: 'daily', price: settings.dailyRate ?? '', units: [] }];
+  }
   return [];
 }
-// 名前のある案件だけ
-export function jobsOf(settings) {
-  return jobList(settings).filter((j) => String(j.name || '').trim());
+
+// 単価の案件の品目（名前と単価が入っているもの）
+export const jobUnits = (job) => (job.units || []).map((u, i) => ({ ...u, i })).filter((u) => String(u.label || '').trim() && num(u.price) != null);
+
+// 入力が足りている案件だけ
+export function jobReady(job) {
+  if (job.kind === 'sagawa') {
+    if (!job.office) return false;
+    if (job.office === OTHER_OFFICE) return !!String(job.officeName || '').trim() && num(job.priceTakuhai) != null;
+    return !!officeEntry(job.office);
+  }
+  if (!String(job.company || '').trim()) return false;
+  if (job.pay === 'unit') return jobUnits(job).length > 0;
+  return job.pay === 'daily';
 }
-// その日の案件 [{ name, amount, memo }]（amount が null の案件は金額まだ）
-// 記録で案件を選んでいない日（以前の版の記録など）は、登録している案件が1つだけならその案件
-export function dayJobs(rec, settings) {
-  if (Array.isArray(rec?.jobs)) return rec.jobs.map((j) => ({ name: j.name, amount: num(j.amount), memo: j.memo || '' }));
+export function jobsOf(settings) {
+  return jobList(settings).filter(jobReady);
+}
+export const hasSagawa = (settings) => jobsOf(settings).some((j) => j.kind === 'sagawa');
+
+// 案件の名前（佐川急便 八王子営業所／○○運送 △△営業所）
+const officeLabel = (name) => (!name || /営業所/.test(name) ? name || '' : name.replace(/^([^（]+)(（.*）)?$/, '$1営業所$2'));
+export function jobLabel(job) {
+  if (job.kind === 'sagawa') return `佐川急便 ${officeLabel(job.office === OTHER_OFFICE ? job.officeName : officeEntry(job.office)?.name || job.office)}`.trim();
+  return [job.company, job.branch].map((v) => String(v || '').trim()).filter(Boolean).join(' ');
+}
+
+// 佐川急便の案件を、以前の設定の形に置きかえる（単価・新人保証の計算をそのまま使う）
+export function sagawaSettings(job, settings) {
+  return { ...settings, salesType: 'sagawa', salesOffice: job.office, salesOfficeName: job.officeName || '', priceTakuhai: job.priceTakuhai ?? '', priceShogyo: job.priceShogyo ?? '', priceShuka: job.priceShuka ?? '', salesStartDate: job.startDate || settings.salesStartDate || '' };
+}
+
+const findJob = (settings, e) => {
   const jobs = jobsOf(settings);
-  return jobs.length === 1 ? [{ name: jobs[0].name, amount: num(jobs[0].price), memo: '' }] : [];
+  return jobs.find((j) => e.id && j.id === e.id) || jobs.find((j) => jobLabel(j) === e.name) || null;
+};
+
+// その日の案件 [{ id, name, job, counts, amount, memo, missing, newbie }]
+// amount：その案件の金額（null は金額まだ）、newbie：その日に含まれる新人保証の額
+// 記録で案件を選んでいない日（以前の版の記録）は、そのころの案件（佐川急便は記録の配達個数を使う）
+export function dayJobs(rec, settings) {
+  let list;
+  if (Array.isArray(rec?.jobs)) list = rec.jobs;
+  else {
+    // 案件を選ぶ前の版の記録：そのころの案件（佐川急便／法人（日極））の分として数える
+    const jobs = jobsOf(settings);
+    const j = settings.salesType === 'sagawa' ? jobs.find((x) => x.kind === 'sagawa')
+      : settings.salesType === 'daily' ? jobs.find((x) => x.kind === 'corp' && x.pay === 'daily')
+        : jobs.length === 1 ? jobs[0] : null;
+    if (!j) return [];
+    list = [j.kind === 'sagawa' ? { id: j.id, counts: rec?.sales || {} } : { id: j.id, amount: j.pay === 'daily' ? num(j.price) : null, counts: [] }];
+  }
+  return list.map((e) => {
+    const job = findJob(settings, e);
+    const out = { id: e.id || job?.id || '', name: job ? jobLabel(job) : e.name || '', job, counts: e.counts ?? (job?.kind === 'sagawa' ? {} : []), memo: e.memo || '', amount: null, missing: false, newbie: 0 };
+    if (!job) { out.amount = num(e.amount); out.missing = out.amount == null; return out; }
+    if (job.kind === 'sagawa') {
+      const ss = sagawaSettings(job, settings);
+      const p = unitPrices(ss);
+      const bonus = dayBonus(ss, rec.date);
+      const nb = newbiePeriod(ss);
+      out.newbie = nb && rec.date >= nb.from && rec.date <= nb.to ? nb.perDay : 0;
+      const c = out.counts || {};
+      out.missing = COUNT_KEYS.every(([k]) => num(c[k]) == null);
+      out.amount = out.missing ? (bonus || null) : COUNT_KEYS.reduce((t, [k]) => t + (num(c[k]) || 0) * (p[k] || 0), 0) + bonus;
+    } else if (job.pay === 'unit') {
+      const c = Array.isArray(out.counts) ? out.counts : [];
+      const units = jobUnits(job);
+      out.missing = units.every((u) => num(c[u.i]) == null);
+      out.amount = out.missing ? null : units.reduce((t, u) => t + (num(c[u.i]) || 0) * num(u.price), 0);
+    } else {
+      out.amount = num(e.amount);
+      out.missing = out.amount == null;
+    }
+    return out;
+  });
 }
 
 export function salesReady(settings) {
-  if (settings.salesType === 'sagawa') return unitPrices(settings).takuhai != null;
-  if (settings.salesType === 'daily') return jobsOf(settings).length > 0;
-  return false;
+  return jobsOf(settings).length > 0;
 }
 
 const worked = (rec) => !!rec?.start && !isOff(rec);
 
-// 乗務した日なのに、売上の入力がまだか（佐川急便：配達個数がひとつもない／その他：案件を選んでいないか、金額が空の案件がある）
+// 乗務した日なのに、売上の入力がまだか（案件を選んでいない／個数や金額が入っていない案件がある）
 export function countsMissing(rec, settings) {
   if (!worked(rec)) return false;
-  if (settings.salesType === 'daily') {
-    const js = dayJobs(rec, settings);
-    return !js.length || js.some((j) => j.amount == null);
-  }
-  if (settings.salesType !== 'sagawa') return false;
-  return COUNT_KEYS.every(([k]) => num(rec.sales?.[k]) == null);
+  const js = dayJobs(rec, settings);
+  return !js.length || js.some((j) => j.missing);
 }
 
-// 1日の金額（売上がない日は null）。1日ごとに足す金額（川口（DRF）など）は個数がまだでも入れる
+// 1日の金額（売上がない日は null）。1日ごとに足す金額（川口（DRF）・新人保証など）は個数がまだでも入れる
 export function dayAmount(rec, settings) {
   if (!worked(rec)) return null;
-  if (settings.salesType === 'daily') {
-    const js = dayJobs(rec, settings);
-    return js.length ? js.reduce((t, j) => t + (j.amount || 0), 0) : null;
-  }
-  if (settings.salesType !== 'sagawa') return null;
-  const p = unitPrices(settings);
-  const bonus = dayBonus(settings, rec.date);
-  if (countsMissing(rec, settings)) return bonus ? bonus : null;
-  const c = rec.sales || {};
-  return COUNT_KEYS.reduce((sum, [k]) => sum + (num(c[k]) || 0) * (p[k] || 0), 0) + bonus;
+  const js = dayJobs(rec, settings);
+  if (!js.length || js.every((j) => j.amount == null)) return null;
+  return js.reduce((t, j) => t + (j.amount || 0), 0);
 }
 
 // その月の売上表。upto（'YYYY-MM-DD'）までの日を数える（前払いは今日まで）
@@ -229,25 +298,25 @@ export function monthSales(records, y, m, settings, upto = null, today = todayKe
   const days = daysInMonth(y, m);
   const rows = [];
   const total = { days: 0, takuhai: 0, shogyo: 0, shuka: 0, km: 0, amount: 0, missing: 0, newbie: 0 };
-  const nb = newbiePeriod(settings);
   for (let d = 1; d <= days; d++) {
     const key = dateKey(y, m, d);
     const rec = byDate.get(key);
     const inRange = !upto || key <= upto;
+    const jobs = worked(rec) ? dayJobs(rec, settings) : [];
     const amount = inRange ? dayAmount(rec, settings) : null;
-    const counts = Object.fromEntries(COUNT_KEYS.map(([k]) => [k, num(rec?.sales?.[k])]));
+    // 佐川急便の配達個数（その日の佐川急便の案件の合計）
+    const sag = jobs.filter((j) => j.job?.kind === 'sagawa');
+    const counts = Object.fromEntries(COUNT_KEYS.map(([k]) => [k, sag.length && sag.some((j) => num(j.counts?.[k]) != null) ? sag.reduce((t, j) => t + (num(j.counts?.[k]) || 0), 0) : null]));
     const km = distanceOf(rec);
     const missing = inRange && countsMissing(rec, settings);
     // 新人保証の分（金額に含まれている）
-    const newbie = inRange && worked(rec) && nb && key >= nb.from && key <= nb.to ? nb.perDay : 0;
-    const jobs = settings.salesType === 'daily' && worked(rec) ? dayJobs(rec, settings) : [];
+    const newbie = inRange ? jobs.reduce((t, j) => t + (j.newbie || 0), 0) : 0;
     rows.push({ jobs, newbie, date: key, day: d, week: weekday(key), rec, worked: worked(rec), off: isOffDay(rec, key, today), start: rec?.start?.time || '', end: rec?.end?.time || '', counts, km, amount, inRange, missing });
     if (inRange && worked(rec)) {
       total.days++;
       for (const [k] of COUNT_KEYS) total[k] += counts[k] || 0;
       total.km += km || 0;
       total.amount += amount || 0;
-      // 佐川急便で個数がまだ入っていない日
       if (missing) total.missing++;
       total.newbie += newbie;
     }
@@ -255,7 +324,10 @@ export function monthSales(records, y, m, settings, upto = null, today = todayKe
   // その月に新人保証の期間がかかっているか（表に新人保証の列を出す）
   const monthFrom = dateKey(y, m, 1);
   const monthTo = dateKey(y, m, days);
-  const hasNewbie = !!nb && nb.from <= monthTo && nb.to >= monthFrom;
+  const hasNewbie = jobsOf(settings).filter((j) => j.kind === 'sagawa').some((j) => {
+    const nb = newbiePeriod(sagawaSettings(j, settings));
+    return nb && nb.from <= monthTo && nb.to >= monthFrom;
+  });
   return { rows, total, hasNewbie };
 }
 

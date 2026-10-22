@@ -18,7 +18,7 @@ export const DEFAULT_SETTINGS = {
   shakenDate: '',      // 車検の満了日（任意）
   licenseDate: '',     // 運転免許証の有効期限（任意）
   expiryAck: {},       // 見せた期限のお知らせ { shaken: { date, stage }, license: { date, stage } }
-  salesType: '',       // 売上表：'sagawa'（佐川急便）・'daily'（日極の案件）
+  salesType: '',       // 以前の版の売上表の種類（'sagawa'・'daily'）。以前の記録を、そのころの案件の分として数えるのに使う
   salesOffice: '',     // 佐川急便の営業所（単価表の営業所名、または「その他」）
   salesOfficeName: '', // 「その他」のときの営業所名
   salesStartDate: '',  // 稼働を開始した日（新人保証の期間と、はじめての前払いの留保を判断する）
@@ -27,7 +27,7 @@ export const DEFAULT_SETTINGS = {
   priceShuka: '',      // 単価 集荷（空なら宅配と同じ）
   salesProject: '',    // 以前の版の、日極の案件の所属（案件名）。いまは jobs を使う
   dailyRate: '',       // 以前の版の、日極（円）。いまは jobs を使う
-  jobs: [],            // 法人（日極）の案件 [{ id, name, price }]（price：いつもの金額。毎回変わる案件は空）
+  jobs: [],            // 売上表の案件（佐川急便・法人）。形は js/sales.js の jobList を参照。以前の版の salesType などは読み替え用に残す
   advance: {},         // 希望する前払い額 { 'YYYY-MM': 円 }
   advanceHistory: {},  // 受けた前払いの履歴 { 'YYYY-MM': [{ id, date, amount }] }
   leaseCar: '',        // リース車両を利用しているか（'yes'・'no'）
