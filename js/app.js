@@ -17,7 +17,7 @@ import {
   KINDS, COLLISIONS, ROAD_TYPES, SLOPES, SHAPES, SURFACES
 } from './accident.js';
 
-export const APP_VERSION = '0.15.2';
+export const APP_VERSION = '0.15.3';
 
 const app = document.getElementById('app');
 const state = {
@@ -275,12 +275,6 @@ function settingsForm(s, fresh = false) {
       ${field('点呼実施者名', `<input id="rollcaller-view" value="${e(s.driverName ?? '')}" placeholder="運転者名が入ります" readonly tabindex="-1" aria-readonly="true">`)}
       ${f('initialOdo', '今のメーターの距離（km）', 'type="number" inputmode="numeric" min="0" placeholder="例：12345"', '最初の日の「開始時走行距離」になります。あとは前の日の終了距離が自動で入ります')}
     </div>
-    <h2 class="section-title">期限のお知らせ（任意）</h2>
-    <div class="card fields">
-      ${f('shakenDate', '車検の満了日', 'type="date"', '車検証に書いてある「有効期間の満了する日」')}
-      ${f('licenseDate', '運転免許証の有効期限', 'type="date"', '免許証に書いてある「○年○月○日まで有効」の日')}
-      <p class="field-note pad-note">期限の60日前・30日前・14日前・7日前と、期限を過ぎたときにお知らせします。更新したら、新しい日付に入れ直してください。</p>
-    </div>
     <h2 class="section-title">売上表</h2>
     <div class="card fields">
       <div class="field"><span class="field-label">案件</span>${SALES_TYPES.map(([v, t]) => `<button type="button" class="chip" data-setting-seg="salesType" data-value="${v}" aria-pressed="${s.salesType === v}">${t}</button>`).join('')}</div>
@@ -293,6 +287,12 @@ function settingsForm(s, fresh = false) {
       ${prevSalesField(s)}
       ${priorAdvanceField(s)}
       ` : ''}
+    </div>
+    <h2 class="section-title">期限のお知らせ（任意）</h2>
+    <div class="card fields">
+      ${f('shakenDate', '車検の満了日', 'type="date"', '車検証に書いてある「有効期間の満了する日」')}
+      ${f('licenseDate', '運転免許証の有効期限', 'type="date"', '免許証に書いてある「○年○月○日まで有効」の日')}
+      <p class="field-note pad-note">期限の60日前・30日前・14日前・7日前と、期限を過ぎたときにお知らせします。更新したら、新しい日付に入れ直してください。</p>
     </div>`;
 }
 
