@@ -17,7 +17,7 @@ import {
   KINDS, COLLISIONS, ROAD_TYPES, SLOPES, SHAPES, SURFACES
 } from './accident.js';
 
-export const APP_VERSION = '0.16.4';
+export const APP_VERSION = '0.16.5';
 
 const app = document.getElementById('app');
 const state = {
@@ -57,12 +57,12 @@ function setPath(obj, path, value) {
 }
 
 let toastTimer;
-function toast(msg) {
+function toast(msg, ms = 2600) {
   const el = document.getElementById('toast');
   el.textContent = msg;
   el.hidden = false;
   clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => { el.hidden = true; }, 2600);
+  toastTimer = setTimeout(() => { el.hidden = true; }, ms);
 }
 
 // 確認の画面（ブラウザの confirm は使えない環境があるので、画面の中に出す）
@@ -1460,7 +1460,14 @@ function renderAdvanceRules() {
 function render() {
   if (state.view !== 'setup' && !state.settings.driverName) state.view = 'setup';
   const views = { sales: renderSales, oil: renderOil, accidents: renderAccidents, accident: renderAccidentForm, rules: renderRules, advrules: renderAdvanceRules, setup: renderSetup, settings: renderSettings, home: renderHome, entry: renderEntry, list: renderList, export: renderExport };
-  (views[state.view] || renderHome)();
+  try {
+    (views[state.view] || renderHome)();
+  } catch (err) {
+    // 画面を出せなかったときは、何も起きないままにせず、内容を見せる（原因を調べるため）
+    console.error(err);
+    const where = String(err?.stack || '').split('\n').slice(1, 3).map((l) => l.trim()).join(' / ');
+    toast(`画面を開けませんでした：${err?.message || err}${where ? `（${where}）` : ''}`, 20000);
+  }
 }
 
 function go(view, { push = true } = {}) {
