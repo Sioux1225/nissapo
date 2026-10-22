@@ -395,3 +395,7 @@ button:focus-visible { outline: 3px solid var(--blue); outline-offset: 2px; }
 .btn-outline:has(> .btn-mark) { display: flex; align-items: center; justify-content: center; gap: 8px; }
 .btn-mark { width: 28px; height: 28px; flex: none; border-radius: 9px; display: grid; place-items: center; background: var(--orange-tint); color: #E08A00; }
 .btn-row.two .btn-outline:has(> .btn-mark) { padding: 0 8px; gap: 6px; white-space: nowrap; }
+
+/* 書き込めない欄（点呼実施者名など） */
+.field input[readonly] { background: var(--bg); color: var(--sub); }
+.field input[readonly]:focus { outline: none; border-color: var(--line-strong); }

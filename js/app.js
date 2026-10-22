@@ -7,7 +7,7 @@ import { SALES_TYPES, COUNT_KEYS, unitPrices, salesReady, monthSales, yen, defau
 import { EXPIRED, expiryStatus, expiryMessage, expiryAlertsToShow } from './expiry.js';
 import { OIL_LIMIT, OIL_STEPS, newOilChange, currentOdo, oilStatus, oilMessage, oilAlertToShow, sortOilChanges } from './oil.js';
 import {
-  DEFAULT_SETTINGS, METHODS, newStart, newEnd, todayKey, nowTime, isTime, num, distanceOf, prevOdo,
+  DEFAULT_SETTINGS, newStart, newEnd, todayKey, nowTime, isTime, num, distanceOf, prevOdo,
   monthSheets, yearSheets, hasMonth, toCsv, daysInMonth, dateKey, weekday, pad2, isOff, isOffDay
 } from './model.js';
 import { buildXlsx } from './xlsx.js';
@@ -17,7 +17,7 @@ import {
   KINDS, COLLISIONS, ROAD_TYPES, SLOPES, SHAPES, SURFACES
 } from './accident.js';
 
-export const APP_VERSION = '0.14.8';
+export const APP_VERSION = '0.15.0';
 
 const app = document.getElementById('app');
 const state = {
@@ -199,8 +199,7 @@ function settingsForm(s, fresh = false) {
       ${f('via', '主な経過地点（集荷・納品先など）', 'placeholder="例：○○町1丁目、△△町2丁目"')}
       ${f('restPlace', '休憩地点', 'placeholder="例：○○公園駐車場"')}
       ${f('restMin', '休憩時間（分）', `type="number" inputmode="numeric" min="0" placeholder="例：${DEFAULT_SETTINGS.restMin}"`)}
-      ${f('rollcaller', '点呼実施者名', 'placeholder="例：運行 花子"', '点呼をしてくれる人（運行管理者）の名前')}
-      <div class="field"><span class="field-label">点呼方法</span>${METHODS.map((m) => `<button type="button" class="chip" data-setting-seg="method" data-value="${m}" aria-pressed="${s.method === m}">${m}</button>`).join('')}</div>
+      ${field('点呼実施者名', `<input id="rollcaller-view" value="${e(s.driverName ?? '')}" placeholder="運転者名が入ります" readonly tabindex="-1" aria-readonly="true">`)}
       ${f('initialOdo', '今のメーターの距離（km）', 'type="number" inputmode="numeric" min="0" placeholder="例：12345"', '最初の日の「開始時走行距離」になります。あとは前の日の終了距離が自動で入ります')}
     </div>
     <h2 class="section-title">期限のお知らせ（任意）</h2>
@@ -376,7 +375,6 @@ function startSection(full) {
       ${field('出発時のメーター（km）', input('start.odo', 'type="number" inputmode="numeric" min="0"'), '前の日の終了距離が入っています')}
       <details class="more" ${full ? 'open' : ''}>
         <summary>そのほかの項目（ふだんは変更不要）</summary>
-        ${segField('点呼方法', 'start.method', METHODS)}
         ${field('指示事項', input('start.instruction'))}
         ${field('乗務開始地点', input('start.place'))}
       </details>
@@ -415,7 +413,6 @@ function endSection(full) {
         ${field('事故・異常の概要', input('end.accident'))}
         ${field('備考', input('end.note'))}
         ${field('乗務終了地点', input('end.place'))}
-        ${segField('点呼方法', 'end.method', METHODS)}
       </details>
     </section>`;
 }
@@ -430,7 +427,7 @@ function renderEntry() {
   else {
     body = (d.start ? startSection(true) : `<button type="button" class="btn-outline" data-action="add-part" data-part="start">＋ 乗務前点呼を入力する</button>`)
       + (d.end ? endSection(true) : `<button type="button" class="btn-outline" data-action="add-part" data-part="end">＋ 乗務後点呼を入力する</button>`)
-      + `<section class="card fields">${field('点呼実施者名', input('rollcaller'))}</section>`;
+      + `<section class="card fields">${field('点呼実施者名', `<input value="${e(d.rollcaller || state.settings.driverName)}" readonly tabindex="-1" aria-readonly="true">`)}</section>`;
   }
   const exists = !!findRecord(d.date);
   app.innerHTML = `
@@ -1379,7 +1376,7 @@ window.addEventListener('popstate', () => {
 function openEntry(date, mode, back = 'home') {
   const s = state.settings;
   const rec = findRecord(date);
-  const draft = structuredClone(rec || { date, start: null, end: null, rollcaller: s.rollcaller });
+  const draft = structuredClone(rec || { date, start: null, end: null, rollcaller: s.driverName });
   if (mode === 'start' && !draft.start) draft.start = newStart(s, prevOdo(state.records, date, s), date === todayKey() ? nowTime() : '');
   if (mode === 'end' && !draft.end) {
     draft.end = newEnd(s, date === todayKey() ? nowTime() : '');
@@ -1413,7 +1410,7 @@ async function saveEntry() {
   const d = state.draft;
   const err = validate(d);
   if (err) { toast(err); return; }
-  if (!d.rollcaller) d.rollcaller = state.settings.rollcaller;
+  if (!d.rollcaller) d.rollcaller = state.settings.driverName; // 点呼実施者名は運転者名と同じ
   if (d.start || d.end) delete d.off; // 乗務を記録したら休みではない
   await db.putRecord(d);
   // 地点などを変えたら、次回からの初期値にする
@@ -1794,6 +1791,9 @@ app.addEventListener('click', async (ev) => {
     const s = state.settings;
     if (!String(s.driverName).trim()) { toast('運転者名を入れてください'); return; }
     s.restMin = num(s.restMin) ?? DEFAULT_SETTINGS.restMin;
+    // 点呼は自分で行う：点呼実施者名は運転者名、点呼方法は「自身」
+    s.rollcaller = String(s.driverName).trim();
+    s.method = '自身';
     // 事業者名が空なら、はじめからの事業者名にする
     if (!String(s.company || '').trim()) s.company = DEFAULT_SETTINGS.company;
     s.initialOdo = num(s.initialOdo);
@@ -1856,6 +1856,11 @@ app.addEventListener('input', (ev) => {
     state.draft.jobs[Number(t.dataset.jobmemo)].memo = t.value;
   } else if (t.dataset.setting) {
     state.settings[t.dataset.setting] = t.value;
+    // 点呼実施者名の欄は、運転者名と同じものを見せる
+    if (t.dataset.setting === 'driverName') {
+      const rv = app.querySelector('#rollcaller-view');
+      if (rv) rv.value = t.value;
+    }
     // 以前に受けた前払いは、入力した月の分として数える
     if (t.dataset.setting === 'priorAdvance') state.settings.priorAdvanceMonth = thisMonthKey();
     // 営業所・稼働を開始した日を変えたら、単価・新人保証の表示を描き直す

@@ -4,11 +4,11 @@ import { DEFAULT_SETTINGS, newStart, newEnd, prevOdo, monthSheets, yearSheets, t
 import { buildXlsx, colName, sheetXml } from '../js/xlsx.js';
 import { buildPdf } from '../js/pdf.js';
 
-const settings = { ...DEFAULT_SETTINGS, driverName: '配送 太郎', office: '○○', startPlace: '○○営業所', via: '○○町1,2丁目、△△町', restPlace: '○○公園駐車場', rollcaller: '運行 花子', initialOdo: 12000 };
+const settings = { ...DEFAULT_SETTINGS, driverName: '配送 太郎', office: '○○', startPlace: '○○営業所', via: '○○町1,2丁目、△△町', restPlace: '○○公園駐車場', rollcaller: '配送 太郎', initialOdo: 12000 };
 
 function rec(date, s, e, a, b) {
   return {
-    date, rollcaller: '運行 花子',
+    date, rollcaller: '配送 太郎', // 点呼実施者名は運転者名と同じ
     start: { ...newStart(settings, a, s) },
     end: e ? { ...newEnd(settings, e), odo: b } : null
   };
@@ -38,7 +38,8 @@ test('運転日報・点呼記録簿の行が事務所のブックと同じ列�
   assert.equal(roll.name, '点呼記録簿10月');
   assert.equal(daily.rows.length, 31);
   assert.deepEqual(daily.rows[0], [1, '○○営業所', { time: '7:20' }, '○○営業所', { time: '19:55' }, '○○町1,2丁目、△△町', 12000, 12110, 110, '○○公園駐車場', 60, '無', '有', '無', '無', '無']);
-  assert.deepEqual(roll.rows[0], [1, { time: '7:20' }, 'LINE', '有', '無', '良好', '良好', '無', { time: '19:55' }, 'LINE', '有', '無', '無', '無', '運行 花子', null]);
+  // 点呼方法は「自身」に固定
+  assert.deepEqual(roll.rows[0], [1, { time: '7:20' }, '自身', '有', '無', '良好', '良好', '無', { time: '19:55' }, '自身', '有', '無', '無', '無', '配送 太郎', null]);
   // 記録のない過去の日（10/3）は自動で休み、今日以降（10/6・10/7）は空欄
   assert.deepEqual(daily.rows[2], [3, ...Array(14).fill(null), '休み']);
   assert.deepEqual(daily.rows[5].slice(1), Array(15).fill(null));
@@ -74,7 +75,7 @@ test('CSV：記録のある日だけ、BOM付き', () => {
   const lines = csv.trim().split('\r\n');
   assert.equal(lines.length, 4);
   assert.ok(lines[1].startsWith('2026/10/01,○○営業所,7:20,○○営業所,19:55,"○○町1,2丁目、△△町",12000,12110,110,'));
-  assert.ok(lines[1].endsWith(',運行 花子'));
+  assert.ok(lines[1].endsWith(',配送 太郎'));
 });
 
 test('PDF：ページ数と終わりの印', () => {

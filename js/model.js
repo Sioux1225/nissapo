@@ -10,8 +10,8 @@ export const DEFAULT_SETTINGS = {
   via: '',             // 主な経過地点
   restPlace: '',       // 休憩・睡眠地点
   restMin: 60,         // 休憩・睡眠時間（分）
-  method: 'LINE',      // 点呼方法
-  rollcaller: '',      // 点呼実施者名
+  method: '自身',      // 点呼方法（自身に固定）
+  rollcaller: '',      // 点呼実施者名（運転者名と同じ。設定を保存するときに入れる）
   initialOdo: null,    // 使い始めたときのメーターの距離
   oilChanges: [],      // オイル交換の記録 [{ id, date, odo, note }]
   oilAck: null,        // 見せたオイル交換のお知らせ { changeId, level }
@@ -39,13 +39,14 @@ export const DEFAULT_SETTINGS = {
   retention: '1年間'
 };
 
-export const METHODS = ['LINE', '対面', '電話', 'その他'];
+// 点呼は自分で行う（点呼方法は「自身」に固定）。以前の版の記録の「LINE」などはそのまま残す
+export const METHOD = '自身';
 
 // 乗務前（出発するとき）の初期値
 export function newStart(settings, odo, time) {
   return {
     time,
-    method: settings.method || 'LINE',
+    method: METHOD,
     alcohol: '有',       // アルコール検知器使用
     drunk: '無',         // 酒気帯びの有無
     health: '良好',      // 健康状態
@@ -60,7 +61,7 @@ export function newStart(settings, odo, time) {
 export function newEnd(settings, time) {
   return {
     time,
-    method: settings.method || 'LINE',
+    method: METHOD,
     alcohol: '有',
     drunk: '無',
     report: '無',        // 運行状況報告
