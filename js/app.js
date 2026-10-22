@@ -17,7 +17,7 @@ import {
   KINDS, COLLISIONS, ROAD_TYPES, SLOPES, SHAPES, SURFACES
 } from './accident.js';
 
-export const APP_VERSION = '0.17.0';
+export const APP_VERSION = '0.17.1';
 
 const app = document.getElementById('app');
 const state = {
@@ -171,7 +171,7 @@ function priorAdvanceField(s) {
   const none = s.priorAdvanceNone === thisMonthKey();
   return `<div class="field"><span class="field-label">今月（${Number(thisMonthKey().slice(5))}月）すでに受けた前払いの金額（円）</span>
     <div class="prior-row">
-      <input data-setting="priorAdvance" value="${none ? '' : e(s.priorAdvance ?? '')}" type="text" inputmode="numeric" placeholder="例：20000" aria-label="今月すでに受けた前払いの金額" ${none ? 'disabled' : ''}>
+      <input data-setting="priorAdvance" value="${none ? '' : e(s.priorAdvance ?? '')}" type="text" inputmode="numeric" placeholder="例：20000" aria-label="今月すでに受けた前払いの金額" class="${none ? 'is-none' : ''}">
       <button type="button" class="chip" data-action="prior-none" aria-pressed="${none}">なし</button>
     </div>
     <span class="field-note">このアプリを使う前に、今月受けた前払いがあれば金額を、なければ「なし」を選んでください。売上表の前払いの合計に入り、前払い可能額の計算で差し引きます。</span></div>`;
@@ -2083,6 +2083,17 @@ app.addEventListener('input', (ev) => {
   }
   updateSaveState();
   updateEntryState();
+});
+
+// 今月すでに受けた前払い：「なし」を選んだあとでも、金額の欄を押せばそのまま金額を入れられる
+app.addEventListener('focusin', (ev) => {
+  const t = ev.target;
+  if (t.dataset?.setting !== 'priorAdvance' || state.settings.priorAdvanceNone !== thisMonthKey()) return;
+  state.settings.priorAdvanceNone = '';
+  t.classList.remove('is-none');
+  const chip = app.querySelector('[data-action="prior-none"]');
+  if (chip) chip.setAttribute('aria-pressed', 'false');
+  updateSaveState();
 });
 
 app.addEventListener('change', async (ev) => {
