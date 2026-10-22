@@ -17,7 +17,7 @@ import {
   KINDS, COLLISIONS, ROAD_TYPES, SLOPES, SHAPES, SURFACES
 } from './accident.js';
 
-export const APP_VERSION = '0.16.0';
+export const APP_VERSION = '0.16.1';
 
 const app = document.getElementById('app');
 const state = {
@@ -184,7 +184,8 @@ function settingsMissing(s) {
     .forEach(([k, label]) => { if (!has(s[k])) miss.push(label); });
   const jobs = jobList(s);
   if (!jobs.length) miss.push('案件');
-  jobs.forEach((j, i) => { if (!jobReady(j)) miss.push(`案件${i + 1}（${jobMissing(j)}）`); });
+  // 法人は営業所名も入れてもらう（計算には使わないので、以前の版の案件は営業所名がなくても数える）
+  jobs.forEach((j, i) => { if (!jobReady(j) || (j.kind === 'corp' && !String(j.branch || '').trim())) miss.push(`案件${i + 1}（${jobMissing(j)}）`); });
   if (!has(s.salesStartDate)) miss.push('稼働を開始した日');
   if (!s.leaseCar) miss.push('リース車両');
   if (isStartMonth(s)) {
@@ -226,6 +227,7 @@ function jobMissing(j) {
   if (j.kind !== 'sagawa' && j.kind !== 'corp') return '佐川急便か法人か';
   if (j.kind === 'sagawa') return !j.office ? '営業所' : '営業所名・単価：宅配';
   if (!String(j.company || '').trim()) return '会社名';
+  if (!String(j.branch || '').trim()) return '営業所名';
   if (j.pay !== 'daily' && j.pay !== 'unit') return '日極か単価か';
   return '品目と単価';
 }
@@ -263,6 +265,7 @@ function jobCard(s, j, i) {
   } else if (j.kind === 'corp') {
     const pays = [['daily', '日極'], ['unit', '単価']].map(([v, t]) => `<button type="button" class="chip" data-action="job-pay" data-i="${i}" data-value="${v}" aria-pressed="${j.pay === v}">${t}</button>`).join('');
     const EX = [['宅配', '170'], ['ネコポス', '40'], ['○○', '○○']];
+    // 単価は数字だけ入れる（「円」は欄の右に付けてある）
     body = `${inp('company', '会社名', 'placeholder="例：○○運送"')}
       ${inp('branch', '営業所名', 'placeholder="例：△△営業所"')}
       <div class="field"><span class="field-label">支払い</span><div class="picks">${pays}</div></div>
@@ -270,7 +273,7 @@ function jobCard(s, j, i) {
       ${j.pay === 'unit' ? `<div class="field"><span class="field-label">品目と単価（3つまで）</span>
         ${Array.from({ length: UNIT_SLOTS }, (_, k) => `<div class="unit-row">
           <input data-job-i="${i}" data-job-k="units.${k}.label" value="${e(j.units?.[k]?.label ?? '')}" placeholder="例：${EX[k][0]}" aria-label="品目${k + 1}">
-          <input data-job-i="${i}" data-job-k="units.${k}.price" value="${e(j.units?.[k]?.price ?? '')}" inputmode="numeric" placeholder="例：${EX[k][1]}円" aria-label="品目${k + 1}の単価（円）">
+          <span class="yen-in"><input data-job-i="${i}" data-job-k="units.${k}.price" value="${e(j.units?.[k]?.price ?? '')}" inputmode="numeric" placeholder="例：${EX[k][1]}" aria-label="品目${k + 1}の単価（円）"><span>円</span></span>
         </div>`).join('')}
         <span class="field-note">乗務後点呼で、品目ごとの個数を入れます。</span></div>` : ''}`;
   }

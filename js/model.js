@@ -115,7 +115,7 @@ export function timeToSerial(s) {
 // 数字（全角の数字・カンマ入りも読む）
 export const num = (v) => {
   if (v == null) return null;
-  const t = String(v).replace(/[０-９]/g, (c) => String.fromCharCode(c.charCodeAt(0) - 0xFEE0)).replace(/[,，\s　]/g, '');
+  const t = String(v).replace(/[０-９]/g, (c) => String.fromCharCode(c.charCodeAt(0) - 0xFEE0)).replace(/[,，\s　]/g, '').replace(/円$/, '');
   return t === '' || Number.isNaN(Number(t)) ? null : Number(t);
 };
 

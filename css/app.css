@@ -420,3 +420,6 @@ button:focus-visible { outline: 3px solid var(--blue); outline-offset: 2px; }
 .dj b { white-space: nowrap; }
 .pj b.pj-wide { grid-column: 1 / -1; }
 .pj-counts { align-items: end; }
+.yen-in { display: flex; align-items: center; gap: 6px; min-width: 0; }
+.yen-in input { flex: 1; min-width: 0; text-align: right; }
+.yen-in span { font-size: 15px; font-weight: 700; color: var(--sub); }
