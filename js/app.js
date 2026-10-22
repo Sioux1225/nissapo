@@ -17,7 +17,7 @@ import {
   KINDS, COLLISIONS, ROAD_TYPES, SLOPES, SHAPES, SURFACES
 } from './accident.js';
 
-export const APP_VERSION = '0.16.1';
+export const APP_VERSION = '0.16.2';
 
 const app = document.getElementById('app');
 const state = {
@@ -265,15 +265,14 @@ function jobCard(s, j, i) {
   } else if (j.kind === 'corp') {
     const pays = [['daily', '日極'], ['unit', '単価']].map(([v, t]) => `<button type="button" class="chip" data-action="job-pay" data-i="${i}" data-value="${v}" aria-pressed="${j.pay === v}">${t}</button>`).join('');
     const EX = [['宅配', '170'], ['ネコポス', '40'], ['○○', '○○']];
-    // 単価は数字だけ入れる（「円」は欄の右に付けてある）
-    body = `${inp('company', '会社名', 'placeholder="例：○○運送"')}
+    body = `${inp('company', '会社名', 'placeholder="例：○○運輸"')}
       ${inp('branch', '営業所名', 'placeholder="例：△△営業所"')}
       <div class="field"><span class="field-label">支払い</span><div class="picks">${pays}</div></div>
       ${j.pay === 'daily' ? inp('price', 'いつもの金額（日極・円）', 'inputmode="numeric" placeholder="例：19000"', '金額が毎回変わる案件（距離で変わるチャーター便など）は、空にしておくと毎回入れられます') : ''}
-      ${j.pay === 'unit' ? `<div class="field"><span class="field-label">品目と単価（3つまで）</span>
+      ${j.pay === 'unit' ? `<div class="field"><span class="field-label">品目と単価（円）</span>
         ${Array.from({ length: UNIT_SLOTS }, (_, k) => `<div class="unit-row">
           <input data-job-i="${i}" data-job-k="units.${k}.label" value="${e(j.units?.[k]?.label ?? '')}" placeholder="例：${EX[k][0]}" aria-label="品目${k + 1}">
-          <span class="yen-in"><input data-job-i="${i}" data-job-k="units.${k}.price" value="${e(j.units?.[k]?.price ?? '')}" inputmode="numeric" placeholder="例：${EX[k][1]}" aria-label="品目${k + 1}の単価（円）"><span>円</span></span>
+          <input data-job-i="${i}" data-job-k="units.${k}.price" value="${e(j.units?.[k]?.price ?? '')}" inputmode="numeric" placeholder="例：${EX[k][1]}" aria-label="品目${k + 1}の単価（円）">
         </div>`).join('')}
         <span class="field-note">乗務後点呼で、品目ごとの個数を入れます。</span></div>` : ''}`;
   }
