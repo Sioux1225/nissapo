@@ -17,7 +17,7 @@ import {
   KINDS, COLLISIONS, ROAD_TYPES, SLOPES, SHAPES, SURFACES
 } from './accident.js';
 
-export const APP_VERSION = '0.16.7';
+export const APP_VERSION = '0.17.0';
 
 const app = document.getElementById('app');
 const state = {
@@ -532,9 +532,47 @@ function renderEntry() {
       ${head(title, state.back)}
       ${mode !== 'day' ? `<p class="muted">${label(d.date)}　${e(state.settings.driverName)}</p>` : ''}
       ${body}
-      <button type="button" class="btn-primary" data-action="save-entry">この内容で記録する</button>
+      ${entrySaveButton()}
       ${mode === 'day' && exists && !isOff(d) ? '<button type="button" class="btn-text danger" data-action="delete-day">この日の記録を消す</button>' : ''}
     </main>`;
+}
+
+// 乗務後点呼で、入れないと記録できない項目（帰着時のメーターか走った距離・その日の案件の金額や個数）
+function entryMissing(d) {
+  if (!d?.end) return [];
+  const miss = [];
+  if (num(d.end.odo) == null) miss.push('帰着時のメーターか今日走った距離');
+  const jobs = jobsOf(state.settings);
+  if (jobs.length) {
+    const picked = (d.jobs || []).map((p) => ({ p, j: jobs.find((x) => x.id === p.id) })).filter((x) => x.j);
+    if (!picked.length) miss.push('今日の案件');
+    for (const { p, j } of picked) {
+      if (j.kind === 'corp' && j.pay === 'daily') {
+        if (num(p.amount) == null) miss.push(`${jobLabel(j)}の金額`);
+      } else {
+        const c = p.counts || {};
+        const keys = j.kind === 'sagawa' ? COUNT_KEYS.map(([k]) => k) : jobUnits(j).map((u) => u.i);
+        if (keys.every((k) => num(c[k]) == null)) miss.push(`${jobLabel(j)}の個数`);
+      }
+    }
+  }
+  return miss;
+}
+
+// 記録のボタン（乗務後点呼で入っていない項目があるときは押せない）
+function entrySaveButton() {
+  const miss = entryMissing(state.draft);
+  return `<p class="save-hint warn-text" id="entry-hint" ${miss.length ? '' : 'hidden'}>まだ入っていない項目：${e(miss.join('、'))}</p>
+    <button type="button" class="btn-primary" data-action="save-entry" ${miss.length ? 'disabled' : ''}>この内容で記録する</button>`;
+}
+function updateEntryState() {
+  const btn = app.querySelector('[data-action="save-entry"]');
+  const hint = app.querySelector('#entry-hint');
+  if (!btn || !hint) return;
+  const miss = entryMissing(state.draft);
+  btn.disabled = miss.length > 0;
+  hint.hidden = !miss.length;
+  hint.textContent = `まだ入っていない項目：${miss.join('、')}`;
 }
 
 // ---- 画面：一覧 ----
@@ -1541,6 +1579,8 @@ async function saveEntry() {
   const d = state.draft;
   const err = validate(d);
   if (err) { toast(err); return; }
+  const miss = entryMissing(d);
+  if (miss.length) { toast(`まだ入っていない項目があります：${miss[0]}`); updateEntryState(); return; }
   if (!d.rollcaller) d.rollcaller = state.settings.driverName; // 点呼実施者名は運転者名と同じ
   if (d.start || d.end) delete d.off; // 乗務を記録したら休みではない
   await db.putRecord(d);
@@ -2042,6 +2082,7 @@ app.addEventListener('input', (ev) => {
     }
   }
   updateSaveState();
+  updateEntryState();
 });
 
 app.addEventListener('change', async (ev) => {
