@@ -385,7 +385,7 @@ test('前払いの履歴と合計（月ごと）', async () => {
 test('前払いの対象額：留保額と50%', async () => {
   const { advanceLimit, isFirstAdvanceMonth } = await import('../js/sales.js');
   // はじめて：リース車両は10万円、車両持ち込みは6万円を留保
-  assert.deepEqual(advanceLimit({ sales: 300000, prevSales: null, first: true, lease: true }), { reserve: 100000, reason: 'はじめての前払い（リース車両）', base: 200000, target: 100000 });
+  assert.deepEqual(advanceLimit({ sales: 300000, prevSales: null, first: true, lease: true }), { reserve: 100000, reason: 'はじめての前払い（リース車両）', base: 200000, half: 100000, target: 100000 });
   assert.equal(advanceLimit({ sales: 300000, prevSales: null, first: true, lease: false }).target, 120000);
   // 2回目以降：前月40万円以上は留保なし、未満・記録なしは5万円
   assert.equal(advanceLimit({ sales: 300000, prevSales: 400000, first: false }).target, 150000);
@@ -395,8 +395,10 @@ test('前払いの対象額：留保額と50%', async () => {
   assert.equal(advanceLimit({ sales: 300000, prevSales: 399999, first: false, lease: true }).reserve, 50000);
   assert.equal(advanceLimit({ sales: 300000, prevSales: null, first: false, lease: true }).target, 125000);
   assert.equal(advanceLimit({ sales: 300000, prevSales: 400000, first: false, lease: true }).reserve, 0);
-  // すでに受けた前払いは売上から先に差し引く：（304,000 − 20,000 − 100,000）× 50% ＝ 92,000
-  assert.equal(advanceLimit({ sales: 304000, advanced: 20000, prevSales: null, first: true, lease: true }).target, 92000);
+  // 前払い可能額 ＝（売上 − 留保）× 50% − すでに受けた前払い：（304,000 − 100,000）× 50% − 20,000 ＝ 82,000
+  assert.equal(advanceLimit({ sales: 304000, advanced: 20000, prevSales: null, first: true, lease: true }).target, 82000);
+  // 前払いが50%を超えていたら0
+  assert.equal(advanceLimit({ sales: 300000, advanced: 200000, prevSales: 500000, first: false }).target, 0);
   // 売上が留保額より少なければ0
   assert.equal(advanceLimit({ sales: 40000, prevSales: null, first: true, lease: false }).target, 0);
   assert.equal(advanceLimit({ sales: 100001, prevSales: 500000, first: false }).target, 50000); // 円未満は切り捨て
