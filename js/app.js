@@ -17,7 +17,7 @@ import {
   KINDS, COLLISIONS, ROAD_TYPES, SLOPES, SHAPES, SURFACES
 } from './accident.js';
 
-export const APP_VERSION = '0.18.2';
+export const APP_VERSION = '0.18.3';
 
 const app = document.getElementById('app');
 const state = {
@@ -1233,7 +1233,7 @@ function advanceSection(s, y, m, salesAmount, today) {
     </div>
     <div class="adv-sum">
       <div><span class="muted">前払いの合計</span><b>${yen(total)}</b></div>
-      <div class="adv-rest"><span class="muted">前払い可能額</span><b>${yen(info.remaining)}</b>${info.exact !== info.target ? '<small class="muted">千円未満は切り捨て</small>' : ''}</div>
+      <div class="adv-rest"><span class="muted">前払い可能額</span><b>${yen(info.remaining)}</b>${info.exact !== info.target ? '<small class="muted">（千円未満は切り捨て）</small>' : ''}</div>
     </div>
     <div class="adv-add">
       <p class="field-note adv-note"><b>申請が承認されたら</b>、今回の前払い金額を入力して「前払いを記録する」を押してください。</p>
