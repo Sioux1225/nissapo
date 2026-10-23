@@ -421,3 +421,4 @@ button:focus-visible { outline: 3px solid var(--blue); outline-offset: 2px; }
 .dj b { white-space: nowrap; }
 .pj b.pj-wide { grid-column: 1 / -1; }
 .pj-counts { align-items: end; }
+.adv-rest .rest-note { align-self: flex-end; font-size: 11px; margin-top: 2px; }
