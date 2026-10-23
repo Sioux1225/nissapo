@@ -17,7 +17,7 @@ import {
   KINDS, COLLISIONS, ROAD_TYPES, SLOPES, SHAPES, SURFACES
 } from './accident.js';
 
-export const APP_VERSION = '0.18.1';
+export const APP_VERSION = '0.18.2';
 
 const app = document.getElementById('app');
 const state = {
@@ -1228,12 +1228,12 @@ function advanceSection(s, y, m, salesAmount, today) {
       </div>`).join('') || '<p class="empty">まだ前払いの記録はありません</p>'}</div>
     <div class="adv-target">
       <span class="muted">前払い可能額の計算</span>
-      <span class="adv-formula">（売上 ${yen(salesAmount)}${info.reserve ? ` − 留保 ${yen(info.reserve)}` : ''}）× 50%${total ? ` − 前払い済み ${yen(total)}` : ''} ＝ <b>${yen(info.target)}</b><small class="muted">（千円未満は切り捨て）</small></span>
+      <span class="adv-formula">（売上 ${yen(salesAmount)}${info.reserve ? ` − 留保 ${yen(info.reserve)}` : ''}）× 50%${total ? ` − 前払い済み ${yen(total)}` : ''} ＝ <b>${yen(info.exact)}</b></span>
       <span class="small">${info.reason ? `留保：${info.reason}${info.prevSales != null && !info.first ? `（${info.pm}月の売上 ${yen(info.prevSales)}）` : info.prevLevel ? '（設定で選んだ前月の売上）' : ''}` : info.prevSales != null ? `${info.pm}月の売上 ${yen(info.prevSales)}（40万円以上のため留保なし）` : info.prevLevel === 'over' ? `${info.pm}月の売上 40万円以上（設定で選択）のため留保なし` : ''}</span>
     </div>
     <div class="adv-sum">
       <div><span class="muted">前払いの合計</span><b>${yen(total)}</b></div>
-      <div class="adv-rest"><span class="muted">前払い可能額</span><b>${yen(info.remaining)}</b></div>
+      <div class="adv-rest"><span class="muted">前払い可能額</span><b>${yen(info.remaining)}</b>${info.exact !== info.target ? '<small class="muted">千円未満は切り捨て</small>' : ''}</div>
     </div>
     <div class="adv-add">
       <p class="field-note adv-note"><b>申請が承認されたら</b>、今回の前払い金額を入力して「前払いを記録する」を押してください。</p>

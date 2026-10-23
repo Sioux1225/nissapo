@@ -165,8 +165,9 @@ export function advanceLimit({ sales, advanced = 0, prevSales, prevLevel = null,
   // 前払い可能額 ＝（売上 − 留保）× 50% − すでに受けた前払い
   const base = Math.max(0, sales - reserve);
   const half = Math.floor(base * ADVANCE_RATE);
-  // 前払い可能額は千円未満を切り捨てる（例：104,230円 → 104,000円）
-  return { reserve, reason, base, half, target: Math.floor(Math.max(0, half - advanced) / 1000) * 1000 };
+  // 前払い可能額は千円未満を切り捨てる（例：104,230円 → 104,000円）。exact は切り捨てる前の額（計算の式に出す）
+  const exact = Math.max(0, half - advanced);
+  return { reserve, reason, base, half, exact, target: Math.floor(exact / 1000) * 1000 };
 }
 
 // ---- 案件（佐川急便・法人をまとめて登録する） ----
