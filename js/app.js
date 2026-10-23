@@ -17,7 +17,7 @@ import {
   KINDS, COLLISIONS, ROAD_TYPES, SLOPES, SHAPES, SURFACES
 } from './accident.js';
 
-export const APP_VERSION = '0.18.5';
+export const APP_VERSION = '0.18.6';
 
 const app = document.getElementById('app');
 const state = {
@@ -1450,7 +1450,7 @@ function renderRules() {
       <h2 class="section-title">このアプリでの保存</h2>
       <div class="card pad">
         <ul class="rule-list">
-          <li>記録は<b>自分で保管</b>します。会社への提出は、決まりでは求められていません。</li>
+          <li>記録は<b>自身で保管</b>します。会社への提出は、決まりでは求められていません。</li>
           <li>記録はこのスマホの中だけにあります。スマホの故障・紛失で消えないよう、<b>毎月「書き出し・共有」で書き出して</b>、パソコンやクラウドなど別の場所にも保存してください。</li>
           <li>事務所（運行管理者）にも送っておくと、会社でも控えを残せて安心です。</li>
           <li>運輸支局の監査などで求められたら、見せられるようにしておきます。事故の記録は、届け出た営業所（個人事業主の場合は自宅）で保管する決まりです。</li>
