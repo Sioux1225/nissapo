@@ -17,7 +17,7 @@ import {
   KINDS, COLLISIONS, ROAD_TYPES, SLOPES, SHAPES, SURFACES
 } from './accident.js';
 
-export const APP_VERSION = '0.17.1';
+export const APP_VERSION = '0.17.2';
 
 const app = document.getElementById('app');
 const state = {
@@ -1143,6 +1143,32 @@ function salesContext() {
 
 
 // withOffice：false なら営業所名を書かない（PDF では表題の「佐川急便」の右に書くため）
+const mdText = (d) => `${Number(d.slice(5, 7))}/${Number(d.slice(8))}`;
+
+// 売上表の2行目：車両（リース車両・車両持ち込み）・前月の売上（40万円以上・未満）・新人保証の期間（佐川急便の案件が2つ以上のとき）
+function salesInfoLine(s, y, m) {
+  const parts = [`車両：${s.leaseCar === 'yes' ? 'リース車両' : '車両持ち込み'}`];
+  const pd = new Date(y, m - 2, 1);
+  const py = pd.getFullYear();
+  const pm = pd.getMonth() + 1;
+  let prev;
+  if (hasMonth(state.records, py, pm)) prev = monthSales(state.records, py, pm, s).total.amount >= 400000 ? '40万円以上' : '40万円未満';
+  else if (s.prevSalesMonth === advanceKey(py, pm) && s.prevSalesLevel === 'over') prev = '40万円以上';
+  else if (s.prevSalesMonth === advanceKey(py, pm) && s.prevSalesLevel === 'under') prev = '40万円未満';
+  else prev = 'なし';
+  parts.push(`前月（${pm}月）の売上：${prev}`);
+  const jobs = jobsOf(s);
+  if (!(jobs.length === 1 && jobs[0].kind === 'sagawa')) {
+    const monthFrom = `${y}-${pad2(m)}-01`;
+    const monthTo = `${y}-${pad2(m)}-31`;
+    jobs.filter((j) => j.kind === 'sagawa').forEach((j) => {
+      const nb = newbiePeriod(sagawaSettings(j, s));
+      if (nb && nb.from <= monthTo && nb.to >= monthFrom) parts.push(`新人保証（${jobLabel(j)}）：1日 ${yen(nb.perDay)}（${mdText(nb.from)}〜${mdText(nb.to)}）`);
+    });
+  }
+  return parts.join('　');
+}
+
 function salesSub(s, y, m, withOffice = true) {
   const jobs = jobsOf(s);
   // 佐川急便の営業所1つだけ：単価と新人保証
@@ -1152,7 +1178,7 @@ function salesSub(s, y, m, withOffice = true) {
     const nb = newbiePeriod(ss);
     const monthFrom = y ? `${y}-${pad2(m)}-01` : '';
     const monthTo = y ? `${y}-${pad2(m)}-31` : '';
-    const nbText = nb && (!y || (nb.from <= monthTo && nb.to >= monthFrom)) ? `　新人保証：1日 ${yen(nb.perDay)}（〜${Number(nb.to.slice(5, 7))}/${Number(nb.to.slice(8))}）` : '';
+    const nbText = nb && (!y || (nb.from <= monthTo && nb.to >= monthFrom)) ? `　新人保証：1日 ${yen(nb.perDay)}（${mdText(nb.from)}〜${mdText(nb.to)}）` : '';
     return `${withOffice ? `営業所：${officeName(ss)}　` : ''}単価：宅配 ${yen(p.takuhai)}・商業 ${yen(p.shogyo)}・集荷 ${yen(p.shuka)}${p.daily ? `＋1日 ${yen(p.daily)}` : ''}${nbText}`;
   }
   // 法人の日極1つだけ：日極
@@ -1336,6 +1362,7 @@ function salesCanvas() {
     ym: `${y}年 ${m}月`,
     name: s.driverName,
     sub: salesSub(s, y, m, !(sagawa && single)),
+    sub2: salesInfoLine(s, y, m),
     head,
     rows,
     foot,
