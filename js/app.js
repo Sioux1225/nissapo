@@ -18,7 +18,7 @@ import {
   KINDS, COLLISIONS, ROAD_TYPES, SLOPES, SHAPES, SURFACES
 } from './accident.js';
 
-export const APP_VERSION = '0.19.0';
+export const APP_VERSION = '0.20.0';
 
 const app = document.getElementById('app');
 const state = {
@@ -34,6 +34,7 @@ const state = {
   month: null,        // 一覧で表示している月 { y, m }
   exp: { doc: 'nippo', period: 'month', y: 0, m: 0, format: 'xlsx' },
   invite: 'ok',       // 招待コード 'ok' | 'none'（まだ・正しくない）| 'revoked'（止めた番号）
+  inviteName: '',     // 招待の名前（運転者名はこの名前に固定）
   busy: false
 };
 
@@ -295,6 +296,7 @@ function editableJobs() {
 }
 
 function settingsForm(s, fresh = false) {
+  if (state.inviteName) s.driverName = state.inviteName; // 運転者名は招待の名前
   // 以前に受けた前払いは今月の分だけを入れる（前の月に入れた金額は出さない）
   if (s.priorAdvanceMonth !== thisMonthKey()) s = { ...s, priorAdvance: '' };
   // はじめての設定では、はじめから入っている事業者名・休憩時間も、ほかの欄と同じく「例」の薄い文字で見せる
@@ -308,7 +310,9 @@ function settingsForm(s, fresh = false) {
     field(text, `<input data-setting="${key}" value="${e(s[key] ?? '')}" ${attrs}>`, note);
   return `
     <div class="card fields">
-      ${f('driverName', '運転者名 <b class="req">必須</b>', 'autocomplete="name" placeholder="例：配送 太郎"')}
+      ${state.inviteName
+        ? field('運転者名', `<input value="${e(state.inviteName)}" readonly tabindex="-1" aria-readonly="true">`, '招待の名前です。字が違うときは、会社に連絡してください。')
+        : f('driverName', '運転者名 <b class="req">必須</b>', 'autocomplete="name" placeholder="例：配送 太郎"')}
       ${f('office', '営業所（勤務先）', 'placeholder="例：○○"')}
       ${f('vehicleNo', '車両番号', 'placeholder="例：品川 000 あ 1234"')}
       ${f('company', '事業者名', `placeholder="例：${e(DEFAULT_SETTINGS.company)}"`)}
@@ -401,7 +405,7 @@ function renderInvited() {
     <main class="screen form">
       <div class="hero">
         <div class="brand">${LOGO(56)}${WORDMARK}</div>
-        <p class="lead">招待を確認しました</p>
+        <p class="lead">${e(state.inviteName)}さんの招待を確認しました</p>
       </div>
       <div class="card pad">
         <p class="small"><b>次に、ホーム画面に追加してください。</b>アプリのように開けるようになります。<br>iPhone：Safariの共有ボタン →「ホーム画面に追加」<br>Android：Chromeのメニュー →「ホーム画面に追加」</p>
@@ -444,7 +448,19 @@ async function checkInvite() {
       state.inviteNew = true;
     }
   }
-  return inviteStatus(s.invite);
+  return useInvite(await inviteStatus(s.invite));
+}
+
+// 確かめた結果を覚え、運転者名を招待の名前にそろえる（設定がまだなら、はじめての設定で入る）
+async function useInvite(r) {
+  state.inviteName = r.name;
+  const s = state.settings;
+  if (r.name && s.driverName && s.driverName !== r.name) {
+    s.driverName = r.name;
+    s.rollcaller = r.name;
+    await db.putSettings(s);
+  }
+  return r.status;
 }
 
 // ---- 画面：ホーム ----
@@ -1846,6 +1862,7 @@ async function restore(file) {
   // 招待コードは、いまこのスマホに入っているものを残す
   if (data.settings) await db.putSettings({ ...DEFAULT_SETTINGS, ...data.settings, invite: state.settings.invite || data.settings.invite || '' });
   state.settings = await db.getSettings();
+  if (state.inviteName) await useInvite({ status: state.invite, name: state.inviteName });
   await reload();
   toast('バックアップから戻しました');
   go('home', { push: false });
@@ -2108,8 +2125,8 @@ app.addEventListener('click', async (ev) => {
     if (!v) { toast('招待コードが正しくありません。届いたリンクやコードを、そのまま全部貼り付けてください', 6000); return; }
     state.settings.invite = v.code;
     await db.putSettings(state.settings);
-    state.invite = await inviteStatus(v.code);
-    if (state.invite === 'ok') toast('招待を確認しました');
+    state.invite = await useInvite(await inviteStatus(v.code));
+    if (state.invite === 'ok') toast(`${v.name}さんの招待を確認しました`);
     go(state.settings.driverName ? 'home' : 'setup', { push: false });
   } else if (action === 'invite-copy') {
     try { await navigator.clipboard.writeText(state.settings.invite); toast('招待コードをコピーしました'); }
@@ -2305,7 +2322,7 @@ async function start() {
   state.invite = await checkInvite();
   state.view = state.settings.driverName ? 'home' : 'setup';
   if (state.inviteNew && state.invite === 'ok') {
-    if (state.settings.driverName) toast('招待を確認しました');
+    if (state.settings.driverName) toast(`${state.inviteName}さんの招待を確認しました`);
     else state.view = 'invited';
   }
   history.replaceState({ view: 'home' }, '');
