@@ -3,6 +3,7 @@
 
 export const DEFAULT_SETTINGS = {
   driverName: '',
+  invite: '',         // 招待コード（番号.署名）
   office: '',
   vehicleNo: '',
   company: 'ドライバーズサポート株式会社',

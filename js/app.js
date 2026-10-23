@@ -11,13 +11,14 @@ import {
   monthSheets, yearSheets, hasMonth, toCsv, daysInMonth, dateKey, weekday, pad2, isOff, isOffDay
 } from './model.js';
 import { buildXlsx } from './xlsx.js';
+import { verifyInvite, inviteStatus, parseInvite } from './invite.js';
 import { specsToPdf, renderSheet, renderAccident, renderAnnex, renderPhotoPage, renderSalesSheet, renderSalesDetail, canvasesToPdf } from './pdf.js';
 import {
   newAccident, normalizeAccident, accidentWhen, wareki, annexLines, needsReport, planFromRecord, validateAccident, accidentSheet, accidentCsv,
   KINDS, COLLISIONS, ROAD_TYPES, SLOPES, SHAPES, SURFACES
 } from './accident.js';
 
-export const APP_VERSION = '0.18.10';
+export const APP_VERSION = '0.19.0';
 
 const app = document.getElementById('app');
 const state = {
@@ -32,6 +33,7 @@ const state = {
   back: 'home',
   month: null,        // 一覧で表示している月 { y, m }
   exp: { doc: 'nippo', period: 'month', y: 0, m: 0, format: 'xlsx' },
+  invite: 'ok',       // 招待コード 'ok' | 'none'（まだ・正しくない）| 'revoked'（止めた番号）
   busy: false
 };
 
@@ -370,8 +372,79 @@ function renderSettings() {
         <button type="button" class="btn-outline" data-action="restore">バックアップから戻す</button>
       </div>
       <button type="button" class="btn-outline" data-action="go" data-view="rules">記録の決まり（保存期間など）</button>
-      <p class="info center">日報サポート v${APP_VERSION}</p>
+      <p class="info center">日報サポート v${APP_VERSION}${parseInvite(state.settings.invite) ? `（招待 No.${parseInvite(state.settings.invite).no}）` : ''}</p>
     </main>`;
+}
+
+// ---- 画面：招待コード ----
+
+// 招待コードがまだない・正しくないとき
+function renderGate() {
+  app.innerHTML = `
+    <main class="screen form">
+      <div class="hero">
+        <div class="brand">${LOGO(56)}${WORDMARK}</div>
+        <p class="lead">運転日報と点呼記録簿を、スマホで簡単に。</p>
+      </div>
+      <div class="card pad">
+        <p class="small">日報サポートは、所属ドライバーのためのアプリです。<b>会社から届いた招待リンク</b>を開いてください。</p>
+        <p class="small">ホーム画面に追加したアプリでこの画面が出たときは、届いた招待リンク（または招待コード）をそのまま下に貼り付けてください。</p>
+      </div>
+      <div class="card fields">${field('招待リンク・招待コード', '<textarea id="invite-input" rows="3" placeholder="例：届いたリンクをそのまま貼り付け"></textarea>')}</div>
+      <button type="button" class="btn-primary" data-action="invite-check">確認する</button>
+    </main>`;
+}
+
+// 招待リンクを開いたとき（はじめての方）：ホーム画面に追加してもらう
+function renderInvited() {
+  app.innerHTML = `
+    <main class="screen form">
+      <div class="hero">
+        <div class="brand">${LOGO(56)}${WORDMARK}</div>
+        <p class="lead">招待を確認しました</p>
+      </div>
+      <div class="card pad">
+        <p class="small"><b>次に、ホーム画面に追加してください。</b>アプリのように開けるようになります。<br>iPhone：Safariの共有ボタン →「ホーム画面に追加」<br>Android：Chromeのメニュー →「ホーム画面に追加」</p>
+        <p class="small">iPhone では、ホーム画面のアプリをはじめて開いたときに、もう一度招待コードを聞かれることがあります。そのときは、ここで「招待コードをコピー」を押して写しておき、貼り付けてください（届いたリンクを開き直してもかまいません）。</p>
+        <button type="button" class="btn-outline" data-action="invite-copy">招待コードをコピー</button>
+      </div>
+      <button type="button" class="btn-primary" data-action="go" data-view="setup">このまま設定をはじめる</button>
+    </main>`;
+}
+
+// 招待コードを止めた方（辞めた方）：新しい記録はつけられないが、これまでの記録は書き出せる
+function renderStopped() {
+  app.innerHTML = `
+    <main class="screen form">
+      <div class="hero">
+        <div class="brand">${LOGO(56)}${WORDMARK}</div>
+        <p class="lead">この招待コードは使えなくなりました</p>
+      </div>
+      <div class="card pad">
+        <p class="small">新しい記録はつけられません。これまでの運転日報・点呼記録簿・事故の記録は、下のボタンから Excel・PDF・CSV に書き出せます。</p>
+        <p class="small">運転日報・点呼記録簿は<b>1年間</b>、事故の記録は<b>3年間</b>、自分で保管するのが決まりです。</p>
+        ${state.settings.driverName ? `<button type="button" class="btn-primary" data-action="go" data-view="export">記録を書き出す</button>
+        <button type="button" class="btn-outline" data-action="backup">バックアップを作る</button>` : ''}
+      </div>
+      <p class="info">わからないことは、会社にお問い合わせください。</p>
+    </main>`;
+}
+
+// アプリを開いたときに招待コードを確かめる（招待リンクで開いたときは、そのコードを保存する）
+async function checkInvite() {
+  if (globalThis.NISSAPO_DEMO) return 'ok'; // 見本（claude.ai のアーティファクト）
+  if (location.hostname === 'localhost' && !location.search.includes('invite')) return 'ok'; // 開発中（?invite を付けると確かめられる）
+  const s = state.settings;
+  const fromLink = location.hash.match(/invite=([^&]+)/)?.[1];
+  if (fromLink) {
+    const v = await verifyInvite(decodeURIComponent(fromLink));
+    if (v && v.code !== s.invite) {
+      s.invite = v.code;
+      await db.putSettings(s);
+      state.inviteNew = true;
+    }
+  }
+  return inviteStatus(s.invite);
 }
 
 // ---- 画面：ホーム ----
@@ -1524,8 +1597,10 @@ function renderAdvanceRules() {
 // ---- 描画 ----
 
 function render() {
-  if (state.view !== 'setup' && !state.settings.driverName) state.view = 'setup';
-  const views = { sales: renderSales, oil: renderOil, accidents: renderAccidents, accident: renderAccidentForm, rules: renderRules, advrules: renderAdvanceRules, setup: renderSetup, settings: renderSettings, home: renderHome, entry: renderEntry, list: renderList, export: renderExport };
+  if (state.invite === 'none') state.view = 'gate';
+  else if (state.invite === 'revoked') { if (state.view !== 'export') state.view = 'stopped'; }
+  else if (state.view !== 'setup' && state.view !== 'invited' && !state.settings.driverName) state.view = 'setup';
+  const views = { gate: renderGate, invited: renderInvited, stopped: renderStopped, sales: renderSales, oil: renderOil, accidents: renderAccidents, accident: renderAccidentForm, rules: renderRules, advrules: renderAdvanceRules, setup: renderSetup, settings: renderSettings, home: renderHome, entry: renderEntry, list: renderList, export: renderExport };
   try {
     (views[state.view] || renderHome)();
   } catch (err) {
@@ -1768,7 +1843,8 @@ async function restore(file) {
     }
     await db.putPhotos(photos);
   }
-  if (data.settings) await db.putSettings({ ...DEFAULT_SETTINGS, ...data.settings });
+  // 招待コードは、いまこのスマホに入っているものを残す
+  if (data.settings) await db.putSettings({ ...DEFAULT_SETTINGS, ...data.settings, invite: state.settings.invite || data.settings.invite || '' });
   state.settings = await db.getSettings();
   await reload();
   toast('バックアップから戻しました');
@@ -2027,6 +2103,18 @@ app.addEventListener('click', async (ev) => {
   } else if (action === 'preview') runBusy(showPreview);
   else if (action === 'backup') runBusy(backup);
   else if (action === 'restore') document.getElementById('import-input').click();
+  else if (action === 'invite-check') {
+    const v = await verifyInvite(document.getElementById('invite-input').value);
+    if (!v) { toast('招待コードが正しくありません。届いたリンクやコードを、そのまま全部貼り付けてください', 6000); return; }
+    state.settings.invite = v.code;
+    await db.putSettings(state.settings);
+    state.invite = await inviteStatus(v.code);
+    if (state.invite === 'ok') toast('招待を確認しました');
+    go(state.settings.driverName ? 'home' : 'setup', { push: false });
+  } else if (action === 'invite-copy') {
+    try { await navigator.clipboard.writeText(state.settings.invite); toast('招待コードをコピーしました'); }
+    catch { toast(`招待コード：${state.settings.invite}`, 20000); }
+  }
   else if (action === 'dismiss-install') {
     state.settings.installHintDismissed = true;
     await db.putSettings(state.settings);
@@ -2214,7 +2302,12 @@ async function start() {
     await db.putSettings(state.settings);
   }
   cleanupPhotos();
+  state.invite = await checkInvite();
   state.view = state.settings.driverName ? 'home' : 'setup';
+  if (state.inviteNew && state.invite === 'ok') {
+    if (state.settings.driverName) toast('招待を確認しました');
+    else state.view = 'invited';
+  }
   history.replaceState({ view: 'home' }, '');
   render();
   setupUpdates();
@@ -2225,7 +2318,7 @@ async function start() {
     s.lastVersion = APP_VERSION;
     db.putSettings(s).catch(() => {});
   }
-  if (state.view === 'home') setTimeout(runAlerts, 600);
+  if (state.view === 'home' && state.invite === 'ok') setTimeout(runAlerts, 600);
 }
 
 start();
