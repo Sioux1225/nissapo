@@ -17,7 +17,7 @@ import {
   KINDS, COLLISIONS, ROAD_TYPES, SLOPES, SHAPES, SURFACES
 } from './accident.js';
 
-export const APP_VERSION = '0.18.9';
+export const APP_VERSION = '0.18.10';
 
 const app = document.getElementById('app');
 const state = {
@@ -231,7 +231,7 @@ function jobMissing(j) {
   if (!String(j.company || '').trim()) return '会社名';
   if (!String(j.branch || '').trim()) return '営業所名';
   if (j.pay !== 'daily' && j.pay !== 'unit') return '日極か単価か';
-  return '品目と単価';
+  return '種類と単価';
 }
 
 // 売上表の案件（佐川急便・法人をまとめて登録）。1つもなければ、空の案件を1つ出す
@@ -271,12 +271,12 @@ function jobCard(s, j, i) {
       ${inp('branch', '営業所名', 'placeholder="例：△△営業所"')}
       <div class="field"><span class="field-label">支払い</span><div class="picks">${pays}</div></div>
       ${j.pay === 'daily' ? inp('price', 'いつもの金額（日極・円）', 'inputmode="numeric" placeholder="例：19000"', '金額が毎回変わる案件（距離で変わるチャーター便など）は、空にしておくと毎回入れられます') : ''}
-      ${j.pay === 'unit' ? `<div class="field"><span class="field-label">品目と単価（円）</span>
+      ${j.pay === 'unit' ? `<div class="field"><span class="field-label">種類と単価（円）</span>
         ${Array.from({ length: UNIT_SLOTS }, (_, k) => `<div class="unit-row">
-          <input data-job-i="${i}" data-job-k="units.${k}.label" value="${e(j.units?.[k]?.label ?? '')}" placeholder="例：${EX[k][0]}" aria-label="品目${k + 1}">
-          <input data-job-i="${i}" data-job-k="units.${k}.price" value="${e(j.units?.[k]?.price ?? '')}" inputmode="numeric" placeholder="例：${EX[k][1]}" aria-label="品目${k + 1}の単価（円）">
+          <input data-job-i="${i}" data-job-k="units.${k}.label" value="${e(j.units?.[k]?.label ?? '')}" placeholder="例：${EX[k][0]}" aria-label="種類${k + 1}">
+          <input data-job-i="${i}" data-job-k="units.${k}.price" value="${e(j.units?.[k]?.price ?? '')}" inputmode="numeric" placeholder="例：${EX[k][1]}" aria-label="種類${k + 1}の単価（円）">
         </div>`).join('')}
-        <span class="field-note">乗務後点呼で、品目ごとの個数を入れます。</span></div>` : ''}`;
+        <span class="field-note">乗務後点呼で、種類ごとの個数を入れます。</span></div>` : ''}`;
   }
   return `<div class="job-card">
     <div class="job-top"><b>案件 ${i + 1}</b><button type="button" class="btn-text danger" data-action="del-job" data-i="${i}">消す</button></div>
@@ -1063,7 +1063,7 @@ async function checkOil() {
 
 // ---- 売上表（前払い） ----
 
-// 乗務後点呼の画面に出す「今日の案件」：佐川急便は配達個数、法人の単価は品目ごとの個数、法人の日極は金額
+// 乗務後点呼の画面に出す「今日の案件」：佐川急便は配達個数、法人の単価は種類ごとの個数、法人の日極は金額
 function jobsPickField() {
   const s = state.settings;
   const jobs = jobsOf(s);
@@ -1193,7 +1193,7 @@ function salesTitle(s) {
   return jobs[0].kind === 'sagawa' ? jobLabel(jobs[0]).replace(/^佐川急便 /, '佐川急便　') : jobLabel(jobs[0]);
 }
 
-// その日の案件の個数（佐川急便：宅配・商業・集荷、法人の単価：品目ごと）を文字にする
+// その日の案件の個数（佐川急便：宅配・商業・集荷、法人の単価：種類ごと）を文字にする
 function jobCountsText(j) {
   if (!j.job) return '';
   if (j.job.kind === 'sagawa') return COUNT_KEYS.filter(([k]) => num(j.counts?.[k]) != null).map(([k, t]) => `${t}${num(j.counts[k])}`).join('・');
