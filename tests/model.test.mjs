@@ -401,7 +401,9 @@ test('前払いの対象額：留保額と50%', async () => {
   assert.equal(advanceLimit({ sales: 300000, advanced: 200000, prevSales: 500000, first: false }).target, 0);
   // 売上が留保額より少なければ0
   assert.equal(advanceLimit({ sales: 40000, prevSales: null, first: true, lease: false }).target, 0);
-  assert.equal(advanceLimit({ sales: 100001, prevSales: 500000, first: false }).target, 50000); // 円未満は切り捨て
+  assert.equal(advanceLimit({ sales: 100001, prevSales: 500000, first: false }).target, 50000); // 千円未満は切り捨て
+  // 例：（348,460 − 100,000）× 50% − 20,000 ＝ 104,230 → 104,000円
+  assert.equal(advanceLimit({ sales: 348460, advanced: 20000, prevSales: null, first: true, lease: true }).target, 104000);
   // はじめての月の判断
   const h = { advanceHistory: { '2026-09': [{ id: 'a', date: '2026-09-10', amount: 10000 }] } };
   assert.equal(isFirstAdvanceMonth(h, 2026, 9), true); // 9月が最初の前払いの月

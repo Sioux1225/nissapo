@@ -17,7 +17,7 @@ import {
   KINDS, COLLISIONS, ROAD_TYPES, SLOPES, SHAPES, SURFACES
 } from './accident.js';
 
-export const APP_VERSION = '0.18.0';
+export const APP_VERSION = '0.18.1';
 
 const app = document.getElementById('app');
 const state = {
@@ -1228,7 +1228,7 @@ function advanceSection(s, y, m, salesAmount, today) {
       </div>`).join('') || '<p class="empty">まだ前払いの記録はありません</p>'}</div>
     <div class="adv-target">
       <span class="muted">前払い可能額の計算</span>
-      <span class="adv-formula">（売上 ${yen(salesAmount)}${info.reserve ? ` − 留保 ${yen(info.reserve)}` : ''}）× 50%${total ? ` − 前払い済み ${yen(total)}` : ''} ＝ <b>${yen(info.target)}</b></span>
+      <span class="adv-formula">（売上 ${yen(salesAmount)}${info.reserve ? ` − 留保 ${yen(info.reserve)}` : ''}）× 50%${total ? ` − 前払い済み ${yen(total)}` : ''} ＝ <b>${yen(info.target)}</b><small class="muted">（千円未満は切り捨て）</small></span>
       <span class="small">${info.reason ? `留保：${info.reason}${info.prevSales != null && !info.first ? `（${info.pm}月の売上 ${yen(info.prevSales)}）` : info.prevLevel ? '（設定で選んだ前月の売上）' : ''}` : info.prevSales != null ? `${info.pm}月の売上 ${yen(info.prevSales)}（40万円以上のため留保なし）` : info.prevLevel === 'over' ? `${info.pm}月の売上 40万円以上（設定で選択）のため留保なし` : ''}</span>
     </div>
     <div class="adv-sum">
@@ -1480,6 +1480,7 @@ function renderAdvanceRules() {
         <ul class="rule-list">
           <li><b>稼働を開始した月のはじめての前払い</b>は、まず売上のうち<b>留保額</b>を差し引きます。留保額は、<b>リース車両を利用している方は10万円</b>、<b>車両持ち込みの方は6万円</b>です。それを超えた売上の<b>50%</b>が前払いの対象額です。</li>
           <li><b>2回目からの前払い</b>は、（売上 − 留保額）の<b>50%</b>から、その月に<b>すでに受けた前払いの額</b>を差し引いた額が前払いできる額です。</li>
+          <li>前払いできる額は、<b>千円未満を切り捨て</b>ます（例：104,230円 → 104,000円）。</li>
           <li><b>翌月以降</b>は、その月の売上の<b>50%</b>が前払いの対象額です（支払いは2か月サイトのため、まだ支払われていない売上があるので、はじめての留保はいりません）。</li>
           <li>ただし、<b>前月の売上が40万円に届かなかった場合</b>は、<b>5万円の留保</b>が必要です（リース車両も5万円）。</li>
           <li>前払いは<b>当月分を当月中にだけ</b>申請できます。月が変わるとリセットされ、元には戻せません。</li>
