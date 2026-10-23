@@ -17,7 +17,7 @@ import {
   KINDS, COLLISIONS, ROAD_TYPES, SLOPES, SHAPES, SURFACES
 } from './accident.js';
 
-export const APP_VERSION = '0.18.4';
+export const APP_VERSION = '0.18.5';
 
 const app = document.getElementById('app');
 const state = {
@@ -1183,7 +1183,7 @@ function salesSub(s, y, m, withOffice = true) {
   }
   // 法人の日極1つだけ：日極
   if (jobs.length === 1 && jobs[0].pay === 'daily' && num(jobs[0].price) != null) return `所属：${jobLabel(jobs[0])}　日極：${yen(jobs[0].price)}`;
-  return `案件：${jobs.map(jobLabel).join('・')}`;
+  return `案件：${jobs.map(jobLabel).join('／')}`;
 }
 
 // 売上表の表題：案件が1つならその名前（佐川急便は「佐川急便　八王子営業所」）、いくつかなら「売上表」
@@ -1259,7 +1259,7 @@ function renderSales() {
       <span class="row-day ${r.week === '日' ? 'sun' : r.week === '土' ? 'sat' : ''}"><b>${r.day}</b><span>${r.week}</span></span>
       <span class="row-main">
         <span class="row-sub">${e(hm(r.start))} → ${e(hm(r.end) || '--:--')}　${r.km != null ? kmText(r.km) : ''}</span>
-        <span class="jobs-line">${r.jobs.length ? e(r.jobs.map((j) => j.name).join('・')) : '案件を選んでいません'}</span>
+        <span class="jobs-line">${r.jobs.length ? e(r.jobs.map((j) => j.name).join('／')) : '案件を選んでいません'}</span>
       </span>
       <span class="row-km">${r.amount != null ? yen(r.amount) : ''}${r.newbie ? `<span class="nb-line">新人保証 ${yen(r.newbie)}</span>` : ''}${tag ? `<span class="tag warn-tag">${tag}</span>` : ''}</span>
     </button>
@@ -1327,7 +1327,7 @@ function salesCanvases() {
     if (!r.jobs.length) rows.push([`${r.day}（${r.week}）`, '（案件を選んでいません）', '', '']);
   }
   return [salesCanvas(), ...renderSalesDetail({
-    title: '売上の内訳', ym: `${y}年 ${m}月`, name: s.driverName, sub: jobsOf(s).length > 1 ? `案件：${jobsOf(s).map(jobLabel).join('・')}` : salesTitle(s),
+    title: '売上の内訳', ym: `${y}年 ${m}月`, name: s.driverName, sub: jobsOf(s).length > 1 ? `案件：${jobsOf(s).map(jobLabel).join('／')}` : salesTitle(s),
     rows, sums: [...sums].map(([k, v]) => [k, `${v.days}日`, yen(v.amount)]),
     total: yen(data.total.amount)
   })];
