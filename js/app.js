@@ -18,7 +18,7 @@ import {
   KINDS, COLLISIONS, ROAD_TYPES, SLOPES, SHAPES, SURFACES
 } from './accident.js';
 
-export const APP_VERSION = '0.21.0';
+export const APP_VERSION = '0.21.1';
 
 const app = document.getElementById('app');
 const state = {
@@ -1506,11 +1506,11 @@ async function checkBackup() {
   const s = state.settings;
   const key = backupReminder(todayKey(), s);
   if (!key || !state.records.length || document.querySelector('.dialog')) return;
+  s.backupShown = key; // お知らせは月に1回だけ
+  await db.putSettings(s);
   const m = Number(key.slice(5));
   const yes = await ask(`${m}月の記録のバックアップを作りましょう。スマホをなくしたり壊れたりしても、バックアップがあれば記録を戻せます。保存先は、iPhone は iCloud Drive、Android は Google ドライブがおすすめです。`, '今すぐ作る', false, 'あとで', 'バックアップのお知らせ');
-  if (yes) { runBusy(backup); return; }
-  s.backupLater = todayKey(); // 「あとで」は今日だけ出さない
-  await db.putSettings(s);
+  if (yes) runBusy(backup);
 }
 
 // ---- 画面：記録の決まり ----

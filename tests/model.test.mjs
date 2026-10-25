@@ -523,7 +523,7 @@ test('以前の版の佐川急便の記録は、あとから法人の案件を�
 });
 
 
-test('月末のバックアップのお知らせ：月末の3日前から翌月5日まで、作るまで出す', () => {
+test('月末のバックアップのお知らせ：月末の3日前から翌月5日までに1回だけ', () => {
   assert.equal(backupReminder('2026-10-28', {}), null);
   assert.equal(backupReminder('2026-10-29', {}), '2026-10');
   assert.equal(backupReminder('2026-10-31', {}), '2026-10');
@@ -533,6 +533,7 @@ test('月末のバックアップのお知らせ：月末の3日前から翌月5
   assert.equal(backupReminder('2026-02-26', {}), '2026-02'); // 2月は28日まで
   assert.equal(backupReminder('2026-10-30', { lastBackup: '2026-10-29' }), null);
   assert.equal(backupReminder('2026-11-02', { lastBackup: '2026-10-20' }), '2026-10');
-  assert.equal(backupReminder('2026-10-30', { backupLater: '2026-10-30' }), null);
-  assert.equal(backupReminder('2026-10-31', { backupLater: '2026-10-30' }), '2026-10');
+  assert.equal(backupReminder('2026-10-31', { backupShown: '2026-10' }), null);
+  assert.equal(backupReminder('2026-11-03', { backupShown: '2026-10' }), null);
+  assert.equal(backupReminder('2026-11-29', { backupShown: '2026-10' }), '2026-11');
 });

@@ -88,7 +88,8 @@ export const pad2 = (n) => String(n).padStart(2, '0');
 export const dateKey = (y, m, d) => `${y}-${pad2(m)}-${pad2(d)}`;
 export const daysInMonth = (y, m) => new Date(y, m, 0).getDate();
 
-// 月末のバックアップのお知らせ：月末の3日前から翌月5日まで、その月の分のバックアップを作るまで出す（「あとで」はその日だけ出さない）
+// 月末のバックアップのお知らせ：月に1回だけ。月末の3日前から翌月5日までの間に、はじめてアプリを開いたときに出す
+// （その間に、すでにバックアップを作っていれば出さない）
 // 出すときはその月（'2026-10'）、出さないときは null
 export function backupReminder(today, s) {
   const [y, m, d] = today.split('-').map(Number);
@@ -97,7 +98,7 @@ export function backupReminder(today, s) {
   else if (d < daysInMonth(y, m) - 2) return null;
   const key = `${ky}-${pad2(km)}`;
   if (s.lastBackup && s.lastBackup >= dateKey(ky, km, daysInMonth(ky, km) - 2)) return null;
-  if (s.backupLater === today) return null;
+  if (s.backupShown === key) return null;
   return key;
 }
 export const WEEK = ['日', '月', '火', '水', '木', '金', '土'];
