@@ -562,4 +562,6 @@ test('佐川急便のナイト・モーニング：日極は個数なしで1日�
   // 組み合わせ：足立ナイト 8,140円 ＋ 八王子ナイト（単価）
   assert.equal(dayAmount(rec([{ id: 'c', counts: {} }, { id: 'b', counts: { takuhai: 10 } }]), s), 8140 + 2500);
   assert.equal(dayJobs(r1, s)[0].missing, false);
+  // 日極：個数を入れても金額は変わらない（個数は記録用）
+  assert.equal(dayAmount(rec([{ id: 'a', counts: { takuhai: 50, shogyo: 3, shuka: 2 } }]), s), 6000);
 });
