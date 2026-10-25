@@ -7,7 +7,7 @@ import { COUNT_KEYS, unitPrices, salesReady, monthSales, yen, defaultShogyo, def
 import { EXPIRED, expiryStatus, expiryMessage, expiryAlertsToShow } from './expiry.js';
 import { OIL_LIMIT, OIL_STEPS, newOilChange, currentOdo, oilStatus, oilMessage, oilAlertToShow, sortOilChanges } from './oil.js';
 import {
-  DEFAULT_SETTINGS, newStart, newEnd, todayKey, nowTime, isTime, num, distanceOf, prevOdo,
+  backupReminder, DEFAULT_SETTINGS, newStart, newEnd, todayKey, nowTime, isTime, num, distanceOf, prevOdo,
   monthSheets, yearSheets, hasMonth, toCsv, daysInMonth, dateKey, weekday, pad2, isOff, isOffDay
 } from './model.js';
 import { buildXlsx } from './xlsx.js';
@@ -18,7 +18,7 @@ import {
   KINDS, COLLISIONS, ROAD_TYPES, SLOPES, SHAPES, SURFACES
 } from './accident.js';
 
-export const APP_VERSION = '0.20.1';
+export const APP_VERSION = '0.21.0';
 
 const app = document.getElementById('app');
 const state = {
@@ -370,7 +370,7 @@ function renderSettings() {
       ${saveSettingsButton('保存する')}
       <h2 class="section-title">バックアップ</h2>
       <div class="card pad">
-        <p class="small">記録はこのスマホの中だけにあります。スマホを替える・アプリを消す前に、バックアップを作って保存してください。</p>
+        <p class="small">記録はこのスマホの中だけにあります。スマホを替える・アプリを消す前に、バックアップを作って保存してください。毎月末にもお知らせします。</p>
         <p class="small cloud-note"><b>保存先は、クラウド（iPhone は iCloud Drive、Android は Google ドライブ）がいちばん安心です。</b>スマホをなくしたり壊れたりしても、クラウドに残ります。「バックアップを作る」を押したら、iPhone は「"ファイル"に保存」→ iCloud Drive、Android は「ドライブ」を選んでください。</p>
         <button type="button" class="btn-outline" data-action="backup">バックアップを作る</button>
         <button type="button" class="btn-outline" data-action="restore">バックアップから戻す</button>
@@ -1498,6 +1498,19 @@ async function checkExpiry() {
 async function runAlerts() {
   await checkExpiry();
   if (state.view === 'home') await checkOil();
+  if (state.view === 'home') await checkBackup();
+}
+
+// 月末のバックアップのお知らせ
+async function checkBackup() {
+  const s = state.settings;
+  const key = backupReminder(todayKey(), s);
+  if (!key || !state.records.length || document.querySelector('.dialog')) return;
+  const m = Number(key.slice(5));
+  const yes = await ask(`${m}月の記録のバックアップを作りましょう。スマホをなくしたり壊れたりしても、バックアップがあれば記録を戻せます。保存先は、iPhone は iCloud Drive、Android は Google ドライブがおすすめです。`, '今すぐ作る', false, 'あとで', 'バックアップのお知らせ');
+  if (yes) { runBusy(backup); return; }
+  s.backupLater = todayKey(); // 「あとで」は今日だけ出さない
+  await db.putSettings(s);
 }
 
 // ---- 画面：記録の決まり ----
@@ -1837,6 +1850,8 @@ async function runBusy(fn) {
 // ---- バックアップ ----
 
 async function backup() {
+  state.settings.lastBackup = todayKey(); // 月末のお知らせは、その月の分を作ったら出さない
+  await db.putSettings(state.settings);
   const photos = [];
   for (const ph of await db.allPhotos()) photos.push({ id: ph.id, accidentId: ph.accidentId, createdAt: ph.createdAt, data: await blobToDataUrl(ph.blob) });
   const data = { app: 'nippo-sapo', version: 1, exportedAt: new Date().toISOString(), settings: state.settings, records: state.records, accidents: state.accidents, photos };

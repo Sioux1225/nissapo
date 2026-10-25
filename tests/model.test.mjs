@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { DEFAULT_SETTINGS, newStart, newEnd, prevOdo, monthSheets, yearSheets, toCsv, timeToSerial, distanceOf } from '../js/model.js';
+import { backupReminder, DEFAULT_SETTINGS, newStart, newEnd, prevOdo, monthSheets, yearSheets, toCsv, timeToSerial, distanceOf } from '../js/model.js';
 import { buildXlsx, colName, sheetXml } from '../js/xlsx.js';
 import { buildPdf } from '../js/pdf.js';
 
@@ -522,3 +522,17 @@ test('以前の版の佐川急便の記録は、あとから法人の案件を�
   assert.equal(dayAmount(rec, s), 100 * 178 + 80 + 200);
 });
 
+
+test('月末のバックアップのお知らせ：月末の3日前から翌月5日まで、作るまで出す', () => {
+  assert.equal(backupReminder('2026-10-28', {}), null);
+  assert.equal(backupReminder('2026-10-29', {}), '2026-10');
+  assert.equal(backupReminder('2026-10-31', {}), '2026-10');
+  assert.equal(backupReminder('2026-11-03', {}), '2026-10');
+  assert.equal(backupReminder('2026-11-06', {}), null);
+  assert.equal(backupReminder('2027-01-02', {}), '2026-12');
+  assert.equal(backupReminder('2026-02-26', {}), '2026-02'); // 2月は28日まで
+  assert.equal(backupReminder('2026-10-30', { lastBackup: '2026-10-29' }), null);
+  assert.equal(backupReminder('2026-11-02', { lastBackup: '2026-10-20' }), '2026-10');
+  assert.equal(backupReminder('2026-10-30', { backupLater: '2026-10-30' }), null);
+  assert.equal(backupReminder('2026-10-31', { backupLater: '2026-10-30' }), '2026-10');
+});
