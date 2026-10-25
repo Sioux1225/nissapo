@@ -551,17 +551,18 @@ test('佐川急便のナイト・モーニング：日極は個数なしで1日�
   assert.equal(isFixedSagawa(s.jobs[1]), false);
   assert.equal(officeEntry('八王子（ナイト・日極）').daily, 8000);
   assert.equal(officeEntry('中野（ナイト）').newbie, null);
-  // 日極：個数がなくても「まだ」にならない
+  // 日極：金額は1日の金額。個数がまだなら「まだ」（個数も必ず入れる）
   const r1 = rec([{ id: 'a', counts: {} }]);
   assert.equal(dayAmount(r1, s), 6000);
-  assert.equal(countsMissing(r1, s), false);
+  assert.equal(countsMissing(r1, s), true);
+  assert.equal(countsMissing(rec([{ id: 'a', counts: { takuhai: 30 } }]), s), false);
   // 単価：宅配 40個 × 250円
   const r2 = rec([{ id: 'b', counts: { takuhai: 40 } }]);
   assert.equal(dayAmount(r2, s), 10000);
   assert.equal(countsMissing(rec([{ id: 'b', counts: {} }]), s), true);
   // 組み合わせ：足立ナイト 8,140円 ＋ 八王子ナイト（単価）
   assert.equal(dayAmount(rec([{ id: 'c', counts: {} }, { id: 'b', counts: { takuhai: 10 } }]), s), 8140 + 2500);
-  assert.equal(dayJobs(r1, s)[0].missing, false);
+  assert.equal(dayJobs(r1, s)[0].missing, true);
   // 日極：個数を入れても金額は変わらない（個数は記録用）
   assert.equal(dayAmount(rec([{ id: 'a', counts: { takuhai: 50, shogyo: 3, shuka: 2 } }]), s), 6000);
 });

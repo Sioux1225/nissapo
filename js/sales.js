@@ -21,7 +21,7 @@ export function defaultShuka(office) {
 // （三多摩は2週間、東京・八王子・練馬・所沢は1か月、世田谷・城北・赤羽は3か月。三多摩（山単価）は新人保証なし）
 // 代走：所沢（代走）は1日5,000円・戸田（代走）は1日10,000円をずっと足す（戸田は代走のみ募集）
 // 三多摩B は三多摩と同じ営業所をエリアで分けたものなので、三多摩を選ぶ（以前の入力の「三多摩B」も三多摩に読み替える）
-// ナイト・モーニング（2026/10 追加）：日極は1日の金額（個数は記録用で、入れても入れなくてもよい。金額は変わらない）、単価は宅配の個数 × 単価。新人保証なし
+// ナイト・モーニング（2026/10 追加）：日極は1日の金額（個数も必ず入れるが、記録用で金額は変わらない）、単価は宅配の個数 × 単価。新人保証なし
 export const PRICE_TABLE_DATE = '2026年5月27日';
 const fixedDay = (name, daily) => [name, 0, daily, null, { fixed: true }];
 export const OFFICES = [
@@ -271,7 +271,7 @@ export function dayJobs(rec, settings) {
       const nb = newbiePeriod(ss);
       out.newbie = nb && rec.date >= nb.from && rec.date <= nb.to ? nb.perDay : 0;
       const c = out.counts || {};
-      out.missing = !isFixedSagawa(job) && COUNT_KEYS.every(([k]) => num(c[k]) == null);
+      out.missing = COUNT_KEYS.every(([k]) => num(c[k]) == null);
       if (isFixedSagawa(job)) out.amount = bonus; // 日極：個数を入れても金額は変わらない
       else out.amount = out.missing ? (bonus || null) : COUNT_KEYS.reduce((t, [k]) => t + (num(c[k]) || 0) * (p[k] || 0), 0) + bonus;
     } else if (job.pay === 'unit') {

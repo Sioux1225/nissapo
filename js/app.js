@@ -18,7 +18,7 @@ import {
   KINDS, COLLISIONS, ROAD_TYPES, SLOPES, SHAPES, SURFACES
 } from './accident.js';
 
-export const APP_VERSION = '0.22.1';
+export const APP_VERSION = '0.22.2';
 
 const app = document.getElementById('app');
 const state = {
@@ -260,7 +260,7 @@ function jobCard(s, j, i) {
       ...OFFICES.map(([o]) => `<option value="${o}" ${o === selected ? 'selected' : ''}>${o}</option>`),
       `<option value="${OTHER_OFFICE}" ${selected === OTHER_OFFICE ? 'selected' : ''}>一覧にない営業所（単価を入力）</option>`].join('');
     body = `${field('営業所', `<select class="select" data-job-i="${i}" data-job-k="office">${opts}</select>`)}
-      ${entry?.fixed ? `<p class="field-note pad-note price-line">日極：<b>1日 ${yen(entry.daily)}</b>（個数は記録用です。入れても入れなくても、金額は変わりません）</p>` : entry ? `<p class="field-note pad-note price-line">単価：<b>宅配 ${yen(p.takuhai)}・商業 ${yen(p.shogyo)}・集荷 ${yen(p.shuka)}${p.daily ? `＋1日 ${yen(p.daily)}` : ''}</b>${entry.newbie ? `<br>新人保証：<b>この営業所で働き始めた日から${newbieSpan(entry.newbie)}、1日 ${yen(entry.newbie.perDay)}をプラス</b>` : ''}<br>（佐川単価表 ${PRICE_TABLE_DATE}更新）</p>` : ''}
+      ${entry?.fixed ? `<p class="field-note pad-note price-line">日極：<b>1日 ${yen(entry.daily)}</b>（個数も入れます。個数は記録用で、金額は変わりません）</p>` : entry ? `<p class="field-note pad-note price-line">単価：<b>宅配 ${yen(p.takuhai)}・商業 ${yen(p.shogyo)}・集荷 ${yen(p.shuka)}${p.daily ? `＋1日 ${yen(p.daily)}` : ''}</b>${entry.newbie ? `<br>新人保証：<b>この営業所で働き始めた日から${newbieSpan(entry.newbie)}、1日 ${yen(entry.newbie.perDay)}をプラス</b>` : ''}<br>（佐川単価表 ${PRICE_TABLE_DATE}更新）</p>` : ''}
       ${entry?.newbie ? inp('startDate', 'この営業所で働き始めた日', 'type="date"', nb ? `新人保証は ${nb.to.replace(/-/g, '/')} まで（空なら下の「稼働を開始した日」）` : '新人保証の期間を数えるのに使います（空なら下の「稼働を開始した日」）') : ''}
       ${selected === OTHER_OFFICE ? `
         ${inp('officeName', '営業所名', 'placeholder="例：○○"')}
@@ -638,7 +638,7 @@ function entryMissing(d) {
     for (const { p, j } of picked) {
       if (j.kind === 'corp' && j.pay === 'daily') {
         if (num(p.amount) == null) miss.push(`${jobLabel(j)}の金額`);
-      } else if (!isFixedSagawa(j)) {
+      } else {
         const c = p.counts || {};
         const keys = j.kind === 'sagawa' ? COUNT_KEYS.map(([k]) => k) : jobUnits(j).map((u) => u.i);
         if (keys.every((k) => num(c[k]) == null)) miss.push(`${jobLabel(j)}の個数`);
@@ -1167,7 +1167,7 @@ function jobsPickField() {
       if (!j) return '';
       let inputs;
       if (isFixedSagawa(j)) {
-        inputs = `<span class="ex">日極 ${yen(officeEntry(j.office).daily)}（個数は任意）</span>
+        inputs = `<span class="ex">日極 ${yen(officeEntry(j.office).daily)}（金額は固定）</span>
           <div class="counts pj-counts">${COUNT_KEYS.map(([k, t]) => unitInput(i, k, t, num(p.counts?.[k]))).join('')}</div>`;
       } else if (j.kind === 'sagawa') {
         inputs = `<div class="counts pj-counts">${COUNT_KEYS.map(([k, t]) => unitInput(i, k, t, num(p.counts?.[k]))).join('')}</div>`;
