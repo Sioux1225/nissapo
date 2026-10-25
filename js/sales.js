@@ -21,14 +21,22 @@ export function defaultShuka(office) {
 // （三多摩は2週間、東京・八王子・練馬・所沢は1か月、世田谷・城北・赤羽は3か月。三多摩（山単価）は新人保証なし）
 // 代走：所沢（代走）は1日5,000円・戸田（代走）は1日10,000円をずっと足す（戸田は代走のみ募集）
 // 三多摩B は三多摩と同じ営業所をエリアで分けたものなので、三多摩を選ぶ（以前の入力の「三多摩B」も三多摩に読み替える）
+// ナイト・モーニング（2026/10 追加）：日極は1日の金額だけ（個数は入れなくてよい）、単価は宅配の個数 × 単価。新人保証なし
 export const PRICE_TABLE_DATE = '2026年5月27日';
+const fixedDay = (name, daily) => [name, 0, daily, null, { fixed: true }];
 export const OFFICES = [
-  ['東京', 173, 0, { perDay: 3000, months: 1 }], ['江東', 173], ['台東', 173], ['世田谷', 176, 0, { perDay: 3000, months: 3 }], ['墨田', 175], ['横浜', 176], ['湘南', 170],
-  ['千葉南', 170], ['千葉北', 170], ['城北', 177, 0, { perDay: 3000, months: 3 }], ['三多摩（山単価）', 186], ['三多摩', 165, 0, { perDay: 5000, days: 14 }], ['練馬', 180, 0, { perDay: 5000, months: 1 }],
-  ['越谷', 167], ['足立', 175], ['八王子', 178, 0, { perDay: 5000, months: 1 }], ['八王子（代走）', 190], ['川崎', 173], ['さいたま', 180], ['川口', 180], ['川口（DRF）', 167, 10000],
-  ['所沢', 180, 0, { perDay: 3000, months: 1 }], ['所沢（代走）', 180, 5000], ['赤羽', 177, 0, { perDay: 3000, months: 3 }], ['座間', 173], ['横須賀', 178], ['横浜北', 175], ['杉並', 177], ['杉並（代走）', 191], ['木更津', 168],
+  ['東京', 173, 0, { perDay: 3000, months: 1 }], ['江東', 173], fixedDay('江東（ナイト）', 6000), ['台東', 173], ['世田谷', 176, 0, { perDay: 3000, months: 3 }], fixedDay('世田谷（ナイト）', 8000),
+  ['墨田', 175], fixedDay('墨田（ナイト）', 8000), ['横浜', 176], ['湘南', 170],
+  ['千葉南', 170], ['千葉北', 170], ['城北', 177, 0, { perDay: 3000, months: 3 }], fixedDay('城北（ナイト）', 8000),
+  ['三多摩（山単価）', 186], ['三多摩', 165, 0, { perDay: 5000, days: 14 }], ['三多摩（ナイト）', 250], fixedDay('三多摩（モーニング）', 8000),
+  ['練馬', 180, 0, { perDay: 5000, months: 1 }], ['練馬（ナイト）', 200],
+  ['越谷', 167], ['足立', 175], fixedDay('足立（ナイト）', 8140), ['八王子', 178, 0, { perDay: 5000, months: 1 }], ['八王子（代走）', 190],
+  ['八王子（ナイト・単価）', 250], fixedDay('八王子（ナイト・日極）', 8000), fixedDay('八王子（モーニング）', 8000),
+  ['川崎', 173], fixedDay('川崎（ナイト4h）', 8000), fixedDay('川崎（ナイト3h）', 6000), ['さいたま', 180], ['川口', 180], ['川口（DRF）', 167, 10000], ['川口（ナイト）', 200],
+  ['所沢', 180, 0, { perDay: 3000, months: 1 }], ['所沢（代走）', 180, 5000], fixedDay('所沢（ナイト）', 10000), ['赤羽', 177, 0, { perDay: 3000, months: 3 }],
+  ['座間', 173], fixedDay('座間（ナイト）', 8000), ['横須賀', 178], ['横浜北', 175], ['杉並', 177], ['杉並（代走）', 191], fixedDay('杉並（ナイト）', 8000), ['木更津', 168],
   ['茂原', 168], ['横浜鶴見', 176], ['城南', 174], ['目黒', 173], ['横浜緑', 171], ['佐倉', 166], ['町田', 159],
-  ['千葉', 168], ['中野', 173], ['相模原', 169], ['戸田（代走）', 167, 10000]
+  ['千葉', 168], ['中野', 173], fixedDay('中野（ナイト）', 9000), ['相模原', 169], ['戸田（代走）', 167, 10000]
 ];
 export const OTHER_OFFICE = 'その他';
 
@@ -39,8 +47,11 @@ export function officeEntry(name) {
   if (/^三多摩[BＢ]$/.test(n)) n = '三多摩';
   if (n === '戸田') n = '戸田（代走）'; // 戸田は代走のみ
   const hit = OFFICES.find(([o]) => o === n);
-  return hit ? { name: hit[0], takuhai: hit[1], daily: hit[2] || 0, newbie: hit[3] || null } : null;
+  return hit ? { name: hit[0], takuhai: hit[1], daily: hit[2] || 0, newbie: hit[3] || null, fixed: !!hit[4]?.fixed } : null;
 }
+
+// 佐川急便の日極の案件（ナイト・モーニングの日極）：個数は入れず、1日の金額だけ
+export const isFixedSagawa = (job) => job?.kind === 'sagawa' && !!officeEntry(job.office)?.fixed;
 
 const isDate = (v) => /^\d{4}-\d{2}-\d{2}$/.test(v || '');
 const pad = (n) => String(n).padStart(2, '0');
@@ -260,7 +271,7 @@ export function dayJobs(rec, settings) {
       const nb = newbiePeriod(ss);
       out.newbie = nb && rec.date >= nb.from && rec.date <= nb.to ? nb.perDay : 0;
       const c = out.counts || {};
-      out.missing = COUNT_KEYS.every(([k]) => num(c[k]) == null);
+      out.missing = !isFixedSagawa(job) && COUNT_KEYS.every(([k]) => num(c[k]) == null);
       out.amount = out.missing ? (bonus || null) : COUNT_KEYS.reduce((t, [k]) => t + (num(c[k]) || 0) * (p[k] || 0), 0) + bonus;
     } else if (job.pay === 'unit') {
       const c = Array.isArray(out.counts) ? out.counts : [];

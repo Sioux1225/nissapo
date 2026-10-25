@@ -3,7 +3,7 @@
 
 import { db, requestPersist } from './db.js';
 import { shrinkImage, newPhoto, blobToDataUrl, dataUrlToBlob } from './photo.js';
-import { COUNT_KEYS, unitPrices, salesReady, monthSales, yen, defaultShogyo, defaultShuka, advanceKey, advanceOf, advanceHistory, advanceTotal, advanceLimit, isFirstAdvanceMonth, prevSalesLevel, OFFICES, OTHER_OFFICE, PRICE_TABLE_DATE, officeEntry, officeName, newbiePeriod, newbieSpan, jobList, jobsOf, dayJobs, jobLabel, jobReady, jobUnits, sagawaSettings, hasSagawa, UNIT_SLOTS } from './sales.js';
+import { COUNT_KEYS, unitPrices, salesReady, monthSales, yen, defaultShogyo, defaultShuka, advanceKey, advanceOf, advanceHistory, advanceTotal, advanceLimit, isFirstAdvanceMonth, prevSalesLevel, OFFICES, OTHER_OFFICE, PRICE_TABLE_DATE, officeEntry, officeName, newbiePeriod, newbieSpan, jobList, jobsOf, dayJobs, jobLabel, jobReady, jobUnits, sagawaSettings, hasSagawa, isFixedSagawa, UNIT_SLOTS } from './sales.js';
 import { EXPIRED, expiryStatus, expiryMessage, expiryAlertsToShow } from './expiry.js';
 import { OIL_LIMIT, OIL_STEPS, newOilChange, currentOdo, oilStatus, oilMessage, oilAlertToShow, sortOilChanges } from './oil.js';
 import {
@@ -18,7 +18,7 @@ import {
   KINDS, COLLISIONS, ROAD_TYPES, SLOPES, SHAPES, SURFACES
 } from './accident.js';
 
-export const APP_VERSION = '0.21.1';
+export const APP_VERSION = '0.22.0';
 
 const app = document.getElementById('app');
 const state = {
@@ -260,7 +260,7 @@ function jobCard(s, j, i) {
       ...OFFICES.map(([o]) => `<option value="${o}" ${o === selected ? 'selected' : ''}>${o}</option>`),
       `<option value="${OTHER_OFFICE}" ${selected === OTHER_OFFICE ? 'selected' : ''}>一覧にない営業所（単価を入力）</option>`].join('');
     body = `${field('営業所', `<select class="select" data-job-i="${i}" data-job-k="office">${opts}</select>`)}
-      ${entry ? `<p class="field-note pad-note price-line">単価：<b>宅配 ${yen(p.takuhai)}・商業 ${yen(p.shogyo)}・集荷 ${yen(p.shuka)}${p.daily ? `＋1日 ${yen(p.daily)}` : ''}</b>${entry.newbie ? `<br>新人保証：<b>この営業所で働き始めた日から${newbieSpan(entry.newbie)}、1日 ${yen(entry.newbie.perDay)}をプラス</b>` : ''}<br>（佐川単価表 ${PRICE_TABLE_DATE}更新）</p>` : ''}
+      ${entry?.fixed ? `<p class="field-note pad-note price-line">日極：<b>1日 ${yen(entry.daily)}</b>（個数は入れなくて大丈夫です）</p>` : entry ? `<p class="field-note pad-note price-line">単価：<b>宅配 ${yen(p.takuhai)}・商業 ${yen(p.shogyo)}・集荷 ${yen(p.shuka)}${p.daily ? `＋1日 ${yen(p.daily)}` : ''}</b>${entry.newbie ? `<br>新人保証：<b>この営業所で働き始めた日から${newbieSpan(entry.newbie)}、1日 ${yen(entry.newbie.perDay)}をプラス</b>` : ''}<br>（佐川単価表 ${PRICE_TABLE_DATE}更新）</p>` : ''}
       ${entry?.newbie ? inp('startDate', 'この営業所で働き始めた日', 'type="date"', nb ? `新人保証は ${nb.to.replace(/-/g, '/')} まで（空なら下の「稼働を開始した日」）` : '新人保証の期間を数えるのに使います（空なら下の「稼働を開始した日」）') : ''}
       ${selected === OTHER_OFFICE ? `
         ${inp('officeName', '営業所名', 'placeholder="例：○○"')}
@@ -638,7 +638,7 @@ function entryMissing(d) {
     for (const { p, j } of picked) {
       if (j.kind === 'corp' && j.pay === 'daily') {
         if (num(p.amount) == null) miss.push(`${jobLabel(j)}の金額`);
-      } else {
+      } else if (!isFixedSagawa(j)) {
         const c = p.counts || {};
         const keys = j.kind === 'sagawa' ? COUNT_KEYS.map(([k]) => k) : jobUnits(j).map((u) => u.i);
         if (keys.every((k) => num(c[k]) == null)) miss.push(`${jobLabel(j)}の個数`);
@@ -1166,7 +1166,9 @@ function jobsPickField() {
       const j = jobs.find((x) => x.id === p.id);
       if (!j) return '';
       let inputs;
-      if (j.kind === 'sagawa') {
+      if (isFixedSagawa(j)) {
+        inputs = `<span class="ex">日極 ${yen(officeEntry(j.office).daily)}</span>`;
+      } else if (j.kind === 'sagawa') {
         inputs = `<div class="counts pj-counts">${COUNT_KEYS.map(([k, t]) => unitInput(i, k, t, num(p.counts?.[k]))).join('')}</div>`;
       } else if (j.pay === 'unit') {
         inputs = `<div class="counts pj-counts">${jobUnits(j).map((u) => unitInput(i, u.i, `${u.label}（${yen(u.price)}）`, num(p.counts?.[u.i]))).join('')}</div>`;
@@ -1267,6 +1269,7 @@ function salesSub(s, y, m, withOffice = true) {
     const nb = newbiePeriod(ss);
     const monthFrom = y ? `${y}-${pad2(m)}-01` : '';
     const monthTo = y ? `${y}-${pad2(m)}-31` : '';
+    if (isFixedSagawa(jobs[0])) return `${withOffice ? `営業所：${officeName(ss)}　` : ''}日極：${yen(p.daily)}`;
     const nbText = nb && (!y || (nb.from <= monthTo && nb.to >= monthFrom)) ? `　新人保証：1日+${yen(nb.perDay)}（${mdText(nb.from)}〜${mdText(nb.to)}）` : '';
     return `${withOffice ? `営業所：${officeName(ss)}　` : ''}単価：宅配 ${yen(p.takuhai)}・商業 ${yen(p.shogyo)}・集荷 ${yen(p.shuka)}${p.daily ? `＋1日 ${yen(p.daily)}` : ''}${nbText}`;
   }
@@ -1355,7 +1358,7 @@ function renderSales() {
     ${isOpen(r) ? `<div class="day-detail">
       ${r.jobs.map((j) => {
         // 佐川急便・法人の単価は、ここで個数を入れられる
-        const cnt = j.job?.kind === 'sagawa' ? COUNT_KEYS.map(([k, tx]) => [k, tx, j.counts?.[k]])
+        const cnt = isFixedSagawa(j.job) ? null : j.job?.kind === 'sagawa' ? COUNT_KEYS.map(([k, tx]) => [k, tx, j.counts?.[k]])
           : j.job?.pay === 'unit' ? jobUnits(j.job).map((u) => [u.i, u.label, j.counts?.[u.i]]) : null;
         return `<div class="dj"><div><span>${e(j.name)}${j.memo ? `　<span class="muted">${e(j.memo)}</span>` : ''}</span><b>${j.amount == null ? '<span class="warn-text">まだ</span>' : yen(j.amount)}</b></div>
           ${cnt ? `<span class="counts small-counts">${cnt.map(([k, tx, v]) => `<label><span>${e(tx)}</span><input data-sales-date="${r.date}" data-sales-job="${e(j.id)}" data-sales-key="${k}" value="${num(v) ?? ''}" type="number" inputmode="numeric" min="0"></label>`).join('')}</span>` : ''}</div>`;

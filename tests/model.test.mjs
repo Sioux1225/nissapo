@@ -537,3 +537,29 @@ test('月末のバックアップのお知らせ：月末の3日前から翌月5
   assert.equal(backupReminder('2026-11-03', { backupShown: '2026-10' }), null);
   assert.equal(backupReminder('2026-11-29', { backupShown: '2026-10' }), '2026-11');
 });
+
+test('佐川急便のナイト・モーニング：日極は個数なしで1日の金額、単価は宅配の個数 × 単価', async () => {
+  const { dayJobs, dayAmount, countsMissing, jobLabel, officeEntry, isFixedSagawa } = await import('../js/sales.js');
+  const s = { jobs: [
+    { id: 'a', kind: 'sagawa', office: '江東（ナイト）' },
+    { id: 'b', kind: 'sagawa', office: '八王子（ナイト・単価）' },
+    { id: 'c', kind: 'sagawa', office: '足立（ナイト）' }
+  ] };
+  const rec = (jobs) => ({ date: '2026-10-05', start: { time: '20:00' }, end: { time: '02:00' }, jobs });
+  assert.equal(jobLabel(s.jobs[0]), '佐川急便 江東営業所（ナイト）');
+  assert.equal(isFixedSagawa(s.jobs[0]), true);
+  assert.equal(isFixedSagawa(s.jobs[1]), false);
+  assert.equal(officeEntry('八王子（ナイト・日極）').daily, 8000);
+  assert.equal(officeEntry('中野（ナイト）').newbie, null);
+  // 日極：個数がなくても「まだ」にならない
+  const r1 = rec([{ id: 'a', counts: {} }]);
+  assert.equal(dayAmount(r1, s), 6000);
+  assert.equal(countsMissing(r1, s), false);
+  // 単価：宅配 40個 × 250円
+  const r2 = rec([{ id: 'b', counts: { takuhai: 40 } }]);
+  assert.equal(dayAmount(r2, s), 10000);
+  assert.equal(countsMissing(rec([{ id: 'b', counts: {} }]), s), true);
+  // 組み合わせ：足立ナイト 8,140円 ＋ 八王子ナイト（単価）
+  assert.equal(dayAmount(rec([{ id: 'c', counts: {} }, { id: 'b', counts: { takuhai: 10 } }]), s), 8140 + 2500);
+  assert.equal(dayJobs(r1, s)[0].missing, false);
+});

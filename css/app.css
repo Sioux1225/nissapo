@@ -363,7 +363,8 @@ button:focus-visible { outline: 3px solid var(--blue); outline-offset: 2px; }
 /* 案件：今日の案件・売上表の内訳 */
 .job-head { padding-bottom: 2px; }
 .picks { display: flex; gap: 6px; flex-wrap: wrap; }
-.picks .chip { flex: none; white-space: nowrap; padding-inline: 16px; }
+.picks .chip { flex: none; white-space: nowrap; padding-inline: 16px; max-width: 100%; }
+.picks .chip[data-pick-job] { white-space: normal; text-align: left; } /* 長い案件名（佐川急便 八王子営業所（ナイト・単価）など）は折り返す */
 .picked { display: flex; flex-direction: column; gap: 8px; padding: 0 16px 12px; }
 .pj { display: grid; grid-template-columns: minmax(0, 1fr) 8.5em; gap: 6px 8px; align-items: center; padding: 10px 12px; border: 1px solid var(--line); border-radius: 14px; background: var(--card); }
 .pj b { font-size: 15px; }
