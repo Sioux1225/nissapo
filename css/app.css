@@ -410,6 +410,7 @@ button:focus-visible { outline: 3px solid var(--blue); outline-offset: 2px; }
 /* 売上表の案件（佐川急便・法人）の登録 */
 .job-card { margin: 4px 12px 8px; border: 1px solid var(--line); border-radius: 14px; background: var(--card); overflow: hidden; }
 .job-card .field { padding: 8px 12px; }
+.guard-card { margin: 4px 12px 8px; border: 1px dashed var(--line); border-radius: 12px; }
 .job-top { display: flex; justify-content: space-between; align-items: center; padding: 8px 12px 0; }
 .job-top b { font-size: 14px; color: var(--orange-text); }
 .job-top .btn-text { min-height: 36px; font-size: 14px; }

@@ -14,11 +14,6 @@ export const SHIFTS = ['代走', 'モーニング', 'ナイト', 'DRF'];
 const EXTRA_SHIFTS = ['代走', 'DRF'];
 export const hasExtra = (shift) => EXTRA_SHIFTS.includes(shift);
 
-// 新人保証の期間（通常の便だけ）。この営業所で働き始めた日から months か月（または days 日）のあいだ、乗務した日ごとに設定の金額を足す
-const M1 = { months: 1 };
-const M3 = { months: 3 };
-const NEWBIE = { 東京: M1, 世田谷: M3, 城北: M3, 三多摩: { days: 14 }, 練馬: M1, 八王子: M1, 所沢: M1, 赤羽: M3 };
-
 // 以前の版（営業所を一覧から選んでいたころ）の、日極の営業所。読み替えに使う
 const LEGACY_FIXED = ['江東（ナイト）', '世田谷（ナイト）', '墨田（ナイト）', '城北（ナイト）', '三多摩（モーニング）', '足立（ナイト）',
   '八王子（ナイト・日極）', '八王子（モーニング）', '川崎（ナイト4h）', '川崎（ナイト3h）', '所沢（ナイト）', '座間（ナイト）', '杉並（ナイト）', '中野（ナイト）'];
@@ -55,24 +50,28 @@ const specOf = (settings) => sagawaJob({
   ...(settings.salesPay !== undefined || settings.salesShift !== undefined ? { shift: settings.salesShift, pay: settings.salesPay } : {})
 });
 
-// 新人保証の期間の決まり（通常の便で、単価の営業所だけ。なければ null）
-export function newbieRule(job) {
-  const j = sagawaJob(job);
-  return !j.shift && j.pay === 'unit' ? NEWBIE[cleanOffice(j.office)] || null : null;
-}
-
-// 期間限定の保証（年末保証など。新規稼働の方で、営業所から案内があった場合だけ各自が入れる）
-//   guard：'daily'（日極保証：期間中は個数に関係なく1日の金額）・'extra'（一部保証：いつもの金額に1日の金額を足す）
-//   期間中は新人保証を足さない（期間限定の保証だけ）。個数は期間中も必ず入れる
+// 保証（新人保証・年末保証。新規稼働の方で、営業所から案内があった場合だけ各自が入れる。いくつでも）
+//   job.guards：[{ name: '新人保証' | '年末保証', type: 'daily' | 'extra', from, to, amount }]
+//   daily（日極保証）：期間中は個数に関係なく1日の金額。extra（一部保証）：いつもの金額に1日の金額を足す
+//   期間が重なる日は年末保証だけ（年末保証がなければ、先に登録したもの）。個数は期間中も必ず入れる
 export const GUARD_DEFAULT_NAME = '年末保証';
 export const GUARD_NAMES = ['新人保証', '年末保証']; // 保証の名前（設定のプルダウン）
-export function guardOf(job) {
-  if (!job || job.kind !== 'sagawa' || (job.guard !== 'daily' && job.guard !== 'extra')) return null;
-  const amount = num(job.guardAmount);
-  if (!isDate(job.guardFrom) || !isDate(job.guardTo) || job.guardFrom > job.guardTo || amount == null) return null;
-  return { type: job.guard, name: String(job.guardName || '').trim() || GUARD_DEFAULT_NAME, from: job.guardFrom, to: job.guardTo, amount };
+const guardName = (g) => String(g?.name || '').trim() || GUARD_DEFAULT_NAME;
+function validGuard(g) {
+  const amount = num(g?.amount);
+  if (!g || (g.type !== 'daily' && g.type !== 'extra') || !isDate(g.from) || !isDate(g.to) || g.from > g.to || amount == null) return null;
+  return { name: guardName(g), type: g.type, from: g.from, to: g.to, amount };
 }
-export const guardOn = (g, date) => !!g && date >= g.from && date <= g.to;
+// 入力が足りている保証だけ
+export const guardsOf = (job) => (job?.kind === 'sagawa' && Array.isArray(job.guards) ? job.guards.map(validGuard).filter(Boolean) : []);
+// その日の保証（なければ null）
+export function guardOn(job, date) {
+  const on = guardsOf(job).filter((g) => date >= g.from && date <= g.to);
+  return on.find((g) => g.name === '年末保証') || on[0] || null;
+}
+// 保証の書き方（「年末保証：日極18,000円（11/1〜12/31）」）
+const md = (d) => `${Number(d.slice(5, 7))}/${Number(d.slice(8))}`;
+export const guardText = (g) => `${g.name}：${g.type === 'daily' ? `日極${yen(g.amount)}` : `1日+${yen(g.amount)}`}（${md(g.from)}〜${md(g.to)}）`;
 
 // 佐川急便の日極の案件：金額は1日の金額だけ（個数は記録用）
 export const isFixedSagawa = (job) => job?.kind === 'sagawa' && sagawaJob(job).pay === 'daily';
@@ -80,43 +79,33 @@ export const isFixedSagawa = (job) => job?.kind === 'sagawa' && sagawaJob(job).p
 const isDate = (v) => /^\d{4}-\d{2}-\d{2}$/.test(v || '');
 const pad = (n) => String(n).padStart(2, '0');
 
-// 新人保証の期間 { from, to }（to はその日まで。新人保証のない営業所や、稼働を開始した日が入っていなければ null）
-// 例：10月13日に開始して1か月なら、11月12日まで（月末をまたぐときは、次の月の末日を上限にする）
-export function newbieDates(settings) {
-  if (settings.salesType !== 'sagawa') return null;
-  const nb = newbieRule(specOf(settings));
-  if (!nb || !isDate(settings.salesStartDate)) return null;
-  const [y, m, d] = settings.salesStartDate.split('-').map(Number);
+// 以前の版の新人保証（営業所ごとに期間が決まっていて、働き始めた日から自動で数えた）。保証の一覧に読み替えるのに使う
+const NEWBIE = { 東京: { months: 1 }, 世田谷: { months: 3 }, 城北: { months: 3 }, 三多摩: { days: 14 }, 練馬: { months: 1 }, 八王子: { months: 1 }, 所沢: { months: 1 }, 赤羽: { months: 3 } };
+function legacyNewbie(j, start) {
+  const nb = !j.shift && j.pay === 'unit' ? NEWBIE[cleanOffice(j.office)] : null;
+  const amount = num(j.newbiePerDay);
+  if (!nb || !(amount > 0) || !isDate(start)) return null;
+  const [y, m, d] = start.split('-').map(Number);
   let end;
-  if (nb.days) {
-    end = new Date(y, m - 1, d + nb.days - 1); // 例：14日間なら開始日を含めて14日
-  } else {
-    const last = new Date(y, m - 1 + nb.months + 1, 0).getDate(); // 期間の終わりの月の末日
+  if (nb.days) end = new Date(y, m - 1, d + nb.days - 1);
+  else {
+    const last = new Date(y, m - 1 + nb.months + 1, 0).getDate();
     end = new Date(y, m - 1 + nb.months, Math.min(d, last));
     end.setDate(end.getDate() - 1);
   }
-  return { from: settings.salesStartDate, to: `${end.getFullYear()}-${pad(end.getMonth() + 1)}-${pad(end.getDate())}` };
+  return { name: '新人保証', type: 'extra', from: start, to: `${end.getFullYear()}-${pad(end.getMonth() + 1)}-${pad(end.getDate())}`, amount: String(amount) };
 }
 
-// 新人保証 { from, to, perDay }（金額は設定で入れたもの。入れていなければ新人保証なしとして null）
-export function newbiePeriod(settings) {
-  const d = newbieDates(settings);
-  const perDay = num(settings.newbiePerDay);
-  return d && perDay > 0 ? { ...d, perDay } : null;
-}
-
-// 新人保証の期間の書き方（「1か月間」「2週間」「10日間」）
-export function newbieSpan(nb) {
-  if (!nb) return '';
-  if (nb.days) return nb.days % 7 === 0 ? `${nb.days / 7}週間` : `${nb.days}日間`;
-  return `${nb.months}か月間`;
-}
-
-// その日に、個数の金額とは別に足す金額（1日の保障・新人保証）
-export function dayBonus(settings, date) {
-  const p = unitPrices(settings);
-  const nb = newbiePeriod(settings);
-  return (p.daily || 0) + (nb && date >= nb.from && date <= nb.to ? nb.perDay : 0);
+// 佐川急便の案件の保証を一覧の形にする（以前の版の新人保証（自動の期間）と、v0.25 の保証1つも読み替える）
+function withGuards(j, settings) {
+  if (Array.isArray(j.guards)) return j;
+  const guards = [];
+  const nb = legacyNewbie(j, j.startDate || settings?.salesStartDate);
+  if (nb) guards.push(nb);
+  if (j.guard === 'daily' || j.guard === 'extra') guards.push({ name: j.guardName || GUARD_DEFAULT_NAME, type: j.guard, from: j.guardFrom || '', to: j.guardTo || '', amount: j.guardAmount ?? '' });
+  const out = { ...j, guards };
+  for (const k of ['newbiePerDay', 'startDate', 'guard', 'guardName', 'guardFrom', 'guardTo', 'guardAmount']) delete out[k];
+  return out;
 }
 
 // 営業所名に種別を付ける（「江東」と「ナイト」→「江東（ナイト）」、「川崎（4h）」と「ナイト」→「川崎（4h・ナイト）」）
@@ -217,15 +206,15 @@ export function advanceLimit({ sales, advanced = 0, prevSales, prevLevel = null,
 // 佐川急便から法人へ移った方や、朝は法人・午後は佐川急便のように組み合わせる方のため、案件をいくつでも登録し、
 // 乗務後点呼でその日の案件を選ぶ。その日の金額は、選んだ案件の金額の合計。
 //   佐川急便：営業所名を入れ、種別（通常・代走・モーニング・ナイト・DRF）と支払い（単価・日極）を選ぶ。
-//             単価（日極・上乗せ）と新人保証の金額は各自が入れる。新人保証はその営業所で働き始めた日（startDate）から数える
+//             単価（日極・上乗せ）と保証（新人保証・年末保証の期間・金額）は各自が入れる
 //   法人：会社名・営業所名。支払いは「日極」（1日いくら。空なら毎回入力）か「単価」（品目と単価を3つまで）
-// settings.jobs：[{ id, kind: 'sagawa', office, shift, pay: 'unit' | 'daily', priceTakuhai, priceShogyo, priceShuka, priceDaily, priceExtra, newbiePerDay, startDate }
+// settings.jobs：[{ id, kind: 'sagawa', office, shift, pay: 'unit' | 'daily', priceTakuhai, priceShogyo, priceShuka, priceDaily, priceExtra, guards: [{ name, type, from, to, amount }] }
 //                 | { id, kind: 'corp', company, branch, pay: 'daily' | 'unit', price, units: [{ label, price }] }]
 export const UNIT_SLOTS = 3;
 
 // 以前の版の案件（法人（日極）の { name, price }）を、いまの形に読み替える
-function normalizeJob(j) {
-  if (j.kind === 'sagawa') return sagawaJob(j); // 以前の版の「江東（ナイト）」のような営業所も、営業所名・種別・支払いに分ける
+function normalizeJob(j, settings) {
+  if (j.kind === 'sagawa') return withGuards(sagawaJob(j), settings); // 以前の版の「江東（ナイト）」のような営業所も、営業所名・種別・支払いに分ける
   // 種類（佐川急便・法人）を選ぶ前の新しい案件は、そのまま（以前の版の案件だけ読み替える）
   if (j.kind === 'sagawa' || j.kind === 'corp' || ('kind' in j && !('name' in j))) return j;
   return { id: j.id, kind: 'corp', company: j.name || '', branch: '', pay: 'daily', price: j.price ?? '', units: [] };
@@ -233,9 +222,9 @@ function normalizeJob(j) {
 
 // 登録した案件の一覧（入力中のものも含む）。以前の版の設定（佐川急便の営業所1つ・法人（日極）の所属1つ）も読み替える
 export function jobList(settings) {
-  if (Array.isArray(settings.jobs) && settings.jobs.length) return settings.jobs.map(normalizeJob);
+  if (Array.isArray(settings.jobs) && settings.jobs.length) return settings.jobs.map((j) => normalizeJob(j, settings));
   if (settings.salesType === 'sagawa' && settings.salesOffice) {
-    return [{ id: 'job-sagawa', kind: 'sagawa', office: settings.salesOffice, officeName: settings.salesOfficeName || '', priceTakuhai: settings.priceTakuhai ?? '', priceShogyo: settings.priceShogyo ?? '', priceShuka: settings.priceShuka ?? '', priceDaily: settings.priceDaily ?? '', priceExtra: settings.priceExtra ?? '', newbiePerDay: settings.newbiePerDay ?? '', startDate: settings.salesStartDate || '' }];
+    return [normalizeJob({ id: 'job-sagawa', kind: 'sagawa', office: settings.salesOffice, officeName: settings.salesOfficeName || '', priceTakuhai: settings.priceTakuhai ?? '', priceShogyo: settings.priceShogyo ?? '', priceShuka: settings.priceShuka ?? '', priceDaily: settings.priceDaily ?? '', priceExtra: settings.priceExtra ?? '', newbiePerDay: settings.newbiePerDay ?? '', startDate: settings.salesStartDate || '' }, settings)];
   }
   if (settings.salesProject || num(settings.dailyRate) != null) {
     return [{ id: 'j1', kind: 'corp', company: settings.salesProject || '案件', branch: '', pay: 'daily', price: settings.dailyRate ?? '', units: [] }];
@@ -263,7 +252,10 @@ export function sagawaMissing(job) {
     const prices = [['priceTakuhai', '宅配'], ['priceShogyo', '商業'], ['priceShuka', '集荷']].filter(([k]) => num(j[k]) == null).map(([, t]) => t);
     if (prices.length) miss.push(`単価：${prices.join('・')}`);
   }
-  if ((j.guard === 'daily' || j.guard === 'extra') && !guardOf(j)) miss.push(`${String(j.guardName || '').trim() || GUARD_DEFAULT_NAME}の期間・金額`);
+  for (const g of Array.isArray(j.guards) ? j.guards : []) {
+    if (g.type !== 'daily' && g.type !== 'extra') miss.push(`${guardName(g)}の種類`);
+    else if (!validGuard(g)) miss.push(`${guardName(g)}の期間・金額`);
+  }
   return miss;
 }
 
@@ -282,7 +274,7 @@ export function jobLabel(job) {
 // 佐川急便の案件を、以前の設定の形に置きかえる（単価・新人保証の計算をそのまま使う）
 export function sagawaSettings(job, settings) {
   const j = sagawaJob(job);
-  return { ...settings, salesType: 'sagawa', salesOffice: j.office || '', salesOfficeName: '', salesShift: j.shift, salesPay: j.pay, priceTakuhai: job.priceTakuhai ?? '', priceShogyo: job.priceShogyo ?? '', priceShuka: job.priceShuka ?? '', priceDaily: job.priceDaily ?? '', priceExtra: job.priceExtra ?? '', newbiePerDay: job.newbiePerDay ?? '', salesStartDate: job.startDate || settings.salesStartDate || '' };
+  return { ...settings, salesType: 'sagawa', salesOffice: j.office || '', salesOfficeName: '', salesShift: j.shift, salesPay: j.pay, priceTakuhai: job.priceTakuhai ?? '', priceShogyo: job.priceShogyo ?? '', priceShuka: job.priceShuka ?? '', priceDaily: job.priceDaily ?? '', priceExtra: job.priceExtra ?? '' };
 }
 
 const findJob = (settings, e) => {
@@ -290,8 +282,8 @@ const findJob = (settings, e) => {
   return jobs.find((j) => e.id && j.id === e.id) || jobs.find((j) => jobLabel(j) === e.name) || null;
 };
 
-// その日の案件 [{ id, name, job, counts, amount, memo, missing, newbie }]
-// amount：その案件の金額（null は金額まだ）、newbie：その日に含まれる新人保証の額
+// その日の案件 [{ id, name, job, counts, amount, memo, missing, guard, guardExtra }]
+// amount：その案件の金額（null は金額まだ）、guard：その日の保証、guardExtra：金額に含まれる一部保証の額
 // 記録で案件を選んでいない日（以前の版の記録）は、そのころの案件（佐川急便は記録の配達個数を使う）
 export function dayJobs(rec, settings) {
   let list;
@@ -307,20 +299,18 @@ export function dayJobs(rec, settings) {
   }
   return list.map((e) => {
     const job = findJob(settings, e);
-    const out = { id: e.id || job?.id || '', name: job ? jobLabel(job) : e.name || '', job, counts: e.counts ?? (job?.kind === 'sagawa' ? {} : []), memo: e.memo || '', amount: null, missing: false, newbie: 0 };
+    const out = { id: e.id || job?.id || '', name: job ? jobLabel(job) : e.name || '', job, counts: e.counts ?? (job?.kind === 'sagawa' ? {} : []), memo: e.memo || '', amount: null, missing: false, guard: null, guardExtra: 0 };
     if (!job) { out.amount = num(e.amount); out.missing = out.amount == null; return out; }
     if (job.kind === 'sagawa') {
       const ss = sagawaSettings(job, settings);
       const p = unitPrices(ss);
-      const g = guardOf(job);
-      const inGuard = guardOn(g, rec.date);
-      const nb = newbiePeriod(ss);
-      out.newbie = !inGuard && nb && rec.date >= nb.from && rec.date <= nb.to ? nb.perDay : 0; // 期間限定の保証の期間中は新人保証を足さない
-      out.guard = inGuard ? g.amount : 0;
-      const bonus = (p.daily || 0) + out.newbie + (inGuard && g.type === 'extra' ? g.amount : 0);
+      const g = guardOn(normalizeJob(job, settings), rec.date);
+      out.guard = g; // その日の保証（新人保証・年末保証）
+      out.guardExtra = g?.type === 'extra' ? g.amount : 0;
+      const bonus = (p.daily || 0) + out.guardExtra;
       const c = out.counts || {};
       out.missing = COUNT_KEYS.every(([k]) => num(c[k]) == null);
-      if (inGuard && g.type === 'daily') out.amount = g.amount; // 日極保証：期間中は個数に関係なく1日の金額
+      if (g?.type === 'daily') out.amount = g.amount; // 日極保証：期間中は個数に関係なく1日の金額
       else if (isFixedSagawa(job)) out.amount = bonus; // 日極：個数を入れても金額は変わらない
       else out.amount = out.missing ? (bonus || null) : COUNT_KEYS.reduce((t, [k]) => t + (num(c[k]) || 0) * (p[k] || 0), 0) + bonus;
     } else if (job.pay === 'unit') {
@@ -362,7 +352,7 @@ export function monthSales(records, y, m, settings, upto = null, today = todayKe
   const byDate = new Map(records.map((r) => [r.date, r]));
   const days = daysInMonth(y, m);
   const rows = [];
-  const total = { days: 0, takuhai: 0, shogyo: 0, shuka: 0, km: 0, amount: 0, missing: 0, newbie: 0 };
+  const total = { days: 0, takuhai: 0, shogyo: 0, shuka: 0, km: 0, amount: 0, missing: 0, guardExtra: 0 };
   for (let d = 1; d <= days; d++) {
     const key = dateKey(y, m, d);
     const rec = byDate.get(key);
@@ -374,26 +364,29 @@ export function monthSales(records, y, m, settings, upto = null, today = todayKe
     const counts = Object.fromEntries(COUNT_KEYS.map(([k]) => [k, sag.length && sag.some((j) => num(j.counts?.[k]) != null) ? sag.reduce((t, j) => t + (num(j.counts?.[k]) || 0), 0) : null]));
     const km = distanceOf(rec);
     const missing = inRange && countsMissing(rec, settings);
-    // 新人保証の分（金額に含まれている）
-    const newbie = inRange ? jobs.reduce((t, j) => t + (j.newbie || 0), 0) : 0;
-    rows.push({ jobs, newbie, date: key, day: d, week: weekday(key), rec, worked: worked(rec), off: isOffDay(rec, key, today), start: rec?.start?.time || '', end: rec?.end?.time || '', counts, km, amount, inRange, missing });
+    // その日の保証（一部保証の分は金額に含まれている）
+    const guard = inRange ? jobs.find((j) => j.guard)?.guard || null : null;
+    const guardExtra = inRange ? jobs.reduce((t, j) => t + (j.guardExtra || 0), 0) : 0;
+    rows.push({ jobs, guard, guardExtra, date: key, day: d, week: weekday(key), rec, worked: worked(rec), off: isOffDay(rec, key, today), start: rec?.start?.time || '', end: rec?.end?.time || '', counts, km, amount, inRange, missing });
     if (inRange && worked(rec)) {
       total.days++;
       for (const [k] of COUNT_KEYS) total[k] += counts[k] || 0;
       total.km += km || 0;
       total.amount += amount || 0;
       if (missing) total.missing++;
-      total.newbie += newbie;
+      total.guardExtra += guardExtra;
     }
   }
-  // その月に新人保証の期間がかかっているか（表に新人保証の列を出す）
-  const monthFrom = dateKey(y, m, 1);
-  const monthTo = dateKey(y, m, days);
-  const hasNewbie = jobsOf(settings).filter((j) => j.kind === 'sagawa').some((j) => {
-    const nb = newbiePeriod(sagawaSettings(j, settings));
-    return nb && nb.from <= monthTo && nb.to >= monthFrom;
-  });
-  return { rows, total, hasNewbie };
+  // その月に保証の期間がかかっているか（表に保証の列を出す）
+  const hasGuard = monthGuards(settings, y, m).length > 0;
+  return { rows, total, hasGuard };
+}
+
+// その月に期間がかかっている保証 [{ job, guard }]
+export function monthGuards(settings, y, m) {
+  const from = dateKey(y, m, 1);
+  const to = dateKey(y, m, daysInMonth(y, m));
+  return jobsOf(settings).flatMap((j) => guardsOf(j).filter((g) => g.from <= to && g.to >= from).map((g) => ({ job: j, guard: g })));
 }
 
 export const yen = (v) => `${Number(v || 0).toLocaleString('ja-JP')}円`;

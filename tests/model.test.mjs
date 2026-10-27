@@ -303,71 +303,6 @@ test('走行距離を入れなかった過去の日は自動で休み（今日�
   assert.equal(rows[6].off, false);
 });
 
-test('八王子の新人保証（期間は稼働開始から1か月、金額は各自が入れる）と八王子（代走）', async () => {
-  const { unitPrices, newbiePeriod, newbieDates, dayBonus, monthSales } = await import('../js/sales.js');
-  const hj = { salesType: 'sagawa', salesOffice: '八王子', salesStartDate: '2026-10-13', priceTakuhai: '150', priceShogyo: '100', priceShuka: '50', newbiePerDay: '2000' };
-  assert.deepEqual(newbiePeriod(hj), { from: '2026-10-13', to: '2026-11-12', perDay: 2000 });
-  assert.equal(newbiePeriod({ ...hj, salesStartDate: '2026-01-31' }).to, '2026-02-27'); // 月末をまたぐとき
-  assert.equal(newbiePeriod({ ...hj, salesStartDate: '' }), null); // 開始日がなければ保証なし
-  assert.equal(newbiePeriod({ ...hj, salesOffice: '湘南' }), null); // 保証のない営業所
-  assert.equal(newbiePeriod({ ...hj, newbiePerDay: '' }), null); // 金額を入れていなければ保証なし
-  assert.deepEqual(newbieDates({ ...hj, newbiePerDay: '' }), { from: '2026-10-13', to: '2026-11-12' }); // 期間は出せる
-  assert.equal(dayBonus(hj, '2026-10-12'), 0);
-  assert.equal(dayBonus(hj, '2026-10-13'), 2000);
-  assert.equal(dayBonus(hj, '2026-11-12'), 2000);
-  assert.equal(dayBonus(hj, '2026-11-13'), 0);
-  // 代走：新人保証なし
-  const dai = { ...hj, salesOffice: '八王子（代走）' };
-  assert.deepEqual(unitPrices(dai), { takuhai: 150, shogyo: 100, shuka: 50, daily: 0 });
-  assert.equal(newbiePeriod(dai), null);
-  // 売上：保証期間の日は個数の金額＋保証、個数がまだでも保証
-  const recs = [
-    { date: '2026-11-12', start: { time: '8:00' }, end: { time: '18:00' }, sales: { takuhai: 100 } },
-    { date: '2026-11-13', start: { time: '8:00' }, end: { time: '18:00' }, sales: { takuhai: 100 } },
-    { date: '2026-11-11', start: { time: '8:00' }, end: { time: '18:00' } }
-  ];
-  const { rows, total } = monthSales(recs, 2026, 11, hj, '2026-11-30', '2026-12-01');
-  assert.equal(rows[11].amount, 100 * 150 + 2000);
-  assert.equal(rows[12].amount, 100 * 150);
-  assert.equal(rows[10].amount, 2000);
-  assert.equal(total.amount, 15000 * 2 + 4000);
-  // 新人保証の分（表の「新人保証」の列）
-  assert.equal(rows[11].newbie, 2000);
-  assert.equal(rows[12].newbie, 0);
-  assert.equal(total.newbie, 4000);
-  assert.equal(monthSales(recs, 2026, 11, hj, '2026-11-30', '2026-12-01').hasNewbie, true);
-  assert.equal(monthSales(recs, 2026, 12, hj, null, '2027-01-01').hasNewbie, false);
-  assert.equal(monthSales(recs, 2026, 11, dai, null, '2026-12-01').hasNewbie, false);
-});
-
-test('三多摩の新人保証は2週間、山単価は保証なし', async () => {
-  const { newbiePeriod, dayBonus, newbieSpan, newbieRule } = await import('../js/sales.js');
-  const tm = { salesType: 'sagawa', salesOffice: '三多摩', salesStartDate: '2026-10-13', newbiePerDay: '2000' };
-  assert.deepEqual(newbiePeriod(tm), { from: '2026-10-13', to: '2026-10-26', perDay: 2000 });
-  assert.equal(dayBonus(tm, '2026-10-26'), 2000);
-  assert.equal(dayBonus(tm, '2026-10-27'), 0);
-  assert.equal(newbiePeriod({ ...tm, salesStartDate: '2026-12-25' }).to, '2027-01-07'); // 年をまたぐ
-  assert.equal(newbiePeriod({ ...tm, salesOffice: '三多摩（山単価）' }), null);
-  assert.equal(newbiePeriod({ ...tm, salesOffice: '三多摩B' }).to, '2026-10-26'); // 三多摩Bは三多摩として扱う
-  assert.equal(newbieSpan(newbieRule({ office: '三多摩', shift: '', pay: 'unit' })), '2週間');
-  assert.equal(newbieSpan(newbieRule({ office: '八王子営業所', shift: '', pay: 'unit' })), '1か月間'); // 「営業所」が付いていても同じ
-  assert.equal(newbieRule({ office: '八王子', shift: 'ナイト', pay: 'unit' }), null); // 通常の便だけ
-});
-
-test('各営業所の新人保証の期間と代走の上乗せ', async () => {
-  const { newbieDates, unitPrices, dayBonus, sagawaJob } = await import('../js/sales.js');
-  const nb = (office, start = '2026-10-13') => newbieDates({ salesType: 'sagawa', salesOffice: office, salesStartDate: start });
-  for (const o of ['世田谷', '城北', '赤羽']) assert.deepEqual(nb(o), { from: '2026-10-13', to: '2027-01-12' });
-  for (const o of ['練馬', '東京', '所沢', '八王子']) assert.deepEqual(nb(o), { from: '2026-10-13', to: '2026-11-12' });
-  // 代走は新人保証なし。所沢（代走）・戸田（代走）は1日の上乗せ（各自が入れる）をずっと足す
-  assert.equal(nb('所沢（代走）'), null);
-  const so = { salesType: 'sagawa', salesOffice: '所沢（代走）', salesStartDate: '2026-10-13', priceTakuhai: '150', priceShogyo: '100', priceShuka: '50', priceExtra: '4000' };
-  assert.equal(unitPrices(so).daily, 4000);
-  assert.equal(dayBonus(so, '2027-06-01'), 4000);
-  // 以前の「戸田」も代走として扱う
-  assert.deepEqual([sagawaJob({ office: '戸田' }).office, sagawaJob({ office: '戸田' }).shift], ['戸田', '代走']);
-});
-
 test('前払いの履歴と合計（月ごと）', async () => {
   const { advanceHistory, advanceTotal } = await import('../js/sales.js');
   const s = { advanceHistory: { '2026-10': [{ id: 'b', date: '2026-10-20', amount: 30000 }, { id: 'a', date: '2026-10-05', amount: 50000 }], '2026-09': [{ id: 'c', date: '2026-09-10', amount: 70000 }] } };
@@ -536,7 +471,7 @@ test('月末のバックアップのお知らせ：月末の3日前から翌月5
 });
 
 test('佐川急便のナイト・モーニング：日極は1日の金額（各自が入れる）、単価は個数 × 単価', async () => {
-  const { dayJobs, dayAmount, countsMissing, jobLabel, newbieRule, isFixedSagawa, sagawaMissing } = await import('../js/sales.js');
+  const { dayJobs, dayAmount, countsMissing, jobLabel, isFixedSagawa, sagawaMissing } = await import('../js/sales.js');
   const s = { jobs: [
     { id: 'a', kind: 'sagawa', office: '江東（ナイト）', priceDaily: '5000' },
     { id: 'b', kind: 'sagawa', office: '八王子（ナイト・単価）', priceTakuhai: '200', priceShogyo: '100', priceShuka: '100' },
@@ -546,7 +481,6 @@ test('佐川急便のナイト・モーニング：日極は1日の金額（各�
   assert.equal(jobLabel(s.jobs[0]), '佐川急便 江東営業所（ナイト）');
   assert.equal(isFixedSagawa(s.jobs[0]), true);
   assert.equal(isFixedSagawa(s.jobs[1]), false);
-  assert.equal(newbieRule({ office: '中野（ナイト）' }), null);
   assert.deepEqual(sagawaMissing({ kind: 'sagawa', office: '江東（ナイト）' }), ['日極（円/日）']);
   // 日極：金額は1日の金額。個数がまだなら「まだ」（個数も必ず入れる）
   const r1 = rec([{ id: 'a', counts: {} }]);
@@ -600,26 +534,37 @@ test('佐川急便：営業所名は入力、種別（通常・代走・モー�
   assert.equal(jobList({ jobs: [{ id: 'x', kind: 'sagawa', office: '足立（ナイト）' }] })[0].pay, 'daily');
 });
 
-test('期間限定の保証（年末保証）：日極保証は個数に関係なく固定、一部保証は上乗せ、期間中は新人保証を足さない', async () => {
-  const { dayAmount, dayJobs, sagawaMissing, guardOf, countsMissing } = await import('../js/sales.js');
-  const base = { id: 'g', kind: 'sagawa', office: '八王子', shift: '', pay: 'unit', priceTakuhai: '150', priceShogyo: '100', priceShuka: '50', newbiePerDay: '2000', startDate: '2026-10-13' };
+test('保証（新人保証・年末保証）：期間・種類・金額は各自が入れる。重なる日は年末保証だけ', async () => {
+  const { dayAmount, dayJobs, countsMissing, sagawaMissing, guardsOf, guardOn, monthSales, jobList } = await import('../js/sales.js');
+  const base = { id: 'g', kind: 'sagawa', office: '○○', shift: '', pay: 'unit', priceTakuhai: '150', priceShogyo: '100', priceShuka: '50' };
   const rec = (date, counts) => ({ date, start: { time: '8:00' }, end: { time: '18:00' }, jobs: [{ id: 'g', counts }] });
-  // 日極保証：11/1〜12/31 は 18,000円（個数に関係なく）。新人保証（〜11/12）は期間中は足さない
-  const daily = { jobs: [{ ...base, guard: 'daily', guardName: '年末保証', guardFrom: '2026-11-01', guardTo: '2026-12-31', guardAmount: '18000' }] };
-  assert.equal(dayAmount(rec('2026-11-05', { takuhai: 200 }), daily), 18000);
-  assert.equal(dayAmount(rec('2026-12-31', { takuhai: 10 }), daily), 18000);
-  assert.equal(dayJobs(rec('2026-11-05', { takuhai: 200 }), daily)[0].newbie, 0);
-  assert.equal(countsMissing(rec('2026-11-05', {}), daily), true); // 個数は期間中も必ず入れる
-  // 期間の前は、いつもの単価＋新人保証
-  assert.equal(dayAmount(rec('2026-10-20', { takuhai: 100 }), daily), 15000 + 2000);
-  // 期間のあと（新人保証も終わっている）
-  assert.equal(dayAmount(rec('2027-01-05', { takuhai: 100 }), daily), 15000);
-  // 一部保証：いつもの単価に +10,000円
-  const extra = { jobs: [{ ...base, guard: 'extra', guardFrom: '2026-11-01', guardTo: '2026-12-31', guardAmount: '10000' }] };
-  assert.equal(dayAmount(rec('2026-11-05', { takuhai: 100 }), extra), 15000 + 10000);
-  assert.equal(guardOf(extra.jobs[0]).name, '年末保証'); // 名前が空なら「年末保証」
+  const nb = { name: '新人保証', type: 'extra', from: '2026-10-13', to: '2026-11-12', amount: '2000' };
+  const ye = { name: '年末保証', type: 'daily', from: '2026-11-01', to: '2026-12-31', amount: '18000' };
+  const s = { jobs: [{ ...base, guards: [nb, ye] }] };
+  assert.equal(dayAmount(rec('2026-10-12', { takuhai: 100 }), s), 15000); // 期間の前
+  assert.equal(dayAmount(rec('2026-10-20', { takuhai: 100 }), s), 15000 + 2000); // 新人保証（一部保証）
+  assert.equal(dayAmount(rec('2026-11-05', { takuhai: 100 }), s), 18000); // 重なる日は年末保証だけ
+  assert.equal(dayAmount(rec('2026-12-31', { takuhai: 10 }), s), 18000); // 日極保証は個数に関係なく
+  assert.equal(dayAmount(rec('2027-01-04', { takuhai: 100 }), s), 15000); // 期間のあと
+  assert.equal(countsMissing(rec('2026-11-05', {}), s), true); // 個数は期間中も必ず入れる
+  assert.equal(guardOn(s.jobs[0], '2026-11-05').name, '年末保証');
+  assert.equal(dayJobs(rec('2026-10-20', { takuhai: 100 }), s)[0].guardExtra, 2000);
+  // 売上表：保証の列（一部保証の額）
+  const m = monthSales([rec('2026-10-20', { takuhai: 100 })], 2026, 10, s, '2026-10-31', '2026-11-01');
+  assert.equal(m.hasGuard, true);
+  assert.equal(m.total.guardExtra, 2000);
+  assert.equal(monthSales([], 2027, 2, s, null, '2027-03-01').hasGuard, false);
   // 入れ忘れ
-  assert.deepEqual(sagawaMissing({ ...base, guard: 'daily', guardFrom: '2026-11-01' }), ['年末保証の期間・金額']);
-  assert.deepEqual(sagawaMissing({ ...base, guard: 'daily', guardFrom: '2026-12-01', guardTo: '2026-11-01', guardAmount: '18000' }), ['年末保証の期間・金額']);
-  assert.deepEqual(sagawaMissing({ ...base, guard: '' }), []);
+  assert.deepEqual(sagawaMissing({ ...base, guards: [{ name: '年末保証', type: '', from: '', to: '', amount: '' }] }), ['年末保証の種類']);
+  assert.deepEqual(sagawaMissing({ ...base, guards: [{ name: '新人保証', type: 'extra', from: '2026-11-01', to: '', amount: '2000' }] }), ['新人保証の期間・金額']);
+  assert.deepEqual(sagawaMissing({ ...base, guards: [{ ...ye, from: '2027-01-01' }] }), ['年末保証の期間・金額']);
+  assert.equal(guardsOf({ ...base, guards: [{ ...ye, amount: '' }] }).length, 0);
+  // 以前の版の新人保証（営業所ごとの自動の期間）と v0.25 の保証1つは、保証の一覧に読み替える
+  const old = jobList({ jobs: [{ id: 'o', kind: 'sagawa', office: '八王子', priceTakuhai: '150', priceShogyo: '100', priceShuka: '50', newbiePerDay: '2000', startDate: '2026-01-31',
+    guard: 'daily', guardName: '年末保証', guardFrom: '2026-11-01', guardTo: '2026-12-31', guardAmount: '18000' }] })[0];
+  assert.deepEqual(old.guards, [{ name: '新人保証', type: 'extra', from: '2026-01-31', to: '2026-02-27', amount: '2000' }, { name: '年末保証', type: 'daily', from: '2026-11-01', to: '2026-12-31', amount: '18000' }]);
+  assert.equal('newbiePerDay' in old, false);
+  const tama = jobList({ salesStartDate: '2026-10-13', jobs: [{ id: 't', kind: 'sagawa', office: '三多摩', newbiePerDay: '2000' }] })[0];
+  assert.equal(tama.guards[0].to, '2026-10-26'); // 三多摩は2週間
+  assert.equal(jobList({ jobs: [{ id: 'd', kind: 'sagawa', office: '八王子（代走）', newbiePerDay: '2000', startDate: '2026-10-13' }] })[0].guards.length, 0); // 代走は新人保証なし
 });
