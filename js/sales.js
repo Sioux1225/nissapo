@@ -54,7 +54,7 @@ const specOf = (settings) => sagawaJob({
 //   job.guards：[{ name: '新人保証' | '年末保証', type: 'daily' | 'extra', from, to, amount }]
 //   daily（日極保証）：期間中は個数に関係なく1日の金額。extra（一部保証）：いつもの金額に1日の金額を足す
 //   期間が重なる日は年末保証だけ（年末保証がなければ、先に登録したもの）。個数は期間中も必ず入れる
-export const GUARD_DEFAULT_NAME = '年末保証';
+export const GUARD_DEFAULT_NAME = '新人保証'; // 保証を追加したときに、はじめに選ばれている名前
 export const GUARD_NAMES = ['新人保証', '年末保証']; // 保証の名前（設定のプルダウン）
 const guardName = (g) => String(g?.name || '').trim() || GUARD_DEFAULT_NAME;
 function validGuard(g) {
@@ -102,7 +102,7 @@ function withGuards(j, settings) {
   const guards = [];
   const nb = legacyNewbie(j, j.startDate || settings?.salesStartDate);
   if (nb) guards.push(nb);
-  if (j.guard === 'daily' || j.guard === 'extra') guards.push({ name: j.guardName || GUARD_DEFAULT_NAME, type: j.guard, from: j.guardFrom || '', to: j.guardTo || '', amount: j.guardAmount ?? '' });
+  if (j.guard === 'daily' || j.guard === 'extra') guards.push({ name: j.guardName || '年末保証', type: j.guard, from: j.guardFrom || '', to: j.guardTo || '', amount: j.guardAmount ?? '' });
   const out = { ...j, guards };
   for (const k of ['newbiePerDay', 'startDate', 'guard', 'guardName', 'guardFrom', 'guardTo', 'guardAmount']) delete out[k];
   return out;
