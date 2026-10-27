@@ -18,7 +18,7 @@ import {
   KINDS, COLLISIONS, ROAD_TYPES, SLOPES, SHAPES, SURFACES
 } from './accident.js';
 
-export const APP_VERSION = '0.23.0';
+export const APP_VERSION = '0.23.1';
 
 const app = document.getElementById('app');
 const state = {
@@ -1412,7 +1412,6 @@ function renderSales() {
             ? '<span class="warn-text">前払い可能額より多い額です</span>' : '')}
       </section>
       <p class="info">前払いは<b>月初めからの売上</b>で計算します。乗務後点呼で選んだ案件の売上の合計を、その日の売上として数えます。日付を押すと内訳が見られ、個数もここで入れられます。</p>
-      <div class="field-inline"><button type="button" class="chip" data-action="sales-detail" aria-pressed="${!!state.salesDetail}">PDFに内訳（案件ごとの金額・メモ）も付ける</button></div>
       <button type="button" class="btn-primary" data-action="share-sales">PDFにしてLINEで送る</button>
       <button type="button" class="btn-text" data-action="preview-sales">プレビューで確認する</button>
       <div class="card list">${rows || '<p class="empty">この月はまだ乗務の記録がありません</p>'}</div>
@@ -1420,14 +1419,15 @@ function renderSales() {
     </main>`;
 }
 
-// 送る売上表のページ：1枚目は1日の合計だけ。「内訳も付ける」なら、案件ごとの内訳のページを足す
+// 送る売上表のページ：1枚目は1日の合計だけ。その月に案件を組み合わせていれば（2つ以上の案件で乗務していれば）、案件ごとの内訳のページを足す
 function salesCanvases() {
   const s = state.settings;
-  if (!state.salesDetail) return [salesCanvas()];
   const { y, m, data } = salesContext();
+  const worked = data.rows.filter((x) => x.worked && x.inRange);
+  if (new Set(worked.flatMap((r) => r.jobs.map((j) => j.id || j.name))).size < 2) return [salesCanvas()];
   const rows = [];
   const sums = new Map();
-  for (const r of data.rows.filter((x) => x.worked && x.inRange)) {
+  for (const r of worked) {
     r.jobs.forEach((j, i) => {
       const note = [jobCountsText(j), j.memo].filter(Boolean).join('　');
       rows.push([i ? '' : `${r.day}（${r.week}）`, j.name, j.amount == null ? 'まだ' : yen(j.amount), note]);
@@ -2062,11 +2062,7 @@ app.addEventListener('click', async (ev) => {
     const y = window.scrollY;
     renderSales();
     window.scrollTo(0, y);
-  } else if (action === 'sales-detail') {
-    state.salesDetail = !state.salesDetail;
-    el.setAttribute('aria-pressed', state.salesDetail);
-  }
-  else if (action === 'sales-month') {
+  } else if (action === 'sales-month') {
     const d = new Date(state.salesMonth.y, state.salesMonth.m - 1 + Number(el.dataset.step), 1);
     state.salesMonth = { y: d.getFullYear(), m: d.getMonth() + 1 };
     renderSales();
