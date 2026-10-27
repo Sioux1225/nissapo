@@ -6,45 +6,63 @@ import { num, daysInMonth, dateKey, weekday, distanceOf, isOff, isOffDay, todayK
 
 export const COUNT_KEYS = [['takuhai', '宅配'], ['shogyo', '商業'], ['shuka', '集荷']];
 
-// 佐川急便の営業所の一覧（名前と、新人保証の期間・日極・1日の上乗せがあるかだけ）
-// 単価・日極・上乗せ・新人保証の金額は、ほかの営業所の方に見えないよう、ここには持たず、各自が設定で入れる（2026/10/28〜）
-//   newbie：新人保証の期間。この営業所で働き始めた日から months か月（または days 日）のあいだ、乗務した日ごとに設定の金額を足す
-//   fixed：日極（ナイト・モーニングの日極）。金額は1日の金額だけ（個数も必ず入れるが、記録用で金額は変わらない）
-//   extra：1日の上乗せ（川口（DRF）の保障・代走の上乗せ）を乗務した日ごとに足す
-// 三多摩B は三多摩と同じ営業所をエリアで分けたものなので、三多摩を選ぶ（以前の入力の「三多摩B」も三多摩に読み替える）
-const M1 = { newbie: { months: 1 } };
-const M3 = { newbie: { months: 3 } };
-const FIX = { fixed: true };
-const EXTRA = { extra: true };
-export const OFFICES = [
-  ['東京', M1], ['江東'], ['江東（ナイト）', FIX], ['台東'], ['世田谷', M3], ['世田谷（ナイト）', FIX],
-  ['墨田'], ['墨田（ナイト）', FIX], ['横浜'], ['湘南'],
-  ['千葉南'], ['千葉北'], ['城北', M3], ['城北（ナイト）', FIX],
-  ['三多摩（山単価）'], ['三多摩', { newbie: { days: 14 } }], ['三多摩（ナイト）'], ['三多摩（モーニング）', FIX],
-  ['練馬', M1], ['練馬（ナイト）'],
-  ['越谷'], ['足立'], ['足立（ナイト）', FIX], ['八王子', M1], ['八王子（代走）'],
-  ['八王子（ナイト・単価）'], ['八王子（ナイト・日極）', FIX], ['八王子（モーニング）', FIX],
-  ['川崎'], ['川崎（ナイト4h）', FIX], ['川崎（ナイト3h）', FIX], ['さいたま'], ['川口'], ['川口（DRF）', EXTRA], ['川口（ナイト）'],
-  ['所沢', M1], ['所沢（代走）', EXTRA], ['所沢（ナイト）', FIX], ['赤羽', M3],
-  ['座間'], ['座間（ナイト）', FIX], ['横須賀'], ['横浜北'], ['杉並'], ['杉並（代走）'], ['杉並（ナイト）', FIX], ['木更津'],
-  ['茂原'], ['横浜鶴見'], ['城南'], ['目黒'], ['横浜緑'], ['佐倉'], ['町田'],
-  ['千葉'], ['中野'], ['中野（ナイト）', FIX], ['相模原'], ['戸田（代走）', EXTRA]
-];
-export const OTHER_OFFICE = 'その他';
+// 佐川急便の案件：営業所名は各自が入れ、種別（通常・代走・モーニング・ナイト・DRF）と支払い（単価・日極）を選ぶ（2026/10/28〜）
+// 単価・日極・上乗せ・新人保証の金額は、ほかの営業所の方に見えないよう、ここには持たず、各自が設定で入れる
+//   単価：宅配・商業・集荷の個数 × 単価。代走・DRF は、1日の上乗せ（保障など）を入れれば乗務した日ごとに足す
+//   日極：金額は1日の金額だけ（個数も必ず入れるが、記録用で金額は変わらない）
+export const SHIFTS = ['代走', 'モーニング', 'ナイト', 'DRF'];
+const EXTRA_SHIFTS = ['代走', 'DRF'];
+export const hasExtra = (shift) => EXTRA_SHIFTS.includes(shift);
 
-// 選んだ営業所（表にあればその行、「その他」や表にない名前なら null）
-// 以前の版で「八王子営業所」のように入力した名前も、表の営業所に読み替える
-export function officeEntry(name) {
-  let n = String(name || '').replace(/\s|　/g, '').replace(/営業所$/, '');
+// 新人保証の期間（通常の便だけ）。この営業所で働き始めた日から months か月（または days 日）のあいだ、乗務した日ごとに設定の金額を足す
+const M1 = { months: 1 };
+const M3 = { months: 3 };
+const NEWBIE = { 東京: M1, 世田谷: M3, 城北: M3, 三多摩: { days: 14 }, 練馬: M1, 八王子: M1, 所沢: M1, 赤羽: M3 };
+
+// 以前の版（営業所を一覧から選んでいたころ）の、日極の営業所。読み替えに使う
+const LEGACY_FIXED = ['江東（ナイト）', '世田谷（ナイト）', '墨田（ナイト）', '城北（ナイト）', '三多摩（モーニング）', '足立（ナイト）',
+  '八王子（ナイト・日極）', '八王子（モーニング）', '川崎（ナイト4h）', '川崎（ナイト3h）', '所沢（ナイト）', '座間（ナイト）', '杉並（ナイト）', '中野（ナイト）'];
+const OTHER_OFFICE = 'その他'; // 以前の版の「一覧にない営業所」
+
+// 営業所名の空白と、最後の「営業所」を取る（「八王子営業所」も「八王子」も同じ営業所）
+const cleanOffice = (name) => String(name || '').replace(/\s|　/g, '').replace(/営業所$/, '');
+
+// 佐川急便の案件を { office, shift, pay } の形にする。以前の版の「江東（ナイト）」のような営業所名も読み替える
+export function sagawaJob(job) {
+  if ('pay' in job || 'shift' in job) return { ...job, shift: job.shift || '', pay: job.pay || '' };
+  const out = { ...job, shift: '', pay: '' };
+  delete out.officeName;
+  if (job.office === OTHER_OFFICE) return { ...out, office: job.officeName || '', pay: job.officeName ? 'unit' : '' };
+  let n = cleanOffice(job.office);
+  if (!n) return { ...out, office: '' };
   if (/^三多摩[BＢ]$/.test(n)) n = '三多摩';
   if (n === '戸田') n = '戸田（代走）'; // 戸田は代走のみ
-  const hit = OFFICES.find(([o]) => o === n);
-  const f = hit?.[1] || {};
-  return hit ? { name: hit[0], newbie: f.newbie || null, fixed: !!f.fixed, extra: !!f.extra } : null;
+  const m = n.match(/^([^（]+)（(.+)）$/);
+  let office = m ? m[1] : n;
+  let shift = '';
+  const rest = [];
+  for (const part of m ? m[2].split('・') : []) {
+    const sh = SHIFTS.find((x) => part.startsWith(x));
+    if (sh && !shift) { shift = sh; if (part.length > sh.length) rest.push(part.slice(sh.length)); } else if (part !== '単価' && part !== '日極') rest.push(part);
+  }
+  if (rest.length) office += `（${rest.join('・')}）`;
+  return { ...out, office, shift, pay: LEGACY_FIXED.includes(n) ? 'daily' : 'unit' };
 }
 
-// 佐川急便の日極の案件（ナイト・モーニングの日極）：金額は1日の金額だけ（個数は記録用）
-export const isFixedSagawa = (job) => job?.kind === 'sagawa' && !!officeEntry(job.office)?.fixed;
+// 設定（以前の形の salesOffice など）から、佐川急便の案件の形にする
+const specOf = (settings) => sagawaJob({
+  office: settings.salesOffice, officeName: settings.salesOfficeName,
+  ...(settings.salesPay !== undefined || settings.salesShift !== undefined ? { shift: settings.salesShift, pay: settings.salesPay } : {})
+});
+
+// 新人保証の期間の決まり（通常の便で、単価の営業所だけ。なければ null）
+export function newbieRule(job) {
+  const j = sagawaJob(job);
+  return !j.shift && j.pay === 'unit' ? NEWBIE[cleanOffice(j.office)] || null : null;
+}
+
+// 佐川急便の日極の案件：金額は1日の金額だけ（個数は記録用）
+export const isFixedSagawa = (job) => job?.kind === 'sagawa' && sagawaJob(job).pay === 'daily';
 
 const isDate = (v) => /^\d{4}-\d{2}-\d{2}$/.test(v || '');
 const pad = (n) => String(n).padStart(2, '0');
@@ -53,7 +71,7 @@ const pad = (n) => String(n).padStart(2, '0');
 // 例：10月13日に開始して1か月なら、11月12日まで（月末をまたぐときは、次の月の末日を上限にする）
 export function newbieDates(settings) {
   if (settings.salesType !== 'sagawa') return null;
-  const nb = officeEntry(settings.salesOffice)?.newbie;
+  const nb = newbieRule(specOf(settings));
   if (!nb || !isDate(settings.salesStartDate)) return null;
   const [y, m, d] = settings.salesStartDate.split('-').map(Number);
   let end;
@@ -88,21 +106,24 @@ export function dayBonus(settings, date) {
   return (p.daily || 0) + (nb && date >= nb.from && date <= nb.to ? nb.perDay : 0);
 }
 
+// 営業所名に種別を付ける（「江東」と「ナイト」→「江東（ナイト）」、「川崎（4h）」と「ナイト」→「川崎（4h・ナイト）」）
+const withShift = (name, shift) => (!shift ? name : /）$/.test(name) ? name.replace(/）$/, `・${shift}）`) : `${name}（${shift}）`);
+
 // 売上表に出す営業所名
 export function officeName(settings) {
-  if (settings.salesOffice === OTHER_OFFICE) return settings.salesOfficeName || '';
-  return officeEntry(settings.salesOffice)?.name || settings.salesOffice || '';
+  const j = specOf(settings);
+  return withShift(String(j.office || '').trim(), j.shift);
 }
 
 // 単価・日極・1日の上乗せ：どの営業所も、各自が設定で入れたもの
-//   daily：その日に個数の金額とは別に足す金額（日極の営業所は日極の金額、上乗せのある営業所は上乗せ）
+//   daily：その日に個数の金額とは別に足す金額（日極は日極の金額、代走・DRF は上乗せ）
 export function unitPrices(settings) {
-  const entry = officeEntry(settings.salesOffice);
+  const j = specOf(settings);
   return {
     takuhai: num(settings.priceTakuhai),
     shogyo: num(settings.priceShogyo),
     shuka: num(settings.priceShuka),
-    daily: entry?.fixed ? num(settings.priceDaily) || 0 : entry?.extra ? num(settings.priceExtra) || 0 : 0
+    daily: j.pay === 'daily' ? num(settings.priceDaily) || 0 : hasExtra(j.shift) ? num(settings.priceExtra) || 0 : 0
   };
 }
 
@@ -182,14 +203,16 @@ export function advanceLimit({ sales, advanced = 0, prevSales, prevLevel = null,
 // ---- 案件（佐川急便・法人をまとめて登録する） ----
 // 佐川急便から法人へ移った方や、朝は法人・午後は佐川急便のように組み合わせる方のため、案件をいくつでも登録し、
 // 乗務後点呼でその日の案件を選ぶ。その日の金額は、選んだ案件の金額の合計。
-//   佐川急便：営業所を選び、単価（日極・上乗せ）と新人保証の金額は各自が入れる。新人保証はその営業所で働き始めた日（startDate）から数える
+//   佐川急便：営業所名を入れ、種別（通常・代走・モーニング・ナイト・DRF）と支払い（単価・日極）を選ぶ。
+//             単価（日極・上乗せ）と新人保証の金額は各自が入れる。新人保証はその営業所で働き始めた日（startDate）から数える
 //   法人：会社名・営業所名。支払いは「日極」（1日いくら。空なら毎回入力）か「単価」（品目と単価を3つまで）
-// settings.jobs：[{ id, kind: 'sagawa', office, officeName, priceTakuhai, priceShogyo, priceShuka, priceDaily, priceExtra, newbiePerDay, startDate }
+// settings.jobs：[{ id, kind: 'sagawa', office, shift, pay: 'unit' | 'daily', priceTakuhai, priceShogyo, priceShuka, priceDaily, priceExtra, newbiePerDay, startDate }
 //                 | { id, kind: 'corp', company, branch, pay: 'daily' | 'unit', price, units: [{ label, price }] }]
 export const UNIT_SLOTS = 3;
 
 // 以前の版の案件（法人（日極）の { name, price }）を、いまの形に読み替える
 function normalizeJob(j) {
+  if (j.kind === 'sagawa') return sagawaJob(j); // 以前の版の「江東（ナイト）」のような営業所も、営業所名・種別・支払いに分ける
   // 種類（佐川急便・法人）を選ぶ前の新しい案件は、そのまま（以前の版の案件だけ読み替える）
   if (j.kind === 'sagawa' || j.kind === 'corp' || ('kind' in j && !('name' in j))) return j;
   return { id: j.id, kind: 'corp', company: j.name || '', branch: '', pay: 'daily', price: j.price ?? '', units: [] };
@@ -217,17 +240,14 @@ export function jobReady(job) {
   if (job.pay === 'unit') return jobUnits(job).length > 0;
   return job.pay === 'daily';
 }
-// 佐川急便の案件で、まだ入っていない項目（営業所・単価・日極・上乗せ。新人保証は入れなければなし）
+// 佐川急便の案件で、まだ入っていない項目（営業所名・単価か日極か・単価・日極。上乗せ・新人保証は入れなければなし）
 export function sagawaMissing(job) {
-  if (!job.office) return ['営業所'];
-  const entry = officeEntry(job.office);
-  const miss = [];
-  if (job.office === OTHER_OFFICE) { if (!String(job.officeName || '').trim()) miss.push('営業所名'); } else if (!entry) return ['営業所'];
-  if (entry?.fixed) { if (num(job.priceDaily) == null) miss.push('日極（円/日）'); return miss; }
-  const prices = [['priceTakuhai', '宅配'], ['priceShogyo', '商業'], ['priceShuka', '集荷']].filter(([k]) => num(job[k]) == null).map(([, t]) => t);
-  if (prices.length) miss.push(`単価：${prices.join("・")}`);
-  if (entry?.extra && num(job.priceExtra) == null) miss.push('1日の上乗せ');
-  return miss;
+  const j = sagawaJob(job);
+  if (!String(j.office || '').trim()) return ['営業所名'];
+  if (j.pay !== 'unit' && j.pay !== 'daily') return ['単価か日極か'];
+  if (j.pay === 'daily') return num(j.priceDaily) == null ? ['日極（円/日）'] : [];
+  const prices = [['priceTakuhai', '宅配'], ['priceShogyo', '商業'], ['priceShuka', '集荷']].filter(([k]) => num(j[k]) == null).map(([, t]) => t);
+  return prices.length ? [`単価：${prices.join('・')}`] : [];
 }
 
 export function jobsOf(settings) {
@@ -238,13 +258,14 @@ export const hasSagawa = (settings) => jobsOf(settings).some((j) => j.kind === '
 // 案件の名前（佐川急便 八王子営業所／○○運送 △△営業所）
 const officeLabel = (name) => (!name || /営業所/.test(name) ? name || '' : name.replace(/^([^（]+)(（.*）)?$/, '$1営業所$2'));
 export function jobLabel(job) {
-  if (job.kind === 'sagawa') return `佐川急便 ${officeLabel(job.office === OTHER_OFFICE ? job.officeName : officeEntry(job.office)?.name || job.office)}`.trim();
+  if (job.kind === 'sagawa') { const j = sagawaJob(job); return `佐川急便 ${withShift(officeLabel(cleanOffice(j.office)), j.shift)}`.trim(); }
   return [job.company, job.branch].map((v) => String(v || '').trim()).filter(Boolean).join(' ');
 }
 
 // 佐川急便の案件を、以前の設定の形に置きかえる（単価・新人保証の計算をそのまま使う）
 export function sagawaSettings(job, settings) {
-  return { ...settings, salesType: 'sagawa', salesOffice: job.office, salesOfficeName: job.officeName || '', priceTakuhai: job.priceTakuhai ?? '', priceShogyo: job.priceShogyo ?? '', priceShuka: job.priceShuka ?? '', priceDaily: job.priceDaily ?? '', priceExtra: job.priceExtra ?? '', newbiePerDay: job.newbiePerDay ?? '', salesStartDate: job.startDate || settings.salesStartDate || '' };
+  const j = sagawaJob(job);
+  return { ...settings, salesType: 'sagawa', salesOffice: j.office || '', salesOfficeName: '', salesShift: j.shift, salesPay: j.pay, priceTakuhai: job.priceTakuhai ?? '', priceShogyo: job.priceShogyo ?? '', priceShuka: job.priceShuka ?? '', priceDaily: job.priceDaily ?? '', priceExtra: job.priceExtra ?? '', newbiePerDay: job.newbiePerDay ?? '', salesStartDate: job.startDate || settings.salesStartDate || '' };
 }
 
 const findJob = (settings, e) => {

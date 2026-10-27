@@ -3,7 +3,7 @@
 
 import { db, requestPersist } from './db.js';
 import { shrinkImage, newPhoto, blobToDataUrl, dataUrlToBlob } from './photo.js';
-import { COUNT_KEYS, unitPrices, salesReady, monthSales, yen, advanceKey, advanceOf, advanceHistory, advanceTotal, advanceLimit, isFirstAdvanceMonth, prevSalesLevel, OFFICES, OTHER_OFFICE, officeEntry, officeName, newbiePeriod, newbieDates, newbieSpan, sagawaMissing, jobList, jobsOf, dayJobs, jobLabel, jobReady, jobUnits, sagawaSettings, hasSagawa, isFixedSagawa, UNIT_SLOTS } from './sales.js';
+import { COUNT_KEYS, unitPrices, salesReady, monthSales, yen, advanceKey, advanceOf, advanceHistory, advanceTotal, advanceLimit, isFirstAdvanceMonth, prevSalesLevel, SHIFTS, hasExtra, sagawaJob, newbieRule, officeName, newbiePeriod, newbieDates, newbieSpan, sagawaMissing, jobList, jobsOf, dayJobs, jobLabel, jobReady, jobUnits, sagawaSettings, hasSagawa, isFixedSagawa, UNIT_SLOTS } from './sales.js';
 import { EXPIRED, expiryStatus, expiryMessage, expiryAlertsToShow } from './expiry.js';
 import { OIL_LIMIT, OIL_STEPS, newOilChange, currentOdo, oilStatus, oilMessage, oilAlertToShow, sortOilChanges } from './oil.js';
 import {
@@ -18,7 +18,7 @@ import {
   KINDS, COLLISIONS, ROAD_TYPES, SLOPES, SHAPES, SURFACES
 } from './accident.js';
 
-export const APP_VERSION = '0.23.1';
+export const APP_VERSION = '0.24.0';
 
 const app = document.getElementById('app');
 const state = {
@@ -251,22 +251,24 @@ function jobCard(s, j, i) {
   const inp = (k, label, attrs = '', note = '') => field(label, `<input data-job-i="${i}" data-job-k="${k}" value="${e(getPath(j, k) ?? '')}" ${attrs}>`, note);
   let body = '';
   if (j.kind === 'sagawa') {
-    const entry = officeEntry(j.office);
-    const selected = entry ? entry.name : j.office === OTHER_OFFICE ? OTHER_OFFICE : '';
+    const sj = sagawaJob(j);
+    const rule = newbieRule(sj);
     const nbDates = newbieDates(sagawaSettings(j, s));
     const yenInp = (k, label, ex, note = '') => inp(k, label, `type="number" inputmode="numeric" min="0" placeholder="例：${ex}"`, note);
-    const opts = ['<option value="">選んでください</option>',
-      ...OFFICES.map(([o]) => `<option value="${o}" ${o === selected ? 'selected' : ''}>${o}</option>`),
-      `<option value="${OTHER_OFFICE}" ${selected === OTHER_OFFICE ? 'selected' : ''}>一覧にない営業所</option>`].join('');
-    // 単価・日極・上乗せ・新人保証の金額は、ほかの営業所の方に見えないよう、各自が入れる（新人保証の期間だけ自動で出す）
-    body = `${field('営業所', `<select class="select" data-job-i="${i}" data-job-k="office">${opts}</select>`)}
-      ${selected === OTHER_OFFICE ? inp('officeName', '営業所名', 'placeholder="例：○○"') : ''}
-      ${!selected ? '' : entry?.fixed ? yenInp('priceDaily', '日極（円/日）', '○○○○', '個数も入れますが、記録用で金額は変わりません') : `
+    const chip = (act, v, t, on) => `<button type="button" class="chip" data-action="${act}" data-i="${i}" data-value="${v}" aria-pressed="${on}">${t}</button>`;
+    const shifts = [['', '通常'], ...SHIFTS.map((x) => [x, x])].map(([v, t]) => chip('job-shift', v, t, sj.shift === v)).join('');
+    const pays = [['unit', '単価'], ['daily', '日極']].map(([v, t]) => chip('job-pay', v, t, sj.pay === v)).join('');
+    // 営業所名は各自が入れ、種別と支払いは選ぶ。単価・日極・上乗せ・新人保証の金額も各自が入れる（新人保証の期間だけ自動で出す）
+    body = `${inp('office', '営業所名', 'placeholder="例：○○"', '「営業所」は付けなくても大丈夫です')}
+      <div class="field"><span class="field-label">種別</span><div class="picks">${shifts}</div></div>
+      <div class="field"><span class="field-label">支払い</span><div class="picks">${pays}</div></div>
+      ${sj.pay === 'daily' ? yenInp('priceDaily', '日極（円/日）', '○○○○', '個数も入れますが、記録用で金額は変わりません') : ''}
+      ${sj.pay === 'unit' ? `
         ${yenInp('priceTakuhai', '単価：宅配（円/個）', '○○○')}
         ${yenInp('priceShogyo', '単価：商業（円/個）', '○○○')}
         ${yenInp('priceShuka', '単価：集荷（円/個）', '○○○')}
-        ${entry?.extra ? yenInp('priceExtra', '1日の上乗せ（保障・代走）（円/日）', '○○○○', '乗務した日ごとに足します') : ''}`}
-      ${entry?.newbie ? `${yenInp('newbiePerDay', '新人保証（円/日）', '○○○○', `この営業所で働き始めた日から${newbieSpan(entry.newbie)}、乗務した日ごとに足します${nbDates ? `（${nbDates.from.replace(/-/g, '/')}〜${nbDates.to.replace(/-/g, '/')}）` : ''}。新人保証がなければ空のまま`)}
+        ${hasExtra(sj.shift) ? yenInp('priceExtra', `1日の上乗せ（保障など）（円/日）`, '○○○○', '乗務した日ごとに足します。なければ空のまま') : ''}` : ''}
+      ${rule ? `${yenInp('newbiePerDay', '新人保証（円/日）', '○○○○', `この営業所で働き始めた日から${newbieSpan(rule)}、乗務した日ごとに足します${nbDates ? `（${nbDates.from.replace(/-/g, '/')}〜${nbDates.to.replace(/-/g, '/')}）` : ''}。新人保証がなければ空のまま`)}
         ${inp('startDate', 'この営業所で働き始めた日', 'type="date"', '新人保証の期間を数えるのに使います（空なら下の「稼働を開始した日」）')}` : ''}`;
   } else if (j.kind === 'corp') {
     const pays = [['daily', '日極'], ['unit', '単価']].map(([v, t]) => `<button type="button" class="chip" data-action="job-pay" data-i="${i}" data-value="${v}" aria-pressed="${j.pay === v}">${t}</button>`).join('');
@@ -2034,7 +2036,7 @@ app.addEventListener('click', async (ev) => {
     const y = window.scrollY;
     render();
     window.scrollTo(0, y);
-  } else if (['add-job', 'del-job', 'job-kind', 'job-pay'].includes(action)) {
+  } else if (['add-job', 'del-job', 'job-kind', 'job-pay', 'job-shift'].includes(action)) {
     const jobs = editableJobs();
     const i = Number(el.dataset.i);
     if (action === 'add-job') jobs.push({ id: `job-${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`, kind: '' });
@@ -2045,9 +2047,10 @@ app.addEventListener('click', async (ev) => {
       if (!j.id) j.id = `job-${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
       if (action === 'job-kind') {
         j.kind = el.dataset.value;
-        if (j.kind === 'sagawa') j.office ??= '';
+        if (j.kind === 'sagawa') { j.office ??= ''; j.shift ??= ''; j.pay ??= ''; }
         else { j.company ??= ''; j.branch ??= ''; j.pay ??= ''; }
-      } else j.pay = el.dataset.value;
+      } else if (action === 'job-shift') j.shift = el.dataset.value;
+      else j.pay = el.dataset.value;
       if (j.kind === 'corp') j.units = Array.from({ length: UNIT_SLOTS }, (_, k) => j.units?.[k] || { label: '', price: '' });
     }
     const y = window.scrollY;
@@ -2203,10 +2206,8 @@ app.addEventListener('input', (ev) => {
     if (!jobs[i]) jobs[i] = { id: `job-${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`, kind: '' };
     if (!jobs[i].id) jobs[i].id = `job-${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
     setPath(jobs[i], t.dataset.jobK, t.value);
-    // 営業所を変えたら、前の営業所の単価・日極・上乗せ・新人保証は消して入れ直してもらう
-    if (t.dataset.jobK === 'office') for (const k of ['priceTakuhai', 'priceShogyo', 'priceShuka', 'priceDaily', 'priceExtra', 'newbiePerDay']) jobs[i][k] = '';
-    // 営業所・働き始めた日を変えたら、単価・新人保証の欄を描き直す
-    if (t.dataset.jobK === 'office' || t.dataset.jobK === 'startDate') {
+    // 働き始めた日を変えたら、新人保証の期間を描き直す（営業所名は、入れ終わったとき（change）に描き直す）
+    if (t.dataset.jobK === 'startDate') {
       const y = window.scrollY;
       render();
       window.scrollTo(0, y);
@@ -2285,6 +2286,16 @@ app.addEventListener('change', async (ev) => {
     await reload();
     const y = window.scrollY;
     renderSales();
+    window.scrollTo(0, y);
+    return;
+  }
+  if (t.dataset.jobK === 'office') {
+    // 営業所名を入れ終わったら、新人保証の欄を出し入れする（変わらなければ描き直さない。押したボタンが消えないように）
+    const j = jobList(state.settings)[Number(t.dataset.jobI)];
+    const shown = !!app.querySelector(`[data-job-i="${t.dataset.jobI}"][data-job-k="newbiePerDay"]`);
+    if (!j || !!newbieRule(j) === shown) return;
+    const y = window.scrollY;
+    render();
     window.scrollTo(0, y);
     return;
   }
