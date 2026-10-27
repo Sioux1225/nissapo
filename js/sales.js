@@ -6,37 +6,29 @@ import { num, daysInMonth, dateKey, weekday, distanceOf, isOff, isOffDay, todayK
 
 export const COUNT_KEYS = [['takuhai', '宅配'], ['shogyo', '商業'], ['shuka', '集荷']];
 
-// 佐川急便の商業・集荷の決まった単価（営業所で変わる）
-//   商業：100円（三多摩・八王子は80円）　集荷：100円（台東は70円）
-export function defaultShogyo(office) {
-  return /三多摩|八王子/.test(office || '') ? 80 : 100;
-}
-export function defaultShuka(office) {
-  return /台東/.test(office || '') ? 70 : 100;
-}
-
-// 佐川急便の営業所と宅配の単価（佐川単価表 2026年5月27日更新の「一般」）
-// 3つ目の数字は、乗務した日ごとに足す金額（川口（DRF）は個建＋1日10,000円の保障）
-// 4つ目は新人保証：稼働を開始した日から months か月（または days 日）のあいだ、乗務した日ごとに perDay 円を足す
-// （三多摩は2週間、東京・八王子・練馬・所沢は1か月、世田谷・城北・赤羽は3か月。三多摩（山単価）は新人保証なし）
-// 代走：所沢（代走）は1日5,000円・戸田（代走）は1日10,000円をずっと足す（戸田は代走のみ募集）
+// 佐川急便の営業所の一覧（名前と、新人保証の期間・日極・1日の上乗せがあるかだけ）
+// 単価・日極・上乗せ・新人保証の金額は、ほかの営業所の方に見えないよう、ここには持たず、各自が設定で入れる（2026/10/28〜）
+//   newbie：新人保証の期間。この営業所で働き始めた日から months か月（または days 日）のあいだ、乗務した日ごとに設定の金額を足す
+//   fixed：日極（ナイト・モーニングの日極）。金額は1日の金額だけ（個数も必ず入れるが、記録用で金額は変わらない）
+//   extra：1日の上乗せ（川口（DRF）の保障・代走の上乗せ）を乗務した日ごとに足す
 // 三多摩B は三多摩と同じ営業所をエリアで分けたものなので、三多摩を選ぶ（以前の入力の「三多摩B」も三多摩に読み替える）
-// ナイト・モーニング（2026/10 追加）：日極は1日の金額（個数も必ず入れるが、記録用で金額は変わらない）、単価は宅配の個数 × 単価。新人保証なし
-export const PRICE_TABLE_DATE = '2026年5月27日';
-const fixedDay = (name, daily) => [name, 0, daily, null, { fixed: true }];
+const M1 = { newbie: { months: 1 } };
+const M3 = { newbie: { months: 3 } };
+const FIX = { fixed: true };
+const EXTRA = { extra: true };
 export const OFFICES = [
-  ['東京', 173, 0, { perDay: 3000, months: 1 }], ['江東', 173], fixedDay('江東（ナイト）', 6000), ['台東', 173], ['世田谷', 176, 0, { perDay: 3000, months: 3 }], fixedDay('世田谷（ナイト）', 8000),
-  ['墨田', 175], fixedDay('墨田（ナイト）', 8000), ['横浜', 176], ['湘南', 170],
-  ['千葉南', 170], ['千葉北', 170], ['城北', 177, 0, { perDay: 3000, months: 3 }], fixedDay('城北（ナイト）', 8000),
-  ['三多摩（山単価）', 186], ['三多摩', 165, 0, { perDay: 5000, days: 14 }], ['三多摩（ナイト）', 250], fixedDay('三多摩（モーニング）', 8000),
-  ['練馬', 180, 0, { perDay: 5000, months: 1 }], ['練馬（ナイト）', 200],
-  ['越谷', 167], ['足立', 175], fixedDay('足立（ナイト）', 8140), ['八王子', 178, 0, { perDay: 5000, months: 1 }], ['八王子（代走）', 190],
-  ['八王子（ナイト・単価）', 250], fixedDay('八王子（ナイト・日極）', 8000), fixedDay('八王子（モーニング）', 8000),
-  ['川崎', 173], fixedDay('川崎（ナイト4h）', 8000), fixedDay('川崎（ナイト3h）', 6000), ['さいたま', 180], ['川口', 180], ['川口（DRF）', 167, 10000], ['川口（ナイト）', 200],
-  ['所沢', 180, 0, { perDay: 3000, months: 1 }], ['所沢（代走）', 180, 5000], fixedDay('所沢（ナイト）', 10000), ['赤羽', 177, 0, { perDay: 3000, months: 3 }],
-  ['座間', 173], fixedDay('座間（ナイト）', 8000), ['横須賀', 178], ['横浜北', 175], ['杉並', 177], ['杉並（代走）', 191], fixedDay('杉並（ナイト）', 8000), ['木更津', 168],
-  ['茂原', 168], ['横浜鶴見', 176], ['城南', 174], ['目黒', 173], ['横浜緑', 171], ['佐倉', 166], ['町田', 159],
-  ['千葉', 168], ['中野', 173], fixedDay('中野（ナイト）', 9000), ['相模原', 169], ['戸田（代走）', 167, 10000]
+  ['東京', M1], ['江東'], ['江東（ナイト）', FIX], ['台東'], ['世田谷', M3], ['世田谷（ナイト）', FIX],
+  ['墨田'], ['墨田（ナイト）', FIX], ['横浜'], ['湘南'],
+  ['千葉南'], ['千葉北'], ['城北', M3], ['城北（ナイト）', FIX],
+  ['三多摩（山単価）'], ['三多摩', { newbie: { days: 14 } }], ['三多摩（ナイト）'], ['三多摩（モーニング）', FIX],
+  ['練馬', M1], ['練馬（ナイト）'],
+  ['越谷'], ['足立'], ['足立（ナイト）', FIX], ['八王子', M1], ['八王子（代走）'],
+  ['八王子（ナイト・単価）'], ['八王子（ナイト・日極）', FIX], ['八王子（モーニング）', FIX],
+  ['川崎'], ['川崎（ナイト4h）', FIX], ['川崎（ナイト3h）', FIX], ['さいたま'], ['川口'], ['川口（DRF）', EXTRA], ['川口（ナイト）'],
+  ['所沢', M1], ['所沢（代走）', EXTRA], ['所沢（ナイト）', FIX], ['赤羽', M3],
+  ['座間'], ['座間（ナイト）', FIX], ['横須賀'], ['横浜北'], ['杉並'], ['杉並（代走）'], ['杉並（ナイト）', FIX], ['木更津'],
+  ['茂原'], ['横浜鶴見'], ['城南'], ['目黒'], ['横浜緑'], ['佐倉'], ['町田'],
+  ['千葉'], ['中野'], ['中野（ナイト）', FIX], ['相模原'], ['戸田（代走）', EXTRA]
 ];
 export const OTHER_OFFICE = 'その他';
 
@@ -47,7 +39,8 @@ export function officeEntry(name) {
   if (/^三多摩[BＢ]$/.test(n)) n = '三多摩';
   if (n === '戸田') n = '戸田（代走）'; // 戸田は代走のみ
   const hit = OFFICES.find(([o]) => o === n);
-  return hit ? { name: hit[0], takuhai: hit[1], daily: hit[2] || 0, newbie: hit[3] || null, fixed: !!hit[4]?.fixed } : null;
+  const f = hit?.[1] || {};
+  return hit ? { name: hit[0], newbie: f.newbie || null, fixed: !!f.fixed, extra: !!f.extra } : null;
 }
 
 // 佐川急便の日極の案件（ナイト・モーニングの日極）：金額は1日の金額だけ（個数は記録用）
@@ -56,9 +49,9 @@ export const isFixedSagawa = (job) => job?.kind === 'sagawa' && !!officeEntry(jo
 const isDate = (v) => /^\d{4}-\d{2}-\d{2}$/.test(v || '');
 const pad = (n) => String(n).padStart(2, '0');
 
-// 新人保証の期間 { from, to, perDay }（to はその日まで。稼働を開始した日が入っていなければ null）
+// 新人保証の期間 { from, to }（to はその日まで。新人保証のない営業所や、稼働を開始した日が入っていなければ null）
 // 例：10月13日に開始して1か月なら、11月12日まで（月末をまたぐときは、次の月の末日を上限にする）
-export function newbiePeriod(settings) {
+export function newbieDates(settings) {
   if (settings.salesType !== 'sagawa') return null;
   const nb = officeEntry(settings.salesOffice)?.newbie;
   if (!nb || !isDate(settings.salesStartDate)) return null;
@@ -71,7 +64,14 @@ export function newbiePeriod(settings) {
     end = new Date(y, m - 1 + nb.months, Math.min(d, last));
     end.setDate(end.getDate() - 1);
   }
-  return { from: settings.salesStartDate, to: `${end.getFullYear()}-${pad(end.getMonth() + 1)}-${pad(end.getDate())}`, perDay: nb.perDay };
+  return { from: settings.salesStartDate, to: `${end.getFullYear()}-${pad(end.getMonth() + 1)}-${pad(end.getDate())}` };
+}
+
+// 新人保証 { from, to, perDay }（金額は設定で入れたもの。入れていなければ新人保証なしとして null）
+export function newbiePeriod(settings) {
+  const d = newbieDates(settings);
+  const perDay = num(settings.newbiePerDay);
+  return d && perDay > 0 ? { ...d, perDay } : null;
 }
 
 // 新人保証の期間の書き方（「1か月間」「2週間」「10日間」）
@@ -94,17 +94,15 @@ export function officeName(settings) {
   return officeEntry(settings.salesOffice)?.name || settings.salesOffice || '';
 }
 
-// 単価：表の営業所なら宅配は表の「一般」、商業・集荷は営業所で決まった単価。
-// 一覧にない営業所は、入力した単価（商業・集荷は空なら営業所名で決まった単価）
+// 単価・日極・1日の上乗せ：どの営業所も、各自が設定で入れたもの
+//   daily：その日に個数の金額とは別に足す金額（日極の営業所は日極の金額、上乗せのある営業所は上乗せ）
 export function unitPrices(settings) {
   const entry = officeEntry(settings.salesOffice);
-  const name = officeName(settings);
-  if (entry) return { takuhai: entry.takuhai, shogyo: defaultShogyo(entry.name), shuka: defaultShuka(entry.name), daily: entry.daily };
   return {
     takuhai: num(settings.priceTakuhai),
-    shogyo: num(settings.priceShogyo) ?? defaultShogyo(name),
-    shuka: num(settings.priceShuka) ?? defaultShuka(name),
-    daily: 0
+    shogyo: num(settings.priceShogyo),
+    shuka: num(settings.priceShuka),
+    daily: entry?.fixed ? num(settings.priceDaily) || 0 : entry?.extra ? num(settings.priceExtra) || 0 : 0
   };
 }
 
@@ -184,9 +182,9 @@ export function advanceLimit({ sales, advanced = 0, prevSales, prevLevel = null,
 // ---- 案件（佐川急便・法人をまとめて登録する） ----
 // 佐川急便から法人へ移った方や、朝は法人・午後は佐川急便のように組み合わせる方のため、案件をいくつでも登録し、
 // 乗務後点呼でその日の案件を選ぶ。その日の金額は、選んだ案件の金額の合計。
-//   佐川急便：営業所を選ぶ（単価は単価表から）。新人保証はその営業所で働き始めた日（startDate）から数える
+//   佐川急便：営業所を選び、単価（日極・上乗せ）と新人保証の金額は各自が入れる。新人保証はその営業所で働き始めた日（startDate）から数える
 //   法人：会社名・営業所名。支払いは「日極」（1日いくら。空なら毎回入力）か「単価」（品目と単価を3つまで）
-// settings.jobs：[{ id, kind: 'sagawa', office, officeName, priceTakuhai, priceShogyo, priceShuka, startDate }
+// settings.jobs：[{ id, kind: 'sagawa', office, officeName, priceTakuhai, priceShogyo, priceShuka, priceDaily, priceExtra, newbiePerDay, startDate }
 //                 | { id, kind: 'corp', company, branch, pay: 'daily' | 'unit', price, units: [{ label, price }] }]
 export const UNIT_SLOTS = 3;
 
@@ -201,7 +199,7 @@ function normalizeJob(j) {
 export function jobList(settings) {
   if (Array.isArray(settings.jobs) && settings.jobs.length) return settings.jobs.map(normalizeJob);
   if (settings.salesType === 'sagawa' && settings.salesOffice) {
-    return [{ id: 'job-sagawa', kind: 'sagawa', office: settings.salesOffice, officeName: settings.salesOfficeName || '', priceTakuhai: settings.priceTakuhai ?? '', priceShogyo: settings.priceShogyo ?? '', priceShuka: settings.priceShuka ?? '', startDate: settings.salesStartDate || '' }];
+    return [{ id: 'job-sagawa', kind: 'sagawa', office: settings.salesOffice, officeName: settings.salesOfficeName || '', priceTakuhai: settings.priceTakuhai ?? '', priceShogyo: settings.priceShogyo ?? '', priceShuka: settings.priceShuka ?? '', priceDaily: settings.priceDaily ?? '', priceExtra: settings.priceExtra ?? '', newbiePerDay: settings.newbiePerDay ?? '', startDate: settings.salesStartDate || '' }];
   }
   if (settings.salesProject || num(settings.dailyRate) != null) {
     return [{ id: 'j1', kind: 'corp', company: settings.salesProject || '案件', branch: '', pay: 'daily', price: settings.dailyRate ?? '', units: [] }];
@@ -214,15 +212,24 @@ export const jobUnits = (job) => (job.units || []).map((u, i) => ({ ...u, i })).
 
 // 入力が足りている案件だけ
 export function jobReady(job) {
-  if (job.kind === 'sagawa') {
-    if (!job.office) return false;
-    if (job.office === OTHER_OFFICE) return !!String(job.officeName || '').trim() && num(job.priceTakuhai) != null;
-    return !!officeEntry(job.office);
-  }
+  if (job.kind === 'sagawa') return sagawaMissing(job).length === 0;
   if (!String(job.company || '').trim()) return false;
   if (job.pay === 'unit') return jobUnits(job).length > 0;
   return job.pay === 'daily';
 }
+// 佐川急便の案件で、まだ入っていない項目（営業所・単価・日極・上乗せ。新人保証は入れなければなし）
+export function sagawaMissing(job) {
+  if (!job.office) return ['営業所'];
+  const entry = officeEntry(job.office);
+  const miss = [];
+  if (job.office === OTHER_OFFICE) { if (!String(job.officeName || '').trim()) miss.push('営業所名'); } else if (!entry) return ['営業所'];
+  if (entry?.fixed) { if (num(job.priceDaily) == null) miss.push('日極（円/日）'); return miss; }
+  const prices = [['priceTakuhai', '宅配'], ['priceShogyo', '商業'], ['priceShuka', '集荷']].filter(([k]) => num(job[k]) == null).map(([, t]) => t);
+  if (prices.length) miss.push(`単価：${prices.join("・")}`);
+  if (entry?.extra && num(job.priceExtra) == null) miss.push('1日の上乗せ');
+  return miss;
+}
+
 export function jobsOf(settings) {
   return jobList(settings).filter(jobReady);
 }
@@ -237,7 +244,7 @@ export function jobLabel(job) {
 
 // 佐川急便の案件を、以前の設定の形に置きかえる（単価・新人保証の計算をそのまま使う）
 export function sagawaSettings(job, settings) {
-  return { ...settings, salesType: 'sagawa', salesOffice: job.office, salesOfficeName: job.officeName || '', priceTakuhai: job.priceTakuhai ?? '', priceShogyo: job.priceShogyo ?? '', priceShuka: job.priceShuka ?? '', salesStartDate: job.startDate || settings.salesStartDate || '' };
+  return { ...settings, salesType: 'sagawa', salesOffice: job.office, salesOfficeName: job.officeName || '', priceTakuhai: job.priceTakuhai ?? '', priceShogyo: job.priceShogyo ?? '', priceShuka: job.priceShuka ?? '', priceDaily: job.priceDaily ?? '', priceExtra: job.priceExtra ?? '', newbiePerDay: job.newbiePerDay ?? '', salesStartDate: job.startDate || settings.salesStartDate || '' };
 }
 
 const findJob = (settings, e) => {

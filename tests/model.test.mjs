@@ -223,25 +223,18 @@ test('車検・免許証の期限：60・30・14・7日前と期限切れ', asyn
   assert.match(expiryMessage({ ...expiryStatus({ licenseDate: '2026-10-01' }, '2026-10-13')[0] }).text, /無免許運転/);
 });
 
-test('売上表：佐川急便は個数×単価、日極は乗務した日×日極、月初めから今日まで', async () => {
+test('売上表：佐川急便は個数×単価（単価は各自が入れる）、日極は乗務した日×日極、月初めから今日まで', async () => {
   const { monthSales, dayAmount, unitPrices, salesReady } = await import('../js/sales.js');
   const sg = { ...settings, salesType: 'sagawa', salesOffice: 'その他', salesOfficeName: '○○', priceTakuhai: '150', priceShogyo: '150', priceShuka: '50' };
   assert.deepEqual(unitPrices(sg), { takuhai: 150, shogyo: 150, shuka: 50, daily: 0 });
-  // 営業所を選ぶだけ：宅配は単価表の「一般」、商業100円（三多摩・八王子80円）、集荷100円（台東70円）
-  assert.deepEqual(unitPrices({ salesType: 'sagawa', salesOffice: '練馬' }), { takuhai: 180, shogyo: 100, shuka: 100, daily: 0 });
-  assert.deepEqual(unitPrices({ salesType: 'sagawa', salesOffice: '八王子' }), { takuhai: 178, shogyo: 80, shuka: 100, daily: 0 });
-  assert.deepEqual(unitPrices({ salesType: 'sagawa', salesOffice: '三多摩' }), { takuhai: 165, shogyo: 80, shuka: 100, daily: 0 });
-  assert.deepEqual(unitPrices({ salesType: 'sagawa', salesOffice: '三多摩（山単価）' }), { takuhai: 186, shogyo: 80, shuka: 100, daily: 0 });
-  // 三多摩B は一覧に出さず、三多摩として扱う
-  assert.deepEqual(unitPrices({ salesType: 'sagawa', salesOffice: '三多摩B営業所' }), { takuhai: 165, shogyo: 80, shuka: 100, daily: 0 });
-  assert.deepEqual(unitPrices({ salesType: 'sagawa', salesOffice: '台東' }), { takuhai: 173, shogyo: 100, shuka: 70, daily: 0 });
-  // 以前の版の入力（「八王子営業所」）も読み替える。表の営業所なら入力した単価は使わない
-  assert.deepEqual(unitPrices({ salesType: 'sagawa', salesOffice: '八王子営業所', priceTakuhai: '150' }), { takuhai: 178, shogyo: 80, shuka: 100, daily: 0 });
-  // 一覧にない営業所は入力した単価。商業・集荷が空なら営業所名で決まる
-  const other = { salesType: 'sagawa', salesOffice: 'その他', salesOfficeName: '三多摩B', priceTakuhai: '170', priceShogyo: '', priceShuka: '' };
-  assert.deepEqual(unitPrices(other), { takuhai: 170, shogyo: 80, shuka: 100, daily: 0 });
-  assert.equal(salesReady({ ...other, priceTakuhai: '' }), false);
-  assert.equal(salesReady({ salesType: 'sagawa', salesOffice: '八王子' }), true);
+  // 一覧の営業所でも、単価は入れたもの（単価表は持たない）
+  assert.deepEqual(unitPrices({ salesType: 'sagawa', salesOffice: '練馬', priceTakuhai: '150', priceShogyo: '100', priceShuka: '50' }), { takuhai: 150, shogyo: 100, shuka: 50, daily: 0 });
+  assert.deepEqual(unitPrices({ salesType: 'sagawa', salesOffice: '八王子営業所', priceTakuhai: '160' }).takuhai, 160); // 以前の版の入力も読み替える
+  assert.deepEqual(unitPrices({ salesType: 'sagawa', salesOffice: '練馬' }), { takuhai: null, shogyo: null, shuka: null, daily: 0 });
+  // 宅配・商業・集荷の単価がそろわないと、案件として使えない
+  assert.equal(salesReady({ salesType: 'sagawa', salesOffice: '練馬', priceTakuhai: '150' }), false);
+  assert.equal(salesReady({ salesType: 'sagawa', salesOffice: '練馬', priceTakuhai: '150', priceShogyo: '100', priceShuka: '50' }), true);
+  assert.equal(salesReady({ ...sg, priceTakuhai: '' }), false);
   assert.equal(salesReady(sg), true);
   assert.equal(salesReady({ ...settings, salesType: 'daily', dailyRate: '' }), false);
   const recs = [
@@ -277,21 +270,22 @@ test('希望する前払い額は月ごと', async () => {
   assert.equal(advanceOf({}, 2026, 10), null);
 });
 
-test('川口（DRF）は個数の金額に1日10,000円を足す', async () => {
-  const { unitPrices, monthSales } = await import('../js/sales.js');
-  const drf = { salesType: 'sagawa', salesOffice: '川口（DRF）' };
-  assert.deepEqual(unitPrices(drf), { takuhai: 167, shogyo: 100, shuka: 100, daily: 10000 });
-  assert.equal(unitPrices({ salesType: 'sagawa', salesOffice: '川口' }).daily, 0);
+test('川口（DRF）は個数の金額に1日の上乗せ（各自が入れる）を足す', async () => {
+  const { unitPrices, monthSales, sagawaMissing } = await import('../js/sales.js');
+  const drf = { salesType: 'sagawa', salesOffice: '川口（DRF）', priceTakuhai: '150', priceShogyo: '100', priceShuka: '50', priceExtra: '9000' };
+  assert.deepEqual(unitPrices(drf), { takuhai: 150, shogyo: 100, shuka: 50, daily: 9000 });
+  assert.equal(unitPrices({ salesType: 'sagawa', salesOffice: '川口', priceExtra: '9000' }).daily, 0); // 上乗せのない営業所
+  assert.deepEqual(sagawaMissing({ kind: 'sagawa', office: '川口（DRF）', priceTakuhai: '150', priceShogyo: '100', priceShuka: '50' }), ['1日の上乗せ']);
   const recs = [
     { date: '2026-10-01', start: { time: '8:00' }, end: { time: '18:00' }, sales: { takuhai: 100 } },
     { date: '2026-10-02', start: { time: '8:00' }, end: { time: '18:00' } }
   ];
   const { total, rows } = monthSales(recs, 2026, 10, drf, '2026-10-13');
-  // 1日目：100個×167円＋10,000円、2日目：個数まだでも10,000円
-  assert.equal(rows[0].amount, 26700);
-  assert.equal(rows[1].amount, 10000);
+  // 1日目：100個×150円＋9,000円、2日目：個数まだでも9,000円
+  assert.equal(rows[0].amount, 24000);
+  assert.equal(rows[1].amount, 9000);
   assert.equal(rows[1].missing, true);
-  assert.equal(total.amount, 36700);
+  assert.equal(total.amount, 33000);
   assert.equal(total.missing, 1);
 });
 
@@ -308,46 +302,48 @@ test('走行距離を入れなかった過去の日は自動で休み（今日�
   assert.equal(rows[6].off, false);
 });
 
-test('八王子の新人保証（稼働開始から1か月は1日5,000円）と八王子（代走）', async () => {
-  const { unitPrices, newbiePeriod, dayBonus, monthSales } = await import('../js/sales.js');
-  const hj = { salesType: 'sagawa', salesOffice: '八王子', salesStartDate: '2026-10-13' };
-  assert.deepEqual(newbiePeriod(hj), { from: '2026-10-13', to: '2026-11-12', perDay: 5000 });
+test('八王子の新人保証（期間は稼働開始から1か月、金額は各自が入れる）と八王子（代走）', async () => {
+  const { unitPrices, newbiePeriod, newbieDates, dayBonus, monthSales } = await import('../js/sales.js');
+  const hj = { salesType: 'sagawa', salesOffice: '八王子', salesStartDate: '2026-10-13', priceTakuhai: '150', priceShogyo: '100', priceShuka: '50', newbiePerDay: '2000' };
+  assert.deepEqual(newbiePeriod(hj), { from: '2026-10-13', to: '2026-11-12', perDay: 2000 });
   assert.equal(newbiePeriod({ ...hj, salesStartDate: '2026-01-31' }).to, '2026-02-27'); // 月末をまたぐとき
   assert.equal(newbiePeriod({ ...hj, salesStartDate: '' }), null); // 開始日がなければ保証なし
   assert.equal(newbiePeriod({ ...hj, salesOffice: '湘南' }), null); // 保証のない営業所
+  assert.equal(newbiePeriod({ ...hj, newbiePerDay: '' }), null); // 金額を入れていなければ保証なし
+  assert.deepEqual(newbieDates({ ...hj, newbiePerDay: '' }), { from: '2026-10-13', to: '2026-11-12' }); // 期間は出せる
   assert.equal(dayBonus(hj, '2026-10-12'), 0);
-  assert.equal(dayBonus(hj, '2026-10-13'), 5000);
-  assert.equal(dayBonus(hj, '2026-11-12'), 5000);
+  assert.equal(dayBonus(hj, '2026-10-13'), 2000);
+  assert.equal(dayBonus(hj, '2026-11-12'), 2000);
   assert.equal(dayBonus(hj, '2026-11-13'), 0);
-  // 代走：宅配190円、商業・集荷は八王子と同じ、新人保証なし
-  const dai = { salesType: 'sagawa', salesOffice: '八王子（代走）', salesStartDate: '2026-10-13' };
-  assert.deepEqual(unitPrices(dai), { takuhai: 190, shogyo: 80, shuka: 100, daily: 0 });
+  // 代走：新人保証なし
+  const dai = { ...hj, salesOffice: '八王子（代走）' };
+  assert.deepEqual(unitPrices(dai), { takuhai: 150, shogyo: 100, shuka: 50, daily: 0 });
   assert.equal(newbiePeriod(dai), null);
-  // 売上：保証期間の日は個数の金額＋5,000円、個数がまだでも5,000円
+  // 売上：保証期間の日は個数の金額＋保証、個数がまだでも保証
   const recs = [
     { date: '2026-11-12', start: { time: '8:00' }, end: { time: '18:00' }, sales: { takuhai: 100 } },
     { date: '2026-11-13', start: { time: '8:00' }, end: { time: '18:00' }, sales: { takuhai: 100 } },
     { date: '2026-11-11', start: { time: '8:00' }, end: { time: '18:00' } }
   ];
   const { rows, total } = monthSales(recs, 2026, 11, hj, '2026-11-30', '2026-12-01');
-  assert.equal(rows[11].amount, 100 * 178 + 5000);
-  assert.equal(rows[12].amount, 100 * 178);
-  assert.equal(rows[10].amount, 5000);
-  assert.equal(total.amount, 17800 * 2 + 10000);
+  assert.equal(rows[11].amount, 100 * 150 + 2000);
+  assert.equal(rows[12].amount, 100 * 150);
+  assert.equal(rows[10].amount, 2000);
+  assert.equal(total.amount, 15000 * 2 + 4000);
   // 新人保証の分（表の「新人保証」の列）
-  assert.equal(rows[11].newbie, 5000);
+  assert.equal(rows[11].newbie, 2000);
   assert.equal(rows[12].newbie, 0);
-  assert.equal(total.newbie, 10000);
+  assert.equal(total.newbie, 4000);
   assert.equal(monthSales(recs, 2026, 11, hj, '2026-11-30', '2026-12-01').hasNewbie, true);
   assert.equal(monthSales(recs, 2026, 12, hj, null, '2027-01-01').hasNewbie, false);
   assert.equal(monthSales(recs, 2026, 11, dai, null, '2026-12-01').hasNewbie, false);
 });
 
-test('三多摩の新人保証は2週間・1日5,000円、山単価は保証なし', async () => {
+test('三多摩の新人保証は2週間、山単価は保証なし', async () => {
   const { newbiePeriod, dayBonus, newbieSpan, officeEntry } = await import('../js/sales.js');
-  const tm = { salesType: 'sagawa', salesOffice: '三多摩', salesStartDate: '2026-10-13' };
-  assert.deepEqual(newbiePeriod(tm), { from: '2026-10-13', to: '2026-10-26', perDay: 5000 });
-  assert.equal(dayBonus(tm, '2026-10-26'), 5000);
+  const tm = { salesType: 'sagawa', salesOffice: '三多摩', salesStartDate: '2026-10-13', newbiePerDay: '2000' };
+  assert.deepEqual(newbiePeriod(tm), { from: '2026-10-13', to: '2026-10-26', perDay: 2000 });
+  assert.equal(dayBonus(tm, '2026-10-26'), 2000);
   assert.equal(dayBonus(tm, '2026-10-27'), 0);
   assert.equal(newbiePeriod({ ...tm, salesStartDate: '2026-12-25' }).to, '2027-01-07'); // 年をまたぐ
   assert.equal(newbiePeriod({ ...tm, salesOffice: '三多摩（山単価）' }), null);
@@ -356,20 +352,19 @@ test('三多摩の新人保証は2週間・1日5,000円、山単価は保証な�
   assert.equal(newbieSpan(officeEntry('八王子').newbie), '1か月間');
 });
 
-test('各営業所の新人保証と代走', async () => {
-  const { newbiePeriod, unitPrices, dayBonus } = await import('../js/sales.js');
-  const nb = (office, start = '2026-10-13') => newbiePeriod({ salesType: 'sagawa', salesOffice: office, salesStartDate: start });
-  for (const o of ['世田谷', '城北', '赤羽']) assert.deepEqual(nb(o), { from: '2026-10-13', to: '2027-01-12', perDay: 3000 });
-  assert.deepEqual(nb('練馬'), { from: '2026-10-13', to: '2026-11-12', perDay: 5000 });
-  for (const o of ['東京', '所沢']) assert.deepEqual(nb(o), { from: '2026-10-13', to: '2026-11-12', perDay: 3000 });
-  // 代走は新人保証なし。所沢（代走）は1日5,000円、戸田（代走）は1日10,000円をずっと足す
-  const so = { salesType: 'sagawa', salesOffice: '所沢（代走）', salesStartDate: '2026-10-13' };
+test('各営業所の新人保証の期間と代走の上乗せ', async () => {
+  const { newbieDates, unitPrices, dayBonus, officeEntry } = await import('../js/sales.js');
+  const nb = (office, start = '2026-10-13') => newbieDates({ salesType: 'sagawa', salesOffice: office, salesStartDate: start });
+  for (const o of ['世田谷', '城北', '赤羽']) assert.deepEqual(nb(o), { from: '2026-10-13', to: '2027-01-12' });
+  for (const o of ['練馬', '東京', '所沢', '八王子']) assert.deepEqual(nb(o), { from: '2026-10-13', to: '2026-11-12' });
+  // 代走は新人保証なし。所沢（代走）・戸田（代走）は1日の上乗せ（各自が入れる）をずっと足す
   assert.equal(nb('所沢（代走）'), null);
-  assert.deepEqual(unitPrices(so), { takuhai: 180, shogyo: 100, shuka: 100, daily: 5000 });
-  assert.equal(dayBonus(so, '2027-06-01'), 5000);
-  assert.deepEqual(unitPrices({ salesType: 'sagawa', salesOffice: '杉並（代走）' }), { takuhai: 191, shogyo: 100, shuka: 100, daily: 0 });
-  assert.deepEqual(unitPrices({ salesType: 'sagawa', salesOffice: '戸田（代走）' }), { takuhai: 167, shogyo: 100, shuka: 100, daily: 10000 });
-  assert.equal(unitPrices({ salesType: 'sagawa', salesOffice: '戸田' }).daily, 10000); // 以前の「戸田」も代走として扱う
+  const so = { salesType: 'sagawa', salesOffice: '所沢（代走）', salesStartDate: '2026-10-13', priceTakuhai: '150', priceShogyo: '100', priceShuka: '50', priceExtra: '4000' };
+  assert.equal(unitPrices(so).daily, 4000);
+  assert.equal(dayBonus(so, '2027-06-01'), 4000);
+  assert.equal(officeEntry('杉並（代走）').extra, false);
+  assert.equal(officeEntry('戸田（代走）').extra, true);
+  assert.equal(officeEntry('戸田').name, '戸田（代走）'); // 以前の「戸田」も代走として扱う
 });
 
 test('前払いの履歴と合計（月ごと）', async () => {
@@ -484,15 +479,17 @@ test('前月の売上「なし」：はじめて稼働する方は、はじめ�
 test('案件をまとめて登録：佐川急便と法人（日極・単価）を1日に組み合わせる', async () => {
   const { dayAmount, countsMissing, monthSales, jobLabel, jobsOf } = await import('../js/sales.js');
   const s = { salesStartDate: '2026-09-01', jobs: [
-    { id: 's', kind: 'sagawa', office: '八王子', startDate: '2026-09-01' },
+    { id: 's', kind: 'sagawa', office: '八王子', startDate: '2026-09-01', priceTakuhai: '150', priceShogyo: '100', priceShuka: '50' },
     { id: 'c', kind: 'corp', company: '○○運送', branch: '△△営業所', pay: 'unit', units: [{ label: '宅配', price: '170' }, { label: 'ネコポス', price: '40' }, { label: '', price: '' }] },
     { id: 'd', kind: 'corp', company: '□□便', branch: '', pay: 'daily', price: '' }
   ] };
   assert.deepEqual(jobsOf(s).map(jobLabel), ['佐川急便 八王子営業所', '○○運送 △△営業所', '□□便']);
+  // 単価を入れていない佐川急便の案件は、まだ使えない
+  assert.equal(jobsOf({ jobs: [{ id: 'x', kind: 'sagawa', office: '八王子' }] }).length, 0);
   const start = { time: '07:00' };
   // 朝は法人の単価（宅配10個・ネコポス20個）、午後は佐川急便（宅配50・商業1・集荷2）
   const rec = { date: '2026-10-05', start, jobs: [{ id: 'c', counts: [10, 20] }, { id: 's', counts: { takuhai: 50, shogyo: 1, shuka: 2 } }] };
-  assert.equal(dayAmount(rec, s), 10 * 170 + 20 * 40 + (50 * 178 + 1 * 80 + 2 * 100));
+  assert.equal(dayAmount(rec, s), 10 * 170 + 20 * 40 + (50 * 150 + 1 * 100 + 2 * 50));
   assert.equal(countsMissing(rec, s), false);
   // 日極の金額が空なら入力まだ
   const rec2 = { date: '2026-10-06', start, jobs: [{ id: 'd', amount: null }] };
@@ -505,23 +502,22 @@ test('案件をまとめて登録：佐川急便と法人（日極・単価）�
 
 test('以前の版の佐川急便の設定と配達個数は、そのまま数える', async () => {
   const { dayAmount, jobsOf } = await import('../js/sales.js');
-  const s = { salesType: 'sagawa', salesOffice: '八王子', salesStartDate: '2026-09-01', jobs: [] };
+  const s = { salesType: 'sagawa', salesOffice: '八王子', salesStartDate: '2026-09-01', jobs: [], priceTakuhai: '150', priceShogyo: '100', priceShuka: '50' };
   assert.equal(jobsOf(s).length, 1);
   const rec = { date: '2026-10-05', start: { time: '07:00' }, sales: { takuhai: 100, shogyo: 1, shuka: 2 } };
-  assert.equal(dayAmount(rec, s), 100 * 178 + 80 + 200);
+  assert.equal(dayAmount(rec, s), 100 * 150 + 100 + 100);
 });
 
 test('以前の版の佐川急便の記録は、あとから法人の案件を足しても佐川急便の分として数える', async () => {
   const { dayAmount, jobsOf } = await import('../js/sales.js');
   const s = { salesType: 'sagawa', salesStartDate: '2026-09-01', jobs: [
-    { id: 'job-sagawa', kind: 'sagawa', office: '八王子' },
+    { id: 'job-sagawa', kind: 'sagawa', office: '八王子', priceTakuhai: '150', priceShogyo: '100', priceShuka: '50' },
     { id: 'c', kind: 'corp', company: '○○運送', pay: 'daily', price: '15000' }
   ] };
   assert.equal(jobsOf(s).length, 2);
   const rec = { date: '2026-10-20', start: { time: '07:00' }, sales: { takuhai: 100, shogyo: 1, shuka: 2 } };
-  assert.equal(dayAmount(rec, s), 100 * 178 + 80 + 200);
+  assert.equal(dayAmount(rec, s), 100 * 150 + 100 + 100);
 });
-
 
 test('月末のバックアップのお知らせ：月末の3日前から翌月5日までに1回だけ', () => {
   assert.equal(backupReminder('2026-10-28', {}), null);
@@ -538,31 +534,31 @@ test('月末のバックアップのお知らせ：月末の3日前から翌月5
   assert.equal(backupReminder('2026-11-29', { backupShown: '2026-10' }), '2026-11');
 });
 
-test('佐川急便のナイト・モーニング：日極は個数なしで1日の金額、単価は宅配の個数 × 単価', async () => {
-  const { dayJobs, dayAmount, countsMissing, jobLabel, officeEntry, isFixedSagawa } = await import('../js/sales.js');
+test('佐川急便のナイト・モーニング：日極は1日の金額（各自が入れる）、単価は個数 × 単価', async () => {
+  const { dayJobs, dayAmount, countsMissing, jobLabel, officeEntry, isFixedSagawa, sagawaMissing } = await import('../js/sales.js');
   const s = { jobs: [
-    { id: 'a', kind: 'sagawa', office: '江東（ナイト）' },
-    { id: 'b', kind: 'sagawa', office: '八王子（ナイト・単価）' },
-    { id: 'c', kind: 'sagawa', office: '足立（ナイト）' }
+    { id: 'a', kind: 'sagawa', office: '江東（ナイト）', priceDaily: '5000' },
+    { id: 'b', kind: 'sagawa', office: '八王子（ナイト・単価）', priceTakuhai: '200', priceShogyo: '100', priceShuka: '100' },
+    { id: 'c', kind: 'sagawa', office: '足立（ナイト）', priceDaily: '7000' }
   ] };
   const rec = (jobs) => ({ date: '2026-10-05', start: { time: '20:00' }, end: { time: '02:00' }, jobs });
   assert.equal(jobLabel(s.jobs[0]), '佐川急便 江東営業所（ナイト）');
   assert.equal(isFixedSagawa(s.jobs[0]), true);
   assert.equal(isFixedSagawa(s.jobs[1]), false);
-  assert.equal(officeEntry('八王子（ナイト・日極）').daily, 8000);
   assert.equal(officeEntry('中野（ナイト）').newbie, null);
+  assert.deepEqual(sagawaMissing({ kind: 'sagawa', office: '江東（ナイト）' }), ['日極（円/日）']);
   // 日極：金額は1日の金額。個数がまだなら「まだ」（個数も必ず入れる）
   const r1 = rec([{ id: 'a', counts: {} }]);
-  assert.equal(dayAmount(r1, s), 6000);
+  assert.equal(dayAmount(r1, s), 5000);
   assert.equal(countsMissing(r1, s), true);
   assert.equal(countsMissing(rec([{ id: 'a', counts: { takuhai: 30 } }]), s), false);
-  // 単価：宅配 40個 × 250円
+  // 単価：宅配 40個 × 200円
   const r2 = rec([{ id: 'b', counts: { takuhai: 40 } }]);
-  assert.equal(dayAmount(r2, s), 10000);
+  assert.equal(dayAmount(r2, s), 8000);
   assert.equal(countsMissing(rec([{ id: 'b', counts: {} }]), s), true);
-  // 組み合わせ：足立ナイト 8,140円 ＋ 八王子ナイト（単価）
-  assert.equal(dayAmount(rec([{ id: 'c', counts: {} }, { id: 'b', counts: { takuhai: 10 } }]), s), 8140 + 2500);
+  // 組み合わせ
+  assert.equal(dayAmount(rec([{ id: 'c', counts: {} }, { id: 'b', counts: { takuhai: 10 } }]), s), 7000 + 2000);
   assert.equal(dayJobs(r1, s)[0].missing, true);
   // 日極：個数を入れても金額は変わらない（個数は記録用）
-  assert.equal(dayAmount(rec([{ id: 'a', counts: { takuhai: 50, shogyo: 3, shuka: 2 } }]), s), 6000);
+  assert.equal(dayAmount(rec([{ id: 'a', counts: { takuhai: 50, shogyo: 3, shuka: 2 } }]), s), 5000);
 });

@@ -3,7 +3,7 @@
 
 import { db, requestPersist } from './db.js';
 import { shrinkImage, newPhoto, blobToDataUrl, dataUrlToBlob } from './photo.js';
-import { COUNT_KEYS, unitPrices, salesReady, monthSales, yen, defaultShogyo, defaultShuka, advanceKey, advanceOf, advanceHistory, advanceTotal, advanceLimit, isFirstAdvanceMonth, prevSalesLevel, OFFICES, OTHER_OFFICE, PRICE_TABLE_DATE, officeEntry, officeName, newbiePeriod, newbieSpan, jobList, jobsOf, dayJobs, jobLabel, jobReady, jobUnits, sagawaSettings, hasSagawa, isFixedSagawa, UNIT_SLOTS } from './sales.js';
+import { COUNT_KEYS, unitPrices, salesReady, monthSales, yen, advanceKey, advanceOf, advanceHistory, advanceTotal, advanceLimit, isFirstAdvanceMonth, prevSalesLevel, OFFICES, OTHER_OFFICE, officeEntry, officeName, newbiePeriod, newbieDates, newbieSpan, sagawaMissing, jobList, jobsOf, dayJobs, jobLabel, jobReady, jobUnits, sagawaSettings, hasSagawa, isFixedSagawa, UNIT_SLOTS } from './sales.js';
 import { EXPIRED, expiryStatus, expiryMessage, expiryAlertsToShow } from './expiry.js';
 import { OIL_LIMIT, OIL_STEPS, newOilChange, currentOdo, oilStatus, oilMessage, oilAlertToShow, sortOilChanges } from './oil.js';
 import {
@@ -18,7 +18,7 @@ import {
   KINDS, COLLISIONS, ROAD_TYPES, SLOPES, SHAPES, SURFACES
 } from './accident.js';
 
-export const APP_VERSION = '0.22.4';
+export const APP_VERSION = '0.23.0';
 
 const app = document.getElementById('app');
 const state = {
@@ -230,7 +230,7 @@ const isStartMonth = (s) => startMonth(s) === thisMonthKey();
 // 案件の足りない入力（「保存する」の上に出す）
 function jobMissing(j) {
   if (j.kind !== 'sagawa' && j.kind !== 'corp') return '佐川急便か法人か';
-  if (j.kind === 'sagawa') return !j.office ? '営業所' : '営業所名・単価：宅配';
+  if (j.kind === 'sagawa') return sagawaMissing(j).join('・') || '営業所';
   if (!String(j.company || '').trim()) return '会社名';
   if (!String(j.branch || '').trim()) return '営業所名';
   if (j.pay !== 'daily' && j.pay !== 'unit') return '日極か単価か';
@@ -253,20 +253,21 @@ function jobCard(s, j, i) {
   if (j.kind === 'sagawa') {
     const entry = officeEntry(j.office);
     const selected = entry ? entry.name : j.office === OTHER_OFFICE ? OTHER_OFFICE : '';
-    const ss = sagawaSettings(j, s);
-    const p = unitPrices(ss);
-    const nb = newbiePeriod(ss);
+    const nbDates = newbieDates(sagawaSettings(j, s));
+    const yenInp = (k, label, ex, note = '') => inp(k, label, `type="number" inputmode="numeric" min="0" placeholder="例：${ex}"`, note);
     const opts = ['<option value="">選んでください</option>',
       ...OFFICES.map(([o]) => `<option value="${o}" ${o === selected ? 'selected' : ''}>${o}</option>`),
-      `<option value="${OTHER_OFFICE}" ${selected === OTHER_OFFICE ? 'selected' : ''}>一覧にない営業所（単価を入力）</option>`].join('');
+      `<option value="${OTHER_OFFICE}" ${selected === OTHER_OFFICE ? 'selected' : ''}>一覧にない営業所</option>`].join('');
+    // 単価・日極・上乗せ・新人保証の金額は、ほかの営業所の方に見えないよう、各自が入れる（新人保証の期間だけ自動で出す）
     body = `${field('営業所', `<select class="select" data-job-i="${i}" data-job-k="office">${opts}</select>`)}
-      ${entry?.fixed ? `<p class="field-note pad-note price-line">日極：<b>1日 ${yen(entry.daily)}</b>（個数も入れます。個数は記録用で、金額は変わりません）</p>` : entry ? `<p class="field-note pad-note price-line">単価：<b>宅配 ${yen(p.takuhai)}・商業 ${yen(p.shogyo)}・集荷 ${yen(p.shuka)}${p.daily ? `＋1日 ${yen(p.daily)}` : ''}</b>${entry.newbie ? `<br>新人保証：<b>この営業所で働き始めた日から${newbieSpan(entry.newbie)}、1日 ${yen(entry.newbie.perDay)}をプラス</b>` : ''}<br>（佐川単価表 ${PRICE_TABLE_DATE}更新）</p>` : ''}
-      ${entry?.newbie ? inp('startDate', 'この営業所で働き始めた日', 'type="date"', nb ? `新人保証は ${nb.to.replace(/-/g, '/')} まで（空なら下の「稼働を開始した日」）` : '新人保証の期間を数えるのに使います（空なら下の「稼働を開始した日」）') : ''}
-      ${selected === OTHER_OFFICE ? `
-        ${inp('officeName', '営業所名', 'placeholder="例：○○"')}
-        ${inp('priceTakuhai', '単価：宅配（円/個）', 'type="number" inputmode="numeric" min="0" placeholder="例：170"')}
-        ${inp('priceShogyo', '単価：商業（円/個）', `type="number" inputmode="numeric" min="0" placeholder="空なら ${defaultShogyo(j.officeName)}円"`, '入れなければ 100円（三多摩・八王子は 80円）')}
-        ${inp('priceShuka', '単価：集荷（円/個）', `type="number" inputmode="numeric" min="0" placeholder="空なら ${defaultShuka(j.officeName)}円"`, '入れなければ 100円（台東は 70円）')}` : ''}`;
+      ${selected === OTHER_OFFICE ? inp('officeName', '営業所名', 'placeholder="例：○○"') : ''}
+      ${!selected ? '' : entry?.fixed ? yenInp('priceDaily', '日極（円/日）', '○○○○', '個数も入れますが、記録用で金額は変わりません') : `
+        ${yenInp('priceTakuhai', '単価：宅配（円/個）', '○○○')}
+        ${yenInp('priceShogyo', '単価：商業（円/個）', '○○○')}
+        ${yenInp('priceShuka', '単価：集荷（円/個）', '○○○')}
+        ${entry?.extra ? yenInp('priceExtra', '1日の上乗せ（保障・代走）（円/日）', '○○○○', '乗務した日ごとに足します') : ''}`}
+      ${entry?.newbie ? `${yenInp('newbiePerDay', '新人保証（円/日）', '○○○○', `この営業所で働き始めた日から${newbieSpan(entry.newbie)}、乗務した日ごとに足します${nbDates ? `（${nbDates.from.replace(/-/g, '/')}〜${nbDates.to.replace(/-/g, '/')}）` : ''}。新人保証がなければ空のまま`)}
+        ${inp('startDate', 'この営業所で働き始めた日', 'type="date"', '新人保証の期間を数えるのに使います（空なら下の「稼働を開始した日」）')}` : ''}`;
   } else if (j.kind === 'corp') {
     const pays = [['daily', '日極'], ['unit', '単価']].map(([v, t]) => `<button type="button" class="chip" data-action="job-pay" data-i="${i}" data-value="${v}" aria-pressed="${j.pay === v}">${t}</button>`).join('');
     const EX = [['宅配', '170'], ['ネコポス', '40'], ['○○', '○○']];
@@ -472,6 +473,16 @@ async function useInvite(r) {
 
 // ---- 画面：ホーム ----
 
+// 佐川急便の案件の単価などがまだのとき（以前の版は単価表から入っていたため）、設定で入れてもらう
+function pricesCard() {
+  const miss = jobList(state.settings).filter((j) => j.kind === 'sagawa' && j.office && sagawaMissing(j).length);
+  if (!miss.length) return '';
+  return `<div class="card pad warn-card">
+    <p><b>${e(miss.map(jobLabel).join('・'))}</b> の単価がまだ入っていません。設定の「売上表」で、単価（日極）と新人保証の金額を入れてください。</p>
+    <button type="button" class="btn-outline" data-action="go" data-view="settings">設定を開く</button>
+  </div>`;
+}
+
 function renderHome() {
   const today = todayKey();
   const rec = findRecord(today);
@@ -519,6 +530,7 @@ function renderHome() {
         ${status(!!rec?.end, '乗務後点呼', rec?.end?.time)}
       </section>
       ${main}
+      ${pricesCard()}
       ${expiryCards()}
       ${oilCard()}
       <section class="card month-sum">
@@ -1174,7 +1186,7 @@ function jobsPickField() {
       if (!j) return '';
       let inputs;
       if (isFixedSagawa(j)) {
-        inputs = `<span class="ex">日極 ${yen(officeEntry(j.office).daily)}（金額は固定）</span>
+        inputs = `<span class="ex">日極 ${yen(unitPrices(sagawaSettings(j, s)).daily)}（金額は固定）</span>
           <div class="counts pj-counts">${COUNT_KEYS.map(([k, t]) => unitInput(i, k, t, num(p.counts?.[k]))).join('')}</div>`;
       } else if (j.kind === 'sagawa') {
         inputs = `<div class="counts pj-counts">${COUNT_KEYS.map(([k, t]) => unitInput(i, k, t, num(p.counts?.[k]))).join('')}</div>`;
@@ -2195,7 +2207,9 @@ app.addEventListener('input', (ev) => {
     if (!jobs[i]) jobs[i] = { id: `job-${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`, kind: '' };
     if (!jobs[i].id) jobs[i].id = `job-${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
     setPath(jobs[i], t.dataset.jobK, t.value);
-    // 営業所・働き始めた日を変えたら、単価・新人保証の表示を描き直す
+    // 営業所を変えたら、前の営業所の単価・日極・上乗せ・新人保証は消して入れ直してもらう
+    if (t.dataset.jobK === 'office') for (const k of ['priceTakuhai', 'priceShogyo', 'priceShuka', 'priceDaily', 'priceExtra', 'newbiePerDay']) jobs[i][k] = '';
+    // 営業所・働き始めた日を変えたら、単価・新人保証の欄を描き直す
     if (t.dataset.jobK === 'office' || t.dataset.jobK === 'startDate') {
       const y = window.scrollY;
       render();
@@ -2231,13 +2245,6 @@ app.addEventListener('input', (ev) => {
       const y = window.scrollY;
       render();
       window.scrollTo(0, y);
-    }
-    // 一覧にない営業所の名前で決まる商業・集荷の単価を、入力欄の例に出す
-    if (t.dataset.setting === 'salesOfficeName') {
-      const sh = app.querySelector('[data-setting="priceShogyo"]');
-      const sk = app.querySelector('[data-setting="priceShuka"]');
-      if (sh) sh.placeholder = `空なら ${defaultShogyo(t.value)}円`;
-      if (sk) sk.placeholder = `空なら ${defaultShuka(t.value)}円`;
     }
   }
   updateSaveState();
