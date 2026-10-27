@@ -3,7 +3,7 @@
 
 import { db, requestPersist } from './db.js';
 import { shrinkImage, newPhoto, blobToDataUrl, dataUrlToBlob } from './photo.js';
-import { COUNT_KEYS, unitPrices, salesReady, monthSales, yen, advanceKey, advanceOf, advanceHistory, advanceTotal, advanceLimit, isFirstAdvanceMonth, prevSalesLevel, SHIFTS, hasExtra, sagawaJob, newbieRule, guardOf, guardOn, GUARD_DEFAULT_NAME, officeName, newbiePeriod, newbieDates, newbieSpan, sagawaMissing, jobList, jobsOf, dayJobs, jobLabel, jobReady, jobUnits, sagawaSettings, hasSagawa, isFixedSagawa, UNIT_SLOTS } from './sales.js';
+import { COUNT_KEYS, unitPrices, salesReady, monthSales, yen, advanceKey, advanceOf, advanceHistory, advanceTotal, advanceLimit, isFirstAdvanceMonth, prevSalesLevel, SHIFTS, hasExtra, sagawaJob, newbieRule, guardOf, guardOn, GUARD_DEFAULT_NAME, GUARD_NAMES, officeName, newbiePeriod, newbieDates, newbieSpan, sagawaMissing, jobList, jobsOf, dayJobs, jobLabel, jobReady, jobUnits, sagawaSettings, hasSagawa, isFixedSagawa, UNIT_SLOTS } from './sales.js';
 import { EXPIRED, expiryStatus, expiryMessage, expiryAlertsToShow } from './expiry.js';
 import { OIL_LIMIT, OIL_STEPS, newOilChange, currentOdo, oilStatus, oilMessage, oilAlertToShow, sortOilChanges } from './oil.js';
 import {
@@ -18,7 +18,7 @@ import {
   KINDS, COLLISIONS, ROAD_TYPES, SLOPES, SHAPES, SURFACES
 } from './accident.js';
 
-export const APP_VERSION = '0.25.0';
+export const APP_VERSION = '0.25.1';
 
 const app = document.getElementById('app');
 const state = {
@@ -298,7 +298,7 @@ function guardFields(j, i, inp, yenInp, chip) {
   const on = j.guard === 'daily' || j.guard === 'extra';
   return `<div class="field"><span class="field-label">期間限定の保証（年末保証など）</span><div class="picks">${types}</div>
       <span class="field-note">新規稼働の方で、営業所から案内があった場合だけ選びます</span></div>
-    ${on ? `${inp('guardName', '保証の名前', `placeholder="例：${GUARD_DEFAULT_NAME}"`)}
+    ${on ? `${field('保証の名前', `<select class="select" data-job-i="${i}" data-job-k="guardName">${GUARD_NAMES.map((n) => `<option value="${n}" ${n === (j.guardName || GUARD_DEFAULT_NAME) ? 'selected' : ''}>${n}</option>`).join('')}</select>`)}
       ${inp('guardFrom', '期間（はじめの日）', 'type="date"')}
       ${inp('guardTo', '期間（終わりの日）', 'type="date"', j.guardFrom && j.guardTo && j.guardFrom > j.guardTo ? '終わりの日が、はじめの日より前になっています' : '')}
       ${j.guard === 'daily'
@@ -2071,7 +2071,7 @@ app.addEventListener('click', async (ev) => {
         if (j.kind === 'sagawa') { j.office ??= ''; j.shift ??= ''; j.pay ??= ''; }
         else { j.company ??= ''; j.branch ??= ''; j.pay ??= ''; }
       } else if (action === 'job-shift') j.shift = el.dataset.value;
-      else if (action === 'job-guard') { j.guard = el.dataset.value; if (j.guard && !j.guardName) j.guardName = GUARD_DEFAULT_NAME; }
+      else if (action === 'job-guard') { j.guard = el.dataset.value; if (j.guard && !GUARD_NAMES.includes(j.guardName)) j.guardName = GUARD_DEFAULT_NAME; }
       else j.pay = el.dataset.value;
       if (j.kind === 'corp') j.units = Array.from({ length: UNIT_SLOTS }, (_, k) => j.units?.[k] || { label: '', price: '' });
     }

@@ -65,6 +65,7 @@ export function newbieRule(job) {
 //   guard：'daily'（日極保証：期間中は個数に関係なく1日の金額）・'extra'（一部保証：いつもの金額に1日の金額を足す）
 //   期間中は新人保証を足さない（期間限定の保証だけ）。個数は期間中も必ず入れる
 export const GUARD_DEFAULT_NAME = '年末保証';
+export const GUARD_NAMES = ['新人保証', '年末保証']; // 保証の名前（設定のプルダウン）
 export function guardOf(job) {
   if (!job || job.kind !== 'sagawa' || (job.guard !== 'daily' && job.guard !== 'extra')) return null;
   const amount = num(job.guardAmount);
