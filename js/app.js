@@ -18,7 +18,7 @@ import {
   KINDS, COLLISIONS, ROAD_TYPES, SLOPES, SHAPES, SURFACES
 } from './accident.js';
 
-export const APP_VERSION = '0.22.2';
+export const APP_VERSION = '0.22.3';
 
 const app = document.getElementById('app');
 const state = {
@@ -184,7 +184,7 @@ function priorAdvanceField(s) {
 function settingsMissing(s) {
   const has = (v) => String(v ?? '').trim() !== '';
   const miss = [];
-  [['driverName', '運転者名'], ['office', '営業所（勤務先）'], ['vehicleNo', '車両番号'], ['company', '事業者名'],
+  [['driverName', '運転者名'], ['office', '営業所（勤務先）'], ['vehicleNo', '車両番号'], ['company', '屋号（ない場合は氏名）'],
     ['startPlace', '乗務開始・終了地点'], ['via', '主な経過地点'], ['restPlace', '休憩地点'], ['restMin', '休憩時間'], ['initialOdo', '今のメーターの距離']]
     .forEach(([k, label]) => { if (!has(s[k])) miss.push(label); });
   const jobs = jobList(s);
@@ -315,7 +315,7 @@ function settingsForm(s, fresh = false) {
         : f('driverName', '運転者名 <b class="req">必須</b>', 'autocomplete="name" placeholder="例：配送 太郎"')}
       ${f('office', '営業所（勤務先）', 'placeholder="例：○○"')}
       ${f('vehicleNo', '車両番号', 'placeholder="例：品川 000 あ 1234"')}
-      ${f('company', '事業者名', `placeholder="例：${e(DEFAULT_SETTINGS.company)}"`)}
+      ${f('company', '屋号（ない場合は氏名）', 'placeholder="例：○○運送"', '日報・点呼記録簿の「事業者名」に入ります')}
     </div>
     <h2 class="section-title">毎日ほぼ同じ内容（入力の初期値になります）</h2>
     <div class="card fields">
@@ -2124,8 +2124,8 @@ app.addEventListener('click', async (ev) => {
     s.rollcaller = String(s.driverName).trim();
     if (!s.appStartMonth) s.appStartMonth = thisMonthKey(); // アプリを使い始めた月
     s.method = '自身';
-    // 事業者名が空なら、はじめからの事業者名にする
-    if (!String(s.company || '').trim()) s.company = DEFAULT_SETTINGS.company;
+    // 屋号（事業者名）が空なら、氏名にする
+    if (!String(s.company || '').trim()) s.company = String(s.driverName).trim();
     s.initialOdo = num(s.initialOdo);
     await db.putSettings(s);
     toast('保存しました');
