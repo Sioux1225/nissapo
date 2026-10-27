@@ -61,6 +61,18 @@ export function newbieRule(job) {
   return !j.shift && j.pay === 'unit' ? NEWBIE[cleanOffice(j.office)] || null : null;
 }
 
+// 期間限定の保証（年末保証など。新規稼働の方で、営業所から案内があった場合だけ各自が入れる）
+//   guard：'daily'（日極保証：期間中は個数に関係なく1日の金額）・'extra'（一部保証：いつもの金額に1日の金額を足す）
+//   期間中は新人保証を足さない（期間限定の保証だけ）。個数は期間中も必ず入れる
+export const GUARD_DEFAULT_NAME = '年末保証';
+export function guardOf(job) {
+  if (!job || job.kind !== 'sagawa' || (job.guard !== 'daily' && job.guard !== 'extra')) return null;
+  const amount = num(job.guardAmount);
+  if (!isDate(job.guardFrom) || !isDate(job.guardTo) || job.guardFrom > job.guardTo || amount == null) return null;
+  return { type: job.guard, name: String(job.guardName || '').trim() || GUARD_DEFAULT_NAME, from: job.guardFrom, to: job.guardTo, amount };
+}
+export const guardOn = (g, date) => !!g && date >= g.from && date <= g.to;
+
 // 佐川急便の日極の案件：金額は1日の金額だけ（個数は記録用）
 export const isFixedSagawa = (job) => job?.kind === 'sagawa' && sagawaJob(job).pay === 'daily';
 
@@ -245,9 +257,13 @@ export function sagawaMissing(job) {
   const j = sagawaJob(job);
   if (!String(j.office || '').trim()) return ['営業所名'];
   if (j.pay !== 'unit' && j.pay !== 'daily') return ['単価か日極か'];
-  if (j.pay === 'daily') return num(j.priceDaily) == null ? ['日極（円/日）'] : [];
-  const prices = [['priceTakuhai', '宅配'], ['priceShogyo', '商業'], ['priceShuka', '集荷']].filter(([k]) => num(j[k]) == null).map(([, t]) => t);
-  return prices.length ? [`単価：${prices.join('・')}`] : [];
+  const miss = [];
+  if (j.pay === 'daily') { if (num(j.priceDaily) == null) miss.push('日極（円/日）'); } else {
+    const prices = [['priceTakuhai', '宅配'], ['priceShogyo', '商業'], ['priceShuka', '集荷']].filter(([k]) => num(j[k]) == null).map(([, t]) => t);
+    if (prices.length) miss.push(`単価：${prices.join('・')}`);
+  }
+  if ((j.guard === 'daily' || j.guard === 'extra') && !guardOf(j)) miss.push(`${String(j.guardName || '').trim() || GUARD_DEFAULT_NAME}の期間・金額`);
+  return miss;
 }
 
 export function jobsOf(settings) {
@@ -295,12 +311,16 @@ export function dayJobs(rec, settings) {
     if (job.kind === 'sagawa') {
       const ss = sagawaSettings(job, settings);
       const p = unitPrices(ss);
-      const bonus = dayBonus(ss, rec.date);
+      const g = guardOf(job);
+      const inGuard = guardOn(g, rec.date);
       const nb = newbiePeriod(ss);
-      out.newbie = nb && rec.date >= nb.from && rec.date <= nb.to ? nb.perDay : 0;
+      out.newbie = !inGuard && nb && rec.date >= nb.from && rec.date <= nb.to ? nb.perDay : 0; // 期間限定の保証の期間中は新人保証を足さない
+      out.guard = inGuard ? g.amount : 0;
+      const bonus = (p.daily || 0) + out.newbie + (inGuard && g.type === 'extra' ? g.amount : 0);
       const c = out.counts || {};
       out.missing = COUNT_KEYS.every(([k]) => num(c[k]) == null);
-      if (isFixedSagawa(job)) out.amount = bonus; // 日極：個数を入れても金額は変わらない
+      if (inGuard && g.type === 'daily') out.amount = g.amount; // 日極保証：期間中は個数に関係なく1日の金額
+      else if (isFixedSagawa(job)) out.amount = bonus; // 日極：個数を入れても金額は変わらない
       else out.amount = out.missing ? (bonus || null) : COUNT_KEYS.reduce((t, [k]) => t + (num(c[k]) || 0) * (p[k] || 0), 0) + bonus;
     } else if (job.pay === 'unit') {
       const c = Array.isArray(out.counts) ? out.counts : [];

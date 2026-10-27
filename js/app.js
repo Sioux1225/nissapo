@@ -3,7 +3,7 @@
 
 import { db, requestPersist } from './db.js';
 import { shrinkImage, newPhoto, blobToDataUrl, dataUrlToBlob } from './photo.js';
-import { COUNT_KEYS, unitPrices, salesReady, monthSales, yen, advanceKey, advanceOf, advanceHistory, advanceTotal, advanceLimit, isFirstAdvanceMonth, prevSalesLevel, SHIFTS, hasExtra, sagawaJob, newbieRule, officeName, newbiePeriod, newbieDates, newbieSpan, sagawaMissing, jobList, jobsOf, dayJobs, jobLabel, jobReady, jobUnits, sagawaSettings, hasSagawa, isFixedSagawa, UNIT_SLOTS } from './sales.js';
+import { COUNT_KEYS, unitPrices, salesReady, monthSales, yen, advanceKey, advanceOf, advanceHistory, advanceTotal, advanceLimit, isFirstAdvanceMonth, prevSalesLevel, SHIFTS, hasExtra, sagawaJob, newbieRule, guardOf, guardOn, GUARD_DEFAULT_NAME, officeName, newbiePeriod, newbieDates, newbieSpan, sagawaMissing, jobList, jobsOf, dayJobs, jobLabel, jobReady, jobUnits, sagawaSettings, hasSagawa, isFixedSagawa, UNIT_SLOTS } from './sales.js';
 import { EXPIRED, expiryStatus, expiryMessage, expiryAlertsToShow } from './expiry.js';
 import { OIL_LIMIT, OIL_STEPS, newOilChange, currentOdo, oilStatus, oilMessage, oilAlertToShow, sortOilChanges } from './oil.js';
 import {
@@ -18,7 +18,7 @@ import {
   KINDS, COLLISIONS, ROAD_TYPES, SLOPES, SHAPES, SURFACES
 } from './accident.js';
 
-export const APP_VERSION = '0.24.0';
+export const APP_VERSION = '0.25.0';
 
 const app = document.getElementById('app');
 const state = {
@@ -268,6 +268,7 @@ function jobCard(s, j, i) {
         ${yenInp('priceShogyo', '単価：商業（円/個）', '○○○')}
         ${yenInp('priceShuka', '単価：集荷（円/個）', '○○○')}
         ${hasExtra(sj.shift) ? yenInp('priceExtra', `1日の上乗せ（保障など）（円/日）`, '○○○○', '乗務した日ごとに足します。なければ空のまま') : ''}` : ''}
+      ${sj.pay ? guardFields(sj, i, inp, yenInp, chip) : ''}
       ${rule ? `${yenInp('newbiePerDay', '新人保証（円/日）', '○○○○', `この営業所で働き始めた日から${newbieSpan(rule)}、乗務した日ごとに足します${nbDates ? `（${nbDates.from.replace(/-/g, '/')}〜${nbDates.to.replace(/-/g, '/')}）` : ''}。新人保証がなければ空のまま`)}
         ${inp('startDate', 'この営業所で働き始めた日', 'type="date"', '新人保証の期間を数えるのに使います（空なら下の「稼働を開始した日」）')}` : ''}`;
   } else if (j.kind === 'corp') {
@@ -289,6 +290,20 @@ function jobCard(s, j, i) {
     <div class="field"><div class="picks">${kinds}</div></div>
     ${body}
   </div>`;
+}
+
+// 佐川急便の期間限定の保証（年末保証など）：名前・期間・種類・金額は各自が入れる
+function guardFields(j, i, inp, yenInp, chip) {
+  const types = [['', 'なし'], ['daily', '日極保証'], ['extra', '一部保証（上乗せ）']].map(([v, t]) => chip('job-guard', v, t, (j.guard || '') === v)).join('');
+  const on = j.guard === 'daily' || j.guard === 'extra';
+  return `<div class="field"><span class="field-label">期間限定の保証（年末保証など）</span><div class="picks">${types}</div>
+      <span class="field-note">新規稼働の方で、営業所から案内があった場合だけ選びます</span></div>
+    ${on ? `${inp('guardName', '保証の名前', `placeholder="例：${GUARD_DEFAULT_NAME}"`)}
+      ${inp('guardFrom', '期間（はじめの日）', 'type="date"')}
+      ${inp('guardTo', '期間（終わりの日）', 'type="date"', j.guardFrom && j.guardTo && j.guardFrom > j.guardTo ? '終わりの日が、はじめの日より前になっています' : '')}
+      ${j.guard === 'daily'
+        ? yenInp('guardAmount', '日極（円/日）', '○○○○○', '期間中は、個数に関係なくこの金額になります（個数は今までどおり入れます）。新人保証は期間中は足しません')
+        : yenInp('guardAmount', '1日の上乗せ（円/日）', '○○○○○', '期間中は、いつもの金額にこの金額を足します。新人保証は期間中は足しません')}` : ''}`;
 }
 
 // 設定の案件を書き換える前に、以前の版の設定も含めた一覧を settings.jobs に入れる
@@ -1187,7 +1202,11 @@ function jobsPickField() {
       const j = jobs.find((x) => x.id === p.id);
       if (!j) return '';
       let inputs;
-      if (isFixedSagawa(j)) {
+      const g = guardOf(j);
+      if (guardOn(g, state.draft.date)) {
+        inputs = `<span class="ex">${e(g.name)}中：${g.type === 'daily' ? `日極 ${yen(g.amount)}（金額は固定）` : `1日 +${yen(g.amount)}`}</span>
+          <div class="counts pj-counts">${COUNT_KEYS.map(([k, t]) => unitInput(i, k, t, num(p.counts?.[k]))).join('')}</div>`;
+      } else if (isFixedSagawa(j)) {
         inputs = `<span class="ex">日極 ${yen(unitPrices(sagawaSettings(j, s)).daily)}（金額は固定）</span>
           <div class="counts pj-counts">${COUNT_KEYS.map(([k, t]) => unitInput(i, k, t, num(p.counts?.[k]))).join('')}</div>`;
       } else if (j.kind === 'sagawa') {
@@ -1291,9 +1310,11 @@ function salesSub(s, y, m, withOffice = true) {
     const nb = newbiePeriod(ss);
     const monthFrom = y ? `${y}-${pad2(m)}-01` : '';
     const monthTo = y ? `${y}-${pad2(m)}-31` : '';
-    if (isFixedSagawa(jobs[0])) return `${withOffice ? `営業所：${officeName(ss)}　` : ''}日極：${yen(p.daily)}`;
+    const g = guardOf(jobs[0]);
+    const gText = g && (!y || (g.from <= monthTo && g.to >= monthFrom)) ? `　${g.name}：${g.type === 'daily' ? `日極${yen(g.amount)}` : `1日+${yen(g.amount)}`}（${mdText(g.from)}〜${mdText(g.to)}）` : '';
+    if (isFixedSagawa(jobs[0])) return `${withOffice ? `営業所：${officeName(ss)}　` : ''}日極：${yen(p.daily)}${gText}`;
     const nbText = nb && (!y || (nb.from <= monthTo && nb.to >= monthFrom)) ? `　新人保証：1日+${yen(nb.perDay)}（${mdText(nb.from)}〜${mdText(nb.to)}）` : '';
-    return `${withOffice ? `営業所：${officeName(ss)}　` : ''}単価：宅配 ${yen(p.takuhai)}・商業 ${yen(p.shogyo)}・集荷 ${yen(p.shuka)}${p.daily ? `＋1日 ${yen(p.daily)}` : ''}${nbText}`;
+    return `${withOffice ? `営業所：${officeName(ss)}　` : ''}単価：宅配 ${yen(p.takuhai)}・商業 ${yen(p.shogyo)}・集荷 ${yen(p.shuka)}${p.daily ? `＋1日 ${yen(p.daily)}` : ''}${nbText}${gText}`;
   }
   // 法人の日極1つだけ：日極
   if (jobs.length === 1 && jobs[0].pay === 'daily' && num(jobs[0].price) != null) return `所属：${jobLabel(jobs[0])}　日極：${yen(jobs[0].price)}`;
@@ -2036,7 +2057,7 @@ app.addEventListener('click', async (ev) => {
     const y = window.scrollY;
     render();
     window.scrollTo(0, y);
-  } else if (['add-job', 'del-job', 'job-kind', 'job-pay', 'job-shift'].includes(action)) {
+  } else if (['add-job', 'del-job', 'job-kind', 'job-pay', 'job-shift', 'job-guard'].includes(action)) {
     const jobs = editableJobs();
     const i = Number(el.dataset.i);
     if (action === 'add-job') jobs.push({ id: `job-${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`, kind: '' });
@@ -2050,6 +2071,7 @@ app.addEventListener('click', async (ev) => {
         if (j.kind === 'sagawa') { j.office ??= ''; j.shift ??= ''; j.pay ??= ''; }
         else { j.company ??= ''; j.branch ??= ''; j.pay ??= ''; }
       } else if (action === 'job-shift') j.shift = el.dataset.value;
+      else if (action === 'job-guard') { j.guard = el.dataset.value; if (j.guard && !j.guardName) j.guardName = GUARD_DEFAULT_NAME; }
       else j.pay = el.dataset.value;
       if (j.kind === 'corp') j.units = Array.from({ length: UNIT_SLOTS }, (_, k) => j.units?.[k] || { label: '', price: '' });
     }
@@ -2207,7 +2229,7 @@ app.addEventListener('input', (ev) => {
     if (!jobs[i].id) jobs[i].id = `job-${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
     setPath(jobs[i], t.dataset.jobK, t.value);
     // 働き始めた日を変えたら、新人保証の期間を描き直す（営業所名は、入れ終わったとき（change）に描き直す）
-    if (t.dataset.jobK === 'startDate') {
+    if (t.dataset.jobK === 'startDate' || ((t.dataset.jobK === 'guardFrom' || t.dataset.jobK === 'guardTo') && t.value)) {
       const y = window.scrollY;
       render();
       window.scrollTo(0, y);

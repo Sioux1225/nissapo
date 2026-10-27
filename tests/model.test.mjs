@@ -599,3 +599,27 @@ test('佐川急便：営業所名は入力、種別（通常・代走・モー�
   // 設定の一覧でも読み替える
   assert.equal(jobList({ jobs: [{ id: 'x', kind: 'sagawa', office: '足立（ナイト）' }] })[0].pay, 'daily');
 });
+
+test('期間限定の保証（年末保証）：日極保証は個数に関係なく固定、一部保証は上乗せ、期間中は新人保証を足さない', async () => {
+  const { dayAmount, dayJobs, sagawaMissing, guardOf, countsMissing } = await import('../js/sales.js');
+  const base = { id: 'g', kind: 'sagawa', office: '八王子', shift: '', pay: 'unit', priceTakuhai: '150', priceShogyo: '100', priceShuka: '50', newbiePerDay: '2000', startDate: '2026-10-13' };
+  const rec = (date, counts) => ({ date, start: { time: '8:00' }, end: { time: '18:00' }, jobs: [{ id: 'g', counts }] });
+  // 日極保証：11/1〜12/31 は 18,000円（個数に関係なく）。新人保証（〜11/12）は期間中は足さない
+  const daily = { jobs: [{ ...base, guard: 'daily', guardName: '年末保証', guardFrom: '2026-11-01', guardTo: '2026-12-31', guardAmount: '18000' }] };
+  assert.equal(dayAmount(rec('2026-11-05', { takuhai: 200 }), daily), 18000);
+  assert.equal(dayAmount(rec('2026-12-31', { takuhai: 10 }), daily), 18000);
+  assert.equal(dayJobs(rec('2026-11-05', { takuhai: 200 }), daily)[0].newbie, 0);
+  assert.equal(countsMissing(rec('2026-11-05', {}), daily), true); // 個数は期間中も必ず入れる
+  // 期間の前は、いつもの単価＋新人保証
+  assert.equal(dayAmount(rec('2026-10-20', { takuhai: 100 }), daily), 15000 + 2000);
+  // 期間のあと（新人保証も終わっている）
+  assert.equal(dayAmount(rec('2027-01-05', { takuhai: 100 }), daily), 15000);
+  // 一部保証：いつもの単価に +10,000円
+  const extra = { jobs: [{ ...base, guard: 'extra', guardFrom: '2026-11-01', guardTo: '2026-12-31', guardAmount: '10000' }] };
+  assert.equal(dayAmount(rec('2026-11-05', { takuhai: 100 }), extra), 15000 + 10000);
+  assert.equal(guardOf(extra.jobs[0]).name, '年末保証'); // 名前が空なら「年末保証」
+  // 入れ忘れ
+  assert.deepEqual(sagawaMissing({ ...base, guard: 'daily', guardFrom: '2026-11-01' }), ['年末保証の期間・金額']);
+  assert.deepEqual(sagawaMissing({ ...base, guard: 'daily', guardFrom: '2026-12-01', guardTo: '2026-11-01', guardAmount: '18000' }), ['年末保証の期間・金額']);
+  assert.deepEqual(sagawaMissing({ ...base, guard: '' }), []);
+});
