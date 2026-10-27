@@ -18,7 +18,7 @@ import {
   KINDS, COLLISIONS, ROAD_TYPES, SLOPES, SHAPES, SURFACES
 } from './accident.js';
 
-export const APP_VERSION = '0.22.3';
+export const APP_VERSION = '0.22.4';
 
 const app = document.getElementById('app');
 const state = {
@@ -347,6 +347,8 @@ function renderSetup() {
   if (!state.setupCleared) {
     if (state.settings.company === DEFAULT_SETTINGS.company) state.settings.company = '';
     if (num(state.settings.restMin) === DEFAULT_SETTINGS.restMin) state.settings.restMin = '';
+    // 屋号は、はじめは招待の名前を入れておく（運転者名と違って書きかえられる）
+    if (!state.settings.company && state.inviteName) state.settings.company = state.inviteName;
     state.setupCleared = true;
   }
   app.innerHTML = `
@@ -458,6 +460,11 @@ async function useInvite(r) {
   if (r.name && s.driverName && s.driverName !== r.name) {
     s.driverName = r.name;
     s.rollcaller = r.name;
+    await db.putSettings(s);
+  }
+  // 屋号がまだ以前のはじめからの値（会社名）か空なら、招待の名前にする（あとから書きかえられる）
+  if (r.name && s.driverName && (!String(s.company || '').trim() || s.company === DEFAULT_SETTINGS.company)) {
+    s.company = r.name;
     await db.putSettings(s);
   }
   return r.status;
