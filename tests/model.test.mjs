@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { backupReminder, DEFAULT_SETTINGS, newStart, newEnd, prevOdo, monthSheets, yearSheets, toCsv, timeToSerial, distanceOf } from '../js/model.js';
+import { cleanTimePart, joinTime, backupReminder, DEFAULT_SETTINGS, newStart, newEnd, prevOdo, monthSheets, yearSheets, toCsv, timeToSerial, distanceOf } from '../js/model.js';
 import { buildXlsx, colName, sheetXml } from '../js/xlsx.js';
 import { buildPdf } from '../js/pdf.js';
 
@@ -567,4 +567,21 @@ test('保証（新人保証・年末保証）：期間・種類・金額は各�
   const tama = jobList({ salesStartDate: '2026-10-13', jobs: [{ id: 't', kind: 'sagawa', office: '三多摩', newbiePerDay: '2000' }] })[0];
   assert.equal(tama.guards[0].to, '2026-10-26'); // 三多摩は2週間
   assert.equal(jobList({ jobs: [{ id: 'd', kind: 'sagawa', office: '八王子（代走）', newbiePerDay: '2000', startDate: '2026-10-13' }] })[0].guards.length, 0); // 代走は新人保証なし
+});
+
+test('Android の時刻の欄：ない時刻は空にする', () => {
+  assert.equal(cleanTimePart('h', '25'), '');
+  assert.equal(cleanTimePart('h', '24'), '');
+  assert.equal(cleanTimePart('h', '23'), '23');
+  assert.equal(cleanTimePart('h', '00'), '00');
+  assert.equal(cleanTimePart('m', '70'), '');
+  assert.equal(cleanTimePart('m', '60'), '');
+  assert.equal(cleanTimePart('m', '59'), '59');
+  assert.equal(cleanTimePart('m', '7'), '7'); // 1桁はまだ打っている途中
+  assert.equal(cleanTimePart('h', '１８'), '18'); // 全角も数字として受ける
+  assert.equal(cleanTimePart('h', '1a'), '1');
+  assert.equal(joinTime('8', '5'), '08:05');
+  assert.equal(joinTime('18', '30'), '18:30');
+  assert.equal(joinTime('18', ''), '');
+  assert.equal(joinTime('', '30'), '');
 });

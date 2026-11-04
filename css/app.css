@@ -337,6 +337,12 @@ button:focus-visible { outline: 3px solid var(--blue); outline-offset: 2px; }
 }
 .field input { min-width: 0; max-width: 100%; }
 
+/* Android の時刻の欄（時・分を数字で入れる） */
+.time-split { display: flex; align-items: center; gap: 6px; min-width: 0; }
+.time-split span { flex: none; font-weight: 700; }
+.time-split span + input { margin-left: 8px; }
+.field .time-split input { flex: 1 1 0; width: auto; text-align: center; font-size: 22px; font-variant-numeric: tabular-nums; }
+
 /* 前払いの履歴 */
 .adv { display: flex; flex-direction: column; }
 .adv-list { display: flex; flex-direction: column; }

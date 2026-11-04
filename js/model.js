@@ -115,6 +115,13 @@ export function nowTime(now = new Date()) {
   return `${pad2(now.getHours())}:${pad2(now.getMinutes())}`;
 }
 
+// Android の時刻の欄（時・分を数字で入れる）：数字だけ残し、ない時刻（25時・70分など）は空にする
+export function cleanTimePart(kind, raw) {
+  const v = String(raw ?? '').replace(/[０-９]/g, (c) => String.fromCharCode(c.charCodeAt(0) - 0xFEE0)).replace(/\D/g, '').slice(0, 2);
+  return v.length === 2 && Number(v) > (kind === 'h' ? 23 : 59) ? '' : v;
+}
+export const joinTime = (h, m) => (h === '' || m === '' ? '' : `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`);
+
 export function isTime(s) {
   return /^([01]?\d|2[0-3]):[0-5]\d$/.test(String(s || ''));
 }

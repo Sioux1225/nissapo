@@ -7,7 +7,7 @@ import { COUNT_KEYS, unitPrices, salesReady, monthSales, yen, advanceKey, advanc
 import { EXPIRED, expiryStatus, expiryMessage, expiryAlertsToShow } from './expiry.js';
 import { OIL_LIMIT, OIL_STEPS, newOilChange, currentOdo, oilStatus, oilMessage, oilAlertToShow, sortOilChanges } from './oil.js';
 import {
-  backupReminder, DEFAULT_SETTINGS, newStart, newEnd, todayKey, nowTime, isTime, num, distanceOf, prevOdo,
+  backupReminder, DEFAULT_SETTINGS, newStart, newEnd, todayKey, nowTime, isTime, cleanTimePart, joinTime, num, distanceOf, prevOdo,
   monthSheets, yearSheets, hasMonth, toCsv, daysInMonth, dateKey, weekday, pad2, isOff, isOffDay
 } from './model.js';
 import { buildXlsx } from './xlsx.js';
@@ -18,7 +18,7 @@ import {
   KINDS, COLLISIONS, ROAD_TYPES, SLOPES, SHAPES, SURFACES
 } from './accident.js';
 
-export const APP_VERSION = '0.26.1';
+export const APP_VERSION = '0.27.0';
 
 const app = document.getElementById('app');
 const state = {
@@ -140,8 +140,18 @@ function segField(labelText, path, options) {
   return `<div class="field"><span class="field-label">${labelText}</span>${seg(path, options, getPath(state.draft, path))}</div>`;
 }
 
+// Android の時刻の入力画面（時計）は、文字を大きくしていると確定のボタンが切れて押せないことがあるので、
+// Android だけ「時」「分」を数字で入れる欄にする。値は隠した欄に入れて、ふつうの入力と同じように受け取る
+const IS_ANDROID = /Android/i.test(navigator.userAgent);
+function timeBox(bind, v, label) {
+  const [h, m] = isTime(v) ? String(v).split(':') : ['', ''];
+  const box = (part, val, name) => `<input data-tp="${part}" type="text" inputmode="numeric" pattern="[0-9]*" maxlength="2" autocomplete="off" aria-label="${e(label)}の${name}" value="${val && val.padStart(2, '0')}">`;
+  return `<div class="time-split"><input type="hidden" ${bind} value="${e(joinTime(h, m))}">${box('h', h, '時')}<span>時</span>${box('m', m, '分')}<span>分</span></div>`;
+}
+
 function input(path, attrs = '') {
   let v = getPath(state.draft, path);
+  if (IS_ANDROID && attrs.includes('type="time"')) return timeBox(`data-bind="${e(path)}"`, v, '点呼時刻');
   // 時刻の欄は「07:10」の形でないと空に見えるので、「7:10」のような記録も前に0を付けて出す
   if (attrs.includes('type="time"') && /^\d:\d\d$/.test(v ?? '')) v = `0${v}`;
   return `<input data-bind="${e(path)}" value="${e(v)}" ${attrs}>`;
@@ -834,6 +844,7 @@ function renderAccidents() {
 
 // 事故の記録の入力部品（キーは 'place' や 'annex.width' のような道すじ）
 function accField(labelText, key, attrs = '', note = '') {
+  if (IS_ANDROID && attrs.includes('type="time"')) return field(labelText, timeBox(`id="acc-${key}" data-acc="${key}"`, getPath(state.acc, key), labelText), note);
   return field(labelText, `<input id="acc-${key.replace('.', '-')}" data-acc="${key}" value="${e(getPath(state.acc, key))}" ${attrs}>`, note);
 }
 function accText(labelText, key, example, note = '', rows = 4) {
@@ -2193,8 +2204,24 @@ app.addEventListener('click', async (ev) => {
   }
 });
 
+// Android の時刻の欄：ない時刻は空にして、時が決まったら分へ移る
+function timePartInput(t) {
+  t.value = cleanTimePart(t.dataset.tp, t.value);
+  const [bind, h, m] = t.closest('.time-split').querySelectorAll('input');
+  bind.value = joinTime(h.value, m.value);
+  bind.dispatchEvent(new Event('input', { bubbles: true }));
+  if (t === h && (h.value.length === 2 || /^[3-9]$/.test(h.value))) m.focus();
+}
+app.addEventListener('compositionend', (ev) => { if (ev.target.dataset.tp) timePartInput(ev.target); });
+app.addEventListener('focusin', (ev) => { if (ev.target.dataset?.tp) setTimeout(() => ev.target.select(), 0); }); // 押したら打ち直せるように全部選ぶ
+app.addEventListener('focusout', (ev) => { if (ev.target.dataset?.tp && ev.target.value.length === 1) ev.target.value = `0${ev.target.value}`; });
+
 app.addEventListener('input', (ev) => {
   const t = ev.target;
+  if (t.dataset.tp) {
+    if (!ev.isComposing) timePartInput(t);
+    return;
+  }
   if (t.dataset.bind) {
     setPath(state.draft, t.dataset.bind, t.value);
     // メーターを入れたら走った距離を、走った距離を入れたらメーターを計算する
