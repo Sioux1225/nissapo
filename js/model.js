@@ -116,11 +116,24 @@ export function nowTime(now = new Date()) {
 }
 
 // Android の時刻の欄（時・分を数字で入れる）：数字だけ残し、ない時刻（25時・70分など）は空にする
+const digitsOf = (raw) => String(raw ?? '').replace(/[０-９]/g, (c) => String.fromCharCode(c.charCodeAt(0) - 0xFEE0)).replace(/\D/g, '');
 export function cleanTimePart(kind, raw) {
-  const v = String(raw ?? '').replace(/[０-９]/g, (c) => String.fromCharCode(c.charCodeAt(0) - 0xFEE0)).replace(/\D/g, '').slice(0, 2);
+  const v = digitsOf(raw).slice(0, 2);
   return v.length === 2 && Number(v) > (kind === 'h' ? 23 : 59) ? '' : v;
 }
 export const joinTime = (h, m) => (h === '' || m === '' ? '' : `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`);
+
+// Android の日付の欄（年・月・日を数字で入れる）：ない日付（13月・32日など）は空にする
+export function cleanDatePart(kind, raw) {
+  const v = digitsOf(raw).slice(0, kind === 'y' ? 4 : 2);
+  if (kind === 'y') return v.length === 4 && (Number(v) < 2000 || Number(v) > 2099) ? '' : v;
+  return v.length === 2 && (Number(v) < 1 || Number(v) > (kind === 'm' ? 12 : 31)) ? '' : v;
+}
+// 年・月・日がそろっていて、その月にある日なら 'YYYY-MM-DD'（2月30日などは空）
+export function joinDate(y, m, d) {
+  const [Y, M, D] = [y, m, d].map(Number);
+  return String(y).length === 4 && M >= 1 && M <= 12 && D >= 1 && D <= daysInMonth(Y, M) ? dateKey(Y, M, D) : '';
+}
 
 export function isTime(s) {
   return /^([01]?\d|2[0-3]):[0-5]\d$/.test(String(s || ''));

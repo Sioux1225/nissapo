@@ -7,7 +7,7 @@ import { COUNT_KEYS, unitPrices, salesReady, monthSales, yen, advanceKey, advanc
 import { EXPIRED, expiryStatus, expiryMessage, expiryAlertsToShow } from './expiry.js';
 import { OIL_LIMIT, OIL_STEPS, newOilChange, currentOdo, oilStatus, oilMessage, oilAlertToShow, sortOilChanges } from './oil.js';
 import {
-  backupReminder, DEFAULT_SETTINGS, newStart, newEnd, todayKey, nowTime, isTime, cleanTimePart, joinTime, num, distanceOf, prevOdo,
+  backupReminder, DEFAULT_SETTINGS, newStart, newEnd, todayKey, nowTime, isTime, cleanTimePart, joinTime, cleanDatePart, joinDate, num, distanceOf, prevOdo,
   monthSheets, yearSheets, hasMonth, toCsv, daysInMonth, dateKey, weekday, pad2, isOff, isOffDay
 } from './model.js';
 import { buildXlsx } from './xlsx.js';
@@ -18,7 +18,7 @@ import {
   KINDS, COLLISIONS, ROAD_TYPES, SLOPES, SHAPES, SURFACES
 } from './accident.js';
 
-export const APP_VERSION = '0.27.0';
+export const APP_VERSION = '0.28.0';
 
 const app = document.getElementById('app');
 const state = {
@@ -148,6 +148,15 @@ function timeBox(bind, v, label) {
   const box = (part, val, name) => `<input data-tp="${part}" type="text" inputmode="numeric" pattern="[0-9]*" maxlength="2" autocomplete="off" aria-label="${e(label)}の${name}" value="${val && val.padStart(2, '0')}">`;
   return `<div class="time-split"><input type="hidden" ${bind} value="${e(joinTime(h, m))}">${box('h', h, '時')}<span>時</span>${box('m', m, '分')}<span>分</span></div>`;
 }
+
+// 日付も同じ（Android の日付の入力画面の代わりに「年」「月」「日」を数字で入れる）
+function dateBox(bind, v, label) {
+  const [y, m, d] = /^\d{4}-\d{2}-\d{2}$/.test(v ?? '') ? v.split('-') : ['', '', ''];
+  const box = (part, val, name, len) => `<input data-dp="${part}" type="text" inputmode="numeric" pattern="[0-9]*" maxlength="${len}" autocomplete="off" aria-label="${e(label)}の${name}" value="${val}">`;
+  return `<div class="time-split date-split"><input type="hidden" ${bind} value="${e(joinDate(y, m, d))}">${box('y', y, '年', 4)}<span>年</span>${box('m', m, '月', 2)}<span>月</span>${box('d', d, '日', 2)}<span>日</span></div>`;
+}
+// 日付の欄（bind は欄の属性）。Android 以外は、ふつうの日付の欄
+const dateInput = (bind, v, label, attrs = '') => (IS_ANDROID ? dateBox(bind, v, label) : `<input ${bind} value="${e(v ?? '')}" type="date" ${attrs}>`);
 
 function input(path, attrs = '') {
   let v = getPath(state.draft, path);
@@ -303,15 +312,15 @@ function guardFields(j, i, yenInp) {
   const list = Array.isArray(j.guards) ? j.guards : [];
   const cards = list.map((g, k) => {
     const gk = (name) => `guards.${k}.${name}`;
-    const gInp = (name, label, attrs = '', note = '') => field(label, `<input data-job-i="${i}" data-job-k="${gk(name)}" value="${e(g[name] ?? '')}" ${attrs}>`, note);
+    const gDate = (name, label, after = '') => field(label, dateInput(`data-job-i="${i}" data-job-k="${gk(name)}"`, g[name], label) + after);
     const types = [['daily', '日極保証'], ['extra', '一部保証（上乗せ）']].map(([v, t]) => `<button type="button" class="chip" data-action="guard-type" data-i="${i}" data-k="${k}" data-value="${v}" aria-pressed="${g.type === v}">${t}</button>`).join('');
     const amount = `<input data-job-i="${i}" data-job-k="${gk('amount')}" value="${e(g.amount ?? '')}" type="number" inputmode="numeric" min="0" placeholder="例：○○○○○">`;
     return `<div class="guard-card">
       <div class="job-top"><b>保証 ${k + 1}</b><button type="button" class="btn-text danger" data-action="del-guard" data-i="${i}" data-k="${k}">消す</button></div>
       ${field('保証の名前', `<select class="select" data-job-i="${i}" data-job-k="${gk('name')}">${GUARD_NAMES.map((n) => `<option value="${n}" ${n === (g.name || GUARD_DEFAULT_NAME) ? 'selected' : ''}>${n}</option>`).join('')}</select>`)}
       <div class="field"><span class="field-label">種類</span><div class="picks">${types}</div></div>
-      ${gInp('from', '期間（はじめの日）', 'type="date"')}
-      ${gInp('to', '期間（終わりの日）', 'type="date"', g.from && g.to && g.from > g.to ? '終わりの日が、はじめの日より前になっています' : '')}
+      ${gDate('from', '期間（はじめの日）')}
+      ${gDate('to', '期間（終わりの日）', `<span class="field-note guard-order" ${g.from && g.to && g.from > g.to ? '' : 'hidden'}>終わりの日が、はじめの日より前になっています</span>`)}
       ${g.type === 'daily' ? field('日極（円/日）', amount, '期間中は、個数に関係なくこの金額になります（個数は今までどおり入れます）')
         : g.type === 'extra' ? field('1日の上乗せ（円/日）', amount, '期間中は、いつもの金額にこの金額を足します') : ''}
     </div>`;
@@ -341,7 +350,7 @@ function settingsForm(s, fresh = false) {
     if (num(s.restMin) === DEFAULT_SETTINGS.restMin) s.restMin = '';
   }
   const f = (key, text, attrs = '', note = '') =>
-    field(text, `<input data-setting="${key}" value="${e(s[key] ?? '')}" ${attrs}>`, note);
+    field(text, attrs.includes('type="date"') ? dateInput(`data-setting="${key}"`, s[key], text) : `<input data-setting="${key}" value="${e(s[key] ?? '')}" ${attrs}>`, note);
   return `
     <div class="card fields">
       ${state.inviteName
@@ -845,6 +854,7 @@ function renderAccidents() {
 // 事故の記録の入力部品（キーは 'place' や 'annex.width' のような道すじ）
 function accField(labelText, key, attrs = '', note = '') {
   if (IS_ANDROID && attrs.includes('type="time"')) return field(labelText, timeBox(`id="acc-${key}" data-acc="${key}"`, getPath(state.acc, key), labelText), note);
+  if (IS_ANDROID && attrs.includes('type="date"')) return field(labelText, dateBox(`id="acc-${key}" data-acc="${key}"`, getPath(state.acc, key), labelText), note);
   return field(labelText, `<input id="acc-${key.replace('.', '-')}" data-acc="${key}" value="${e(getPath(state.acc, key))}" ${attrs}>`, note);
 }
 function accText(labelText, key, example, note = '', rows = 4) {
@@ -1150,7 +1160,7 @@ function renderOil() {
 
       <h2 class="section-title">オイル交換をしたら記録する</h2>
       <section class="card fields">
-        ${field('交換した日', `<input id="oil-date" type="date" value="${todayKey()}">`)}
+        ${field('交換した日', dateInput('id="oil-date"', todayKey(), '交換した日'))}
         ${field('交換したときのメーター（km）', `<input id="oil-odo" type="number" inputmode="numeric" min="0" value="${nowOdo ?? ''}">`, '運転日報のいちばん新しいメーターが入っています。違うときは直してください')}
         <div class="field"><span class="field-label">オイルエレメント</span>
           <div class="seg">${['交換した', '交換していない'].map((v) => `<button type="button" data-oil-element="${v}" aria-pressed="${state.oilElement === v}">${v}</button>`).join('')}</div>
@@ -1376,7 +1386,7 @@ function advanceSection(s, y, m, salesAmount, today) {
     </div>
     <div class="adv-add">
       <p class="field-note adv-note"><b>申請が承認されたら</b>、今回の前払い金額を入力して「前払いを記録する」を押してください。</p>
-      <input id="adv-date" type="date" value="${def}" aria-label="前払いを受けた日">
+      ${dateInput('id="adv-date"', def, '前払いを受けた日', 'aria-label="前払いを受けた日"')}
       <input id="adv-amount" type="number" inputmode="numeric" min="0" placeholder="金額（円）" aria-label="前払いの金額">
       <button type="button" class="btn-outline" data-action="add-advance">前払いを記録する</button>
     </div>
@@ -2212,14 +2222,36 @@ function timePartInput(t) {
   bind.dispatchEvent(new Event('input', { bubbles: true }));
   if (t === h && (h.value.length === 2 || /^[3-9]$/.test(h.value))) m.focus();
 }
-app.addEventListener('compositionend', (ev) => { if (ev.target.dataset.tp) timePartInput(ev.target); });
-app.addEventListener('focusin', (ev) => { if (ev.target.dataset?.tp) setTimeout(() => ev.target.select(), 0); }); // 押したら打ち直せるように全部選ぶ
-app.addEventListener('focusout', (ev) => { if (ev.target.dataset?.tp && ev.target.value.length === 1) ev.target.value = `0${ev.target.value}`; });
+// Android の日付の欄：ない日付は空にして、年→月→日と移る
+function datePartInput(t, move = true) {
+  t.value = cleanDatePart(t.dataset.dp, t.value);
+  const [bind, y, m, d] = t.closest('.date-split').querySelectorAll('input');
+  // 月を変えて、その月にない日になったとき（2月30日など）は日を空にする
+  if (y.value.length === 4 && Number(m.value) >= 1 && d.value.length === 2 && !joinDate(y.value, m.value, d.value)) d.value = '';
+  bind.value = joinDate(y.value, m.value, d.value);
+  bind.dispatchEvent(new Event('input', { bubbles: true }));
+  if (!move) return;
+  if (t === y && y.value.length === 4) m.focus();
+  if (t === m && (m.value.length === 2 || /^[2-9]$/.test(m.value))) d.focus();
+}
+const partInput = (t) => (t.dataset.tp ? timePartInput(t) : datePartInput(t));
+app.addEventListener('compositionend', (ev) => { if (ev.target.dataset.tp || ev.target.dataset.dp) partInput(ev.target); });
+app.addEventListener('focusin', (ev) => { if (ev.target.dataset?.tp || ev.target.dataset?.dp) setTimeout(() => ev.target.select(), 0); }); // 押したら打ち直せるように全部選ぶ
+app.addEventListener('focusout', (ev) => {
+  const t = ev.target;
+  if (t.dataset?.dp === 'y') {
+    // 4桁でない年は、ない年として空にする
+    if (t.value.length < 4 && t.value) { t.value = ''; datePartInput(t, false); }
+  } else if ((t.dataset?.tp || t.dataset?.dp) && t.value.length === 1) {
+    t.value = t.value === '0' && t.dataset.dp ? '' : `0${t.value}`;
+    if (t.dataset.dp) datePartInput(t, false);
+  }
+});
 
 app.addEventListener('input', (ev) => {
   const t = ev.target;
-  if (t.dataset.tp) {
-    if (!ev.isComposing) timePartInput(t);
+  if (t.dataset.tp || t.dataset.dp) {
+    if (!ev.isComposing) partInput(t);
     return;
   }
   if (t.dataset.bind) {
@@ -2251,10 +2283,11 @@ app.addEventListener('input', (ev) => {
     if (!jobs[i].id) jobs[i].id = `job-${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
     setPath(jobs[i], t.dataset.jobK, t.value);
     // 働き始めた日を変えたら、新人保証の期間を描き直す（営業所名は、入れ終わったとき（change）に描き直す）
-    if (/^guards\.\d+\.(from|to)$/.test(t.dataset.jobK) && t.value) {
-      const y = window.scrollY;
-      render();
-      window.scrollTo(0, y);
+    // 保証の期間の順番がおかしいときの注意（入力の途中で描き直さない）
+    if (/^guards\.\d+\.(from|to)$/.test(t.dataset.jobK)) {
+      const g = jobs[i].guards[Number(t.dataset.jobK.split('.')[1])];
+      const note = t.closest('.guard-card')?.querySelector('.guard-order');
+      if (note) note.hidden = !(g.from && g.to && g.from > g.to);
     }
   } else if (t.dataset.jobamt || t.dataset.jobcnt) {
     // 乗務後点呼：その日の案件の金額・個数
@@ -2281,12 +2314,6 @@ app.addEventListener('input', (ev) => {
     }
     // 以前に受けた前払いは、入力した月の分として数える
     if (t.dataset.setting === 'priorAdvance') { state.settings.priorAdvanceMonth = thisMonthKey(); state.settings.priorAdvanceNone = ''; }
-    // 営業所・稼働を開始した日を変えたら、単価・新人保証の表示を描き直す
-    if (t.dataset.setting === 'salesOffice' || t.dataset.setting === 'salesStartDate') {
-      const y = window.scrollY;
-      render();
-      window.scrollTo(0, y);
-    }
   }
   updateSaveState();
   updateEntryState();

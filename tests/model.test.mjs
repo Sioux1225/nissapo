@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { cleanTimePart, joinTime, backupReminder, DEFAULT_SETTINGS, newStart, newEnd, prevOdo, monthSheets, yearSheets, toCsv, timeToSerial, distanceOf } from '../js/model.js';
+import { cleanTimePart, joinTime, cleanDatePart, joinDate, backupReminder, DEFAULT_SETTINGS, newStart, newEnd, prevOdo, monthSheets, yearSheets, toCsv, timeToSerial, distanceOf } from '../js/model.js';
 import { buildXlsx, colName, sheetXml } from '../js/xlsx.js';
 import { buildPdf } from '../js/pdf.js';
 
@@ -584,4 +584,26 @@ test('Android の時刻の欄：ない時刻は空にする', () => {
   assert.equal(joinTime('18', '30'), '18:30');
   assert.equal(joinTime('18', ''), '');
   assert.equal(joinTime('', '30'), '');
+});
+
+test('Android の日付の欄：ない日付は空にする', () => {
+  assert.equal(cleanDatePart('m', '13'), '');
+  assert.equal(cleanDatePart('m', '00'), '');
+  assert.equal(cleanDatePart('m', '12'), '12');
+  assert.equal(cleanDatePart('m', '1'), '1'); // 1桁はまだ打っている途中
+  assert.equal(cleanDatePart('d', '32'), '');
+  assert.equal(cleanDatePart('d', '00'), '');
+  assert.equal(cleanDatePart('d', '31'), '31');
+  assert.equal(cleanDatePart('y', '1999'), '');
+  assert.equal(cleanDatePart('y', '2100'), '');
+  assert.equal(cleanDatePart('y', '2026'), '2026');
+  assert.equal(cleanDatePart('y', '20'), '20');
+  assert.equal(cleanDatePart('y', '２０２６'), '2026'); // 全角も数字として受ける
+  assert.equal(joinDate('2026', '11', '5'), '2026-11-05');
+  assert.equal(joinDate('2026', '2', '30'), ''); // 2月30日はない
+  assert.equal(joinDate('2028', '2', '29'), '2028-02-29'); // うるう年
+  assert.equal(joinDate('2027', '2', '29'), '');
+  assert.equal(joinDate('2026', '', '5'), '');
+  assert.equal(joinDate('20', '11', '5'), '');
+  assert.equal(joinDate('', '', ''), '');
 });

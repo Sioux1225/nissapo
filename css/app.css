@@ -342,6 +342,13 @@ button:focus-visible { outline: 3px solid var(--blue); outline-offset: 2px; }
 .time-split span { flex: none; font-weight: 700; }
 .time-split span + input { margin-left: 8px; }
 .field .time-split input { flex: 1 1 0; width: auto; text-align: center; font-size: 22px; font-variant-numeric: tabular-nums; }
+/* 日付の欄（年・月・日）。年だけ広く */
+.date-split span + input { margin-left: 4px; }
+.date-split input { flex: 1 1 0; width: auto; padding: 0 4px; text-align: center; font-variant-numeric: tabular-nums; }
+.field .date-split input { padding: 0 4px; font-size: 20px; }
+.date-split input[data-dp="y"] { flex-grow: 1.8; }
+.adv-add .date-split { grid-column: 1 / -1; }
+.adv-add:has(.date-split) #adv-amount { grid-column: 1 / -1; }
 
 /* 前払いの履歴 */
 .adv { display: flex; flex-direction: column; }
