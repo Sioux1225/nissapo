@@ -165,13 +165,46 @@ export function prevSalesLevel(settings, y, m) {
   return settings.prevSalesMonth === pk && ['over', 'under'].includes(settings.prevSalesLevel) ? settings.prevSalesLevel : null;
 }
 
+// はじめての前払いの留保（リース車両10万円・車両持ち込み6万円）
+export const firstReserve = (lease) => (lease ? 100000 : 60000);
+
+// 稼働を始めた月（'YYYY-MM'）：設定の「稼働を開始した日」と、事前研修の初日の早い方
+export function startMonth(settings) {
+  const ds = [isDate(settings.salesStartDate) ? settings.salesStartDate : null, ...trainingList(settings).map((t) => t.date)].filter(Boolean).sort();
+  return ds.length ? ds[0].slice(0, 7) : null;
+}
+
 // はじめての前払いの月か（以前から稼働していて前月の売上を選んだ方は、はじめてではない）
-// 支払いは2か月サイトなので、稼働を開始した月より後の月は、まだ支払われていない売上があり、はじめての留保はいらない
-export function isFirstAdvanceMonth(settings, y, m) {
+// 稼働を始めた月（事前研修を含む）までは、はじめての月。その翌月からは、前月が「はじめての月」で、
+// 前月の売上（事前研修を含む）がはじめての留保（10万円・6万円）以下（経費割れ）なら、この月もはじめての月。
+// 上回っていれば、通常の判断（前月の売上が40万円未満なら5万円）。salesOf(y, m)：その月の売上（事前研修を含む）
+export function isFirstAdvanceMonth(settings, y, m, salesOf = null) {
   if (prevSalesLevel(settings, y, m)) return false;
   const key = advanceKey(y, m);
-  if (isDate(settings.salesStartDate) && key > settings.salesStartDate.slice(0, 7)) return false;
-  return !Object.entries(settings.advanceHistory || {}).some(([k, list]) => k < key && (list || []).length > 0);
+  if (Object.entries(settings.advanceHistory || {}).some(([k, list]) => k < key && (list || []).length > 0)) return false;
+  const start = startMonth(settings);
+  if (!start || key <= start) return true;
+  if (!salesOf) return false;
+  const pd = new Date(y, m - 2, 1);
+  const py = pd.getFullYear();
+  const pm = pd.getMonth() + 1;
+  return isFirstAdvanceMonth(settings, py, pm, salesOf) && salesOf(py, pm) <= firstReserve(settings.leaseCar === 'yes');
+}
+
+// ---- 事前研修 ----
+// 佐川急便のID発行（申請から承認まで7営業日）までの間、責任者のIDで研修した日の売上。新人の売上に移す
+// settings.trainings：[{ id, date, staff, start, end, takuhai, shogyo, shuka, amount }]（任意。しない人もいる）
+export function trainingList(settings) {
+  return [...(settings.trainings || [])].filter((t) => isDate(t.date)).sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0));
+}
+export function trainingsOf(settings, y, m) {
+  const key = advanceKey(y, m);
+  return trainingList(settings).filter((t) => t.date.startsWith(`${key}-`));
+}
+export function trainingTotal(settings, y, m) {
+  const list = trainingsOf(settings, y, m);
+  const sum = (k) => list.reduce((t, x) => t + (num(x[k]) || 0), 0);
+  return { days: list.length, amount: sum('amount'), takuhai: sum('takuhai'), shogyo: sum('shogyo'), shuka: sum('shuka') };
 }
 
 // sales：その月の売上、advanced：その月にすでに受けた前払い、prevSales：前月の売上（記録がなければ null）
@@ -180,7 +213,7 @@ export function advanceLimit({ sales, advanced = 0, prevSales, prevLevel = null,
   let reserve = 0;
   let reason = '';
   if (first) {
-    reserve = lease ? 100000 : 60000;
+    reserve = firstReserve(lease);
     reason = lease ? 'はじめての前払い（リース車両）' : 'はじめての前払い（車両持ち込み）';
   } else if (prevSales == null && prevLevel === 'over') {
     // 留保なし
@@ -379,7 +412,12 @@ export function monthSales(records, y, m, settings, upto = null, today = todayKe
   }
   // その月に保証の期間がかかっているか（表に保証の列を出す）
   const hasGuard = monthGuards(settings, y, m).length > 0;
-  return { rows, total, hasGuard };
+  // 事前研修の分（売上の合計・前払いに含める。表には入れず、別の用紙にする）
+  const training = trainingTotal(settings, y, m);
+  total.training = training.amount;
+  total.trainingDays = training.days;
+  total.sales = total.amount + training.amount;
+  return { rows, total, hasGuard, training };
 }
 
 // その月に期間がかかっている保証 [{ job, guard }]

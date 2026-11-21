@@ -479,6 +479,64 @@ export function renderSalesDetail({ title, ym, name, sub, rows, sums, total }) {
   return pages;
 }
 
+// 事前研修（売上表とは別の用紙）：A4縦。rows：[日, 担当者, 稼働時間, 宅配, 商業, 集荷, 金額]、foot：合計の行
+export function renderTrainingSheet({ title, ym, name, sub, rows, foot, note = [] }) {
+  const W = 1654;
+  const H = 2339;
+  const m = 110;
+  const rowH = 52;
+  const cols = [{ t: '日', w: 12 }, { t: '担当者', w: 22, align: 'left' }, { t: '稼働時間', w: 20 }, { t: '宅配', w: 9 }, { t: '商業', w: 9 }, { t: '集荷', w: 9 }, { t: '金額', w: 19, align: 'right' }];
+  const sumW = cols.reduce((t, c) => t + c.w, 0);
+  const pages = [];
+  let ctx;
+  let y;
+  const newPage = () => {
+    const canvas = document.createElement('canvas');
+    canvas.width = W;
+    canvas.height = H;
+    ctx = canvas.getContext('2d');
+    ctx.fillStyle = '#FFFFFF';
+    ctx.fillRect(0, 0, W, H);
+    ctx.fillStyle = '#000000';
+    ctx.strokeStyle = '#000000';
+    ctx.textBaseline = 'middle';
+    ctx.font = `700 54px ${FONT}`;
+    ctx.textAlign = 'left';
+    ctx.fillText(title, m, 150);
+    ctx.font = `400 34px ${FONT}`;
+    ctx.textAlign = 'right';
+    ctx.fillText(ym, W - m, 150);
+    ctx.fillText(`氏名：${name}`, W - m, 220);
+    if (sub) { ctx.font = `400 26px ${FONT}`; ctx.textAlign = 'left'; ctx.fillText(sub, m, 220); }
+    pages.push(canvas);
+    y = 270;
+    row(cols.map((c) => c.t), { bold: true, fill: '#EFEFEF' });
+  };
+  const row = (cells, { bold = false, fill = null, h = rowH } = {}) => {
+    let x = m;
+    ctx.lineWidth = 2;
+    cells.forEach((v, i) => {
+      const w = (cols[i].w / sumW) * (W - m * 2);
+      if (fill) { ctx.fillStyle = fill; ctx.fillRect(x, y, w, h); ctx.fillStyle = '#000000'; }
+      ctx.strokeRect(x, y, w, h);
+      if (v !== '' && v != null) drawLines(ctx, String(v), x, y, w, h, { size: 26, weight: bold ? 700 : 400, align: bold && !fill?.startsWith('#FFF3') ? 'center' : cols[i].align || 'center' });
+      x += w;
+    });
+    y += h;
+  };
+  const bottom = H - 220;
+  newPage();
+  for (const r of rows) {
+    if (y + rowH > bottom) newPage();
+    row(r);
+  }
+  row(foot, { bold: true, fill: '#FFF3E0', h: rowH + 8 });
+  ctx.textAlign = 'left';
+  ctx.font = `400 24px ${FONT}`;
+  note.forEach((t, i) => ctx.fillText(t, m, y + 60 + i * 36));
+  return pages;
+}
+
 function canvasJpeg(canvas) {
   return new Promise((resolve, reject) => {
     canvas.toBlob(async (blob) => {

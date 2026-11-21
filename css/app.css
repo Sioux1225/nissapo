@@ -438,3 +438,20 @@ button:focus-visible { outline: 3px solid var(--blue); outline-offset: 2px; }
 .pj b.pj-wide { grid-column: 1 / -1; }
 .pj-counts { align-items: end; }
 .adv-rest .rest-note { align-self: flex-end; font-size: 11px; margin-top: 2px; }
+
+/* 事前研修（設定） */
+.training { display: flex; flex-direction: column; gap: 10px; padding: 12px 16px 14px; }
+.tr-f > input { width: 100%; min-height: 48px; border: 1px solid var(--line-strong); border-radius: 12px; background: var(--card); padding: 0 12px; font-size: 18px; font-weight: 600; }
+.tr-f > input::placeholder { color: #B5B5B5; font-weight: 400; }
+.tr-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 8px; }
+.tr-grid.three { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.tr-grid .tr-f:has(.date-split) { grid-column: 1 / -1; }
+.tr-f { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.tr-f input { min-width: 0; max-width: 100%; }
+.tr-list { display: flex; flex-direction: column; border-top: 1px solid var(--line-soft); }
+.tr-row { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 8px 0; border-bottom: 1px solid var(--line-soft); font-size: 14px; }
+.tr-row:last-child { border-bottom: 0; }
+.tr-amt { display: flex; align-items: center; gap: 6px; white-space: nowrap; }
+.tr-line { color: var(--sub); }
+.tr-f .time-split input { flex: 1 1 0; width: auto; min-width: 0; min-height: 48px; border: 1px solid var(--line-strong); border-radius: 12px; background: var(--card); text-align: center; font-size: 22px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.tr-f .time-split span + input { margin-left: 4px; }
