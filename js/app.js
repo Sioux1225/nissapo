@@ -18,7 +18,7 @@ import {
   KINDS, COLLISIONS, ROAD_TYPES, SLOPES, SHAPES, SURFACES
 } from './accident.js';
 
-export const APP_VERSION = '0.28.0';
+export const APP_VERSION = '0.29.0';
 
 const app = document.getElementById('app');
 const state = {
@@ -1364,11 +1364,10 @@ function advanceInfo(s, y, m, salesAmount) {
   return { ...lim, first, prevSales, prevLevel, pm, total, remaining: lim.target };
 }
 
-function advanceSection(s, y, m, salesAmount, today) {
+function advanceSection(s, y, m, salesAmount) {
   const list = advanceHistory(s, y, m);
   const info = advanceInfo(s, y, m, salesAmount);
   const total = info.total;
-  const def = today.startsWith(`${y}-${pad2(m)}-`) ? today : dateKey(y, m, 1);
   return `<section class="card adv">
     <h2 class="card-title">${m}月の前払い</h2>
     <div class="adv-list">${list.map((a) => `<div class="adv-row">
@@ -1384,6 +1383,17 @@ function advanceSection(s, y, m, salesAmount, today) {
       <div><span class="muted">前払いの合計</span><b>${yen(total)}</b></div>
       <div class="adv-rest"><span class="muted">前払い可能額</span><b>${yen(info.remaining)}</b>${info.exact !== info.target ? '<small class="muted rest-note">（千円未満は切り捨て）</small>' : ''}</div>
     </div>
+    <div class="adv-wish">
+      ${field('希望する前払い額（円）', `<input id="advance" data-advance="${advanceKey(y, m)}" value="${advanceOf(s, y, m) ?? ''}" type="number" inputmode="numeric" min="0" placeholder="例：50000">`,
+        advanceOf(s, y, m) != null && advanceOf(s, y, m) > info.remaining ? '<span class="warn-text">前払い可能額より多い額です</span>' : '')}
+    </div>
+  </section>`;
+}
+
+// 申請が承認されたあとに、受けた前払いを記録する（PDFを送るボタンの下。手順の順番に並べる）
+function advanceAddSection(y, m, today) {
+  const def = today.startsWith(`${y}-${pad2(m)}-`) ? today : dateKey(y, m, 1);
+  return `<section class="card">
     <div class="adv-add">
       <p class="field-note adv-note"><b>申請が承認されたら</b>、今回の前払い金額を入力して「前払いを記録する」を押してください。</p>
       ${dateInput('id="adv-date"', def, '前払いを受けた日', 'aria-label="前払いを受けた日"')}
@@ -1442,15 +1452,11 @@ function renderSales() {
         ${t.missing ? `<span class="small warn-text">個数・金額がまだの日が ${t.missing}日あります</span>` : ''}
         <span class="small muted">${e(salesSub(s, y, m))}</span>
       </section>
-      ${advanceSection(s, y, m, t.amount, today)}
-      <section class="card fields">
-        ${field('希望する前払い額（円）', `<input id="advance" data-advance="${advanceKey(y, m)}" value="${advanceOf(s, y, m) ?? ''}" type="number" inputmode="numeric" min="0" placeholder="例：50000">`,
-          advanceOf(s, y, m) != null && advanceOf(s, y, m) > advanceInfo(s, y, m, t.amount).remaining
-            ? '<span class="warn-text">前払い可能額より多い額です</span>' : '')}
-      </section>
+      ${advanceSection(s, y, m, t.amount)}
       <p class="info">前払いは<b>月初めからの売上</b>で計算します。乗務後点呼で選んだ案件の売上の合計を、その日の売上として数えます。日付を押すと内訳が見られ、個数もここで入れられます。</p>
       <button type="button" class="btn-primary" data-action="share-sales">PDFにしてLINEで送る</button>
       <button type="button" class="btn-text" data-action="preview-sales">プレビューで確認する</button>
+      ${advanceAddSection(y, m, today)}
       <div class="card list">${rows || '<p class="empty">この月はまだ乗務の記録がありません</p>'}</div>
       <div id="preview" class="preview"></div>`}
     </main>`;
