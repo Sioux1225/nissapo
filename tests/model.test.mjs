@@ -607,30 +607,3 @@ test('Android の日付の欄：ない日付は空にする', () => {
   assert.equal(joinDate('20', '11', '5'), '');
   assert.equal(joinDate('', '', ''), '');
 });
-
-test('事前研修：その月の売上に足し、はじめての月は研修の初日から数える', async () => {
-  const { monthSales, trainingTotal, startMonth, isFirstAdvanceMonth } = await import('../js/sales.js');
-  const s = { salesStartDate: '2026-11-01', leaseCar: 'yes', jobs: [{ id: 'j', kind: 'corp', company: '○○', branch: '△△', pay: 'daily', price: 15000, units: [] }],
-    trainings: [{ id: 't1', date: '2026-10-27', staff: '配送 一郎', amount: 18000, takuhai: 80 }, { id: 't2', date: '2026-10-28', staff: '配送 一郎', amount: 19000 }] };
-  assert.deepEqual(trainingTotal(s, 2026, 10), { days: 2, amount: 37000, takuhai: 80, shogyo: 0, shuka: 0 });
-  const t = monthSales([], 2026, 10, s).total;
-  assert.equal(t.amount, 0);
-  assert.equal(t.sales, 37000);
-  assert.equal(monthSales([], 2026, 11, s).total.sales, 0);
-  assert.equal(startMonth(s), '2026-10');
-  assert.equal(startMonth({ salesStartDate: '2026-11-01' }), '2026-11');
-  // 研修の月（10月）の売上が10万円以下（経費割れ）なら、11月もはじめての留保
-  const salesOf = (y, m) => (m === 10 ? 37000 : m === 11 ? 300000 : 0);
-  assert.equal(isFirstAdvanceMonth(s, 2026, 10, salesOf), true);
-  assert.equal(isFirstAdvanceMonth(s, 2026, 11, salesOf), true);
-  assert.equal(isFirstAdvanceMonth(s, 2026, 12, salesOf), false); // 11月は10万円を上回った
-  // 10月が10万円を上回っていれば、11月は通常の判断
-  assert.equal(isFirstAdvanceMonth(s, 2026, 11, (y, m) => (m === 10 ? 120000 : 0)), false);
-  // 持ち込みは6万円で判断
-  assert.equal(isFirstAdvanceMonth({ ...s, leaseCar: 'no' }, 2026, 11, (y, m) => (m === 10 ? 70000 : 0)), false);
-  assert.equal(isFirstAdvanceMonth({ ...s, leaseCar: 'no' }, 2026, 11, (y, m) => (m === 10 ? 60000 : 0)), true);
-  // 10月に前払いを受けていれば、11月ははじめてではない
-  assert.equal(isFirstAdvanceMonth({ ...s, advanceHistory: { '2026-10': [{ id: 'a', date: '2026-10-29', amount: 5000 }] } }, 2026, 11, salesOf), false);
-  // 事前研修がない人は今までどおり
-  assert.equal(isFirstAdvanceMonth({ salesStartDate: '2026-10-13' }, 2026, 10), true);
-});

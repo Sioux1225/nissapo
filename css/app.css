@@ -138,7 +138,7 @@ svg { flex: none; }
   padding: 0 12px; font-size: 18px; font-weight: 600;
 }
 .field input::placeholder { color: #B5B5B5; font-weight: 400; }
-.field input[type="time"], .tr-f input[type="time"] { font-size: 22px; font-variant-numeric: tabular-nums; }
+.field input[type="time"] { font-size: 22px; font-variant-numeric: tabular-nums; }
 .field input:focus, .select:focus { outline: 2px solid var(--orange); outline-offset: 0; border-color: transparent; }
 .ym { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
 
@@ -311,7 +311,7 @@ button:focus-visible { outline: 3px solid var(--blue); outline-offset: 2px; }
 .nb-line { font-size: 11px; font-weight: 600; color: var(--orange-text); }
 
 /* iPhone の Safari では日付・時刻の欄が横幅を守らずにはみ出すので、幅に収める */
-.field input[type="date"], .field input[type="time"], .tr-f input[type="date"], .tr-f input[type="time"] {
+.field input[type="date"], .field input[type="time"] {
   -webkit-appearance: none;
   appearance: none;
   display: block;
@@ -321,7 +321,7 @@ button:focus-visible { outline: 3px solid var(--blue); outline-offset: 2px; }
   text-align: left;
 }
 /* 数字を上下の真ん中に（iPhone は上に寄るため、欄の高さと行の高さをそろえる） */
-.field input[type="date"], .field input[type="time"], .tr-f input[type="date"], .tr-f input[type="time"] {
+.field input[type="date"], .field input[type="time"] {
   height: 48px;
   min-height: 48px;
   line-height: 46px;
@@ -329,9 +329,7 @@ button:focus-visible { outline: 3px solid var(--blue); outline-offset: 2px; }
   padding-bottom: 0;
 }
 .field input[type="date"]::-webkit-date-and-time-value,
-.field input[type="time"]::-webkit-date-and-time-value,
-.tr-f input[type="date"]::-webkit-date-and-time-value,
-.tr-f input[type="time"]::-webkit-date-and-time-value {
+.field input[type="time"]::-webkit-date-and-time-value {
   text-align: left;
   margin: 0;
   line-height: 46px;
@@ -440,20 +438,3 @@ button:focus-visible { outline: 3px solid var(--blue); outline-offset: 2px; }
 .pj b.pj-wide { grid-column: 1 / -1; }
 .pj-counts { align-items: end; }
 .adv-rest .rest-note { align-self: flex-end; font-size: 11px; margin-top: 2px; }
-
-/* 事前研修（設定） */
-.training { display: flex; flex-direction: column; gap: 10px; padding: 12px 16px 14px; }
-.tr-f > input { width: 100%; min-height: 48px; border: 1px solid var(--line-strong); border-radius: 12px; background: var(--card); padding: 0 12px; font-size: 18px; font-weight: 600; }
-.tr-f > input::placeholder { color: #B5B5B5; font-weight: 400; }
-.tr-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 8px; }
-.tr-grid.three { grid-template-columns: repeat(3, minmax(0, 1fr)); }
-.tr-grid .tr-f:has(.date-split) { grid-column: 1 / -1; }
-.tr-f { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
-.tr-f input { min-width: 0; max-width: 100%; }
-.tr-list { display: flex; flex-direction: column; border-top: 1px solid var(--line-soft); }
-.tr-row { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 8px 0; border-bottom: 1px solid var(--line-soft); font-size: 14px; }
-.tr-row:last-child { border-bottom: 0; }
-.tr-amt { display: flex; align-items: center; gap: 6px; white-space: nowrap; }
-.tr-line { color: var(--sub); }
-.tr-f .time-split input { flex: 1 1 0; width: auto; min-width: 0; min-height: 48px; border: 1px solid var(--line-strong); border-radius: 12px; background: var(--card); text-align: center; font-size: 22px; font-weight: 600; font-variant-numeric: tabular-nums; }
-.tr-f .time-split span + input { margin-left: 4px; }

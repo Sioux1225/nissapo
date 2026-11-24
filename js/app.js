@@ -3,7 +3,7 @@
 
 import { db, requestPersist } from './db.js';
 import { shrinkImage, newPhoto, blobToDataUrl, dataUrlToBlob } from './photo.js';
-import { COUNT_KEYS, unitPrices, salesReady, monthSales, yen, advanceKey, advanceOf, advanceHistory, advanceTotal, advanceLimit, isFirstAdvanceMonth, prevSalesLevel, trainingList, trainingsOf, SHIFTS, hasExtra, sagawaJob, guardOn, guardText, monthGuards, GUARD_DEFAULT_NAME, GUARD_NAMES, officeName, sagawaMissing, jobList, jobsOf, dayJobs, jobLabel, jobReady, jobUnits, sagawaSettings, hasSagawa, isFixedSagawa, UNIT_SLOTS } from './sales.js';
+import { COUNT_KEYS, unitPrices, salesReady, monthSales, yen, advanceKey, advanceOf, advanceHistory, advanceTotal, advanceLimit, isFirstAdvanceMonth, prevSalesLevel, SHIFTS, hasExtra, sagawaJob, guardOn, guardText, monthGuards, GUARD_DEFAULT_NAME, GUARD_NAMES, officeName, sagawaMissing, jobList, jobsOf, dayJobs, jobLabel, jobReady, jobUnits, sagawaSettings, hasSagawa, isFixedSagawa, UNIT_SLOTS } from './sales.js';
 import { EXPIRED, expiryStatus, expiryMessage, expiryAlertsToShow } from './expiry.js';
 import { OIL_LIMIT, OIL_STEPS, newOilChange, currentOdo, oilStatus, oilMessage, oilAlertToShow, sortOilChanges } from './oil.js';
 import {
@@ -12,13 +12,13 @@ import {
 } from './model.js';
 import { buildXlsx } from './xlsx.js';
 import { verifyInvite, inviteStatus, parseInvite } from './invite.js';
-import { specsToPdf, renderSheet, renderAccident, renderAnnex, renderPhotoPage, renderSalesSheet, renderSalesDetail, renderTrainingSheet, canvasesToPdf } from './pdf.js';
+import { specsToPdf, renderSheet, renderAccident, renderAnnex, renderPhotoPage, renderSalesSheet, renderSalesDetail, canvasesToPdf } from './pdf.js';
 import {
   newAccident, normalizeAccident, accidentWhen, wareki, annexLines, needsReport, planFromRecord, validateAccident, accidentSheet, accidentCsv,
   KINDS, COLLISIONS, ROAD_TYPES, SLOPES, SHAPES, SURFACES
 } from './accident.js';
 
-export const APP_VERSION = '0.30.1';
+export const APP_VERSION = '0.30.2';
 
 const app = document.getElementById('app');
 const state = {
@@ -338,28 +338,6 @@ function editableJobs() {
   return s.jobs;
 }
 
-// 設定：事前研修（佐川急便のID発行までの間、責任者のIDで研修した日の売上）。任意で、入れなくても保存できる
-// 「事前研修を記録する」を押すと、すぐ保存する（前払いの記録と同じ）
-function trainingFields(s) {
-  const list = trainingList(s).reverse();
-  const box = (id, label, attrs) => `<label class="tr-f"><span class="field-label">${label}</span><input id="${id}" ${attrs}></label>`;
-  const time = (id, label) => `<label class="tr-f"><span class="field-label">${label}</span>${IS_ANDROID ? timeBox(`id="${id}"`, '', label) : `<input id="${id}" type="time" aria-label="${label}">`}</label>`;
-  const cnt = (id, label) => box(id, label, `type="number" inputmode="numeric" min="0" aria-label="${label}の個数"`);
-  return `<h2 class="section-title">事前研修（任意）</h2>
-    <div class="card fields training">
-      <label class="tr-f"><span class="field-label">日付</span>${dateInput('id="tr-date"', '', '事前研修の日付', 'aria-label="事前研修の日付"')}</label>
-      ${box('tr-staff', '担当者の名前', 'placeholder="例：配送 一郎" autocomplete="off"')}
-      <div class="tr-grid">${time('tr-start', '開始')}${time('tr-end', '終了')}</div>
-      <div class="tr-grid three">${cnt('tr-takuhai', '宅配')}${cnt('tr-shogyo', '商業')}${cnt('tr-shuka', '集荷')}</div>
-      ${box('tr-amount', '金額（円）', 'type="number" inputmode="numeric" min="0" placeholder="例：18000"')}
-      <button type="button" class="btn-outline" data-action="add-training">事前研修を記録する</button>
-      ${list.length ? `<div class="tr-list">${list.map((t) => `<div class="tr-row">
-          <span><b>${Number(t.date.slice(5, 7))}/${Number(t.date.slice(8))}</b>　${e(t.staff)}${t.start || t.end ? `　${e(hm(t.start))}〜${e(hm(t.end))}` : ''}</span>
-          <span class="tr-amt"><b>${yen(t.amount)}</b><button type="button" class="btn-text danger" data-action="delete-training" data-id="${e(t.id)}">消す</button></span>
-        </div>`).join('')}</div>` : ''}
-    </div>`;
-}
-
 function settingsForm(s, fresh = false) {
   if (state.inviteName) s.driverName = state.inviteName; // 運転者名は招待の名前
   // 以前に受けた前払いは今月の分だけを入れる（前の月に入れた金額は出さない）
@@ -399,7 +377,6 @@ function settingsForm(s, fresh = false) {
       ${prevSalesField(s)}
       ${priorAdvanceField(s)}
     </div>
-    ${fresh ? '' : trainingFields(s)}
     <h2 class="section-title">期限のお知らせ（任意）</h2>
     <div class="card fields">
       ${f('shakenDate', '車検の満了日', 'type="date"', '車検証に書いてある「有効期間の満了する日」')}
@@ -1326,10 +1303,6 @@ function salesContext() {
 
 // withOffice：false なら営業所名を書かない（PDF では表題の「佐川急便」の右に書くため）
 
-// その月の売上（事前研修を含む）と、その月に記録か事前研修があるか（前月の売上・はじめての月の判断に使う）
-const monthAmount = (s, y, m) => monthSales(state.records, y, m, s).total.sales;
-const hasSalesMonth = (s, y, m) => hasMonth(state.records, y, m) || trainingsOf(s, y, m).length > 0;
-
 // 売上表の2行目：車両（リース・持ち込み）・前月の売上（40万円以上・未満）・新人保証の期間（佐川急便の案件が2つ以上のとき）
 function salesInfoLine(s, y, m) {
   const parts = [`車両：${s.leaseCar === 'yes' ? 'リース' : '持ち込み'}`];
@@ -1337,7 +1310,7 @@ function salesInfoLine(s, y, m) {
   const py = pd.getFullYear();
   const pm = pd.getMonth() + 1;
   let prev;
-  if (hasSalesMonth(s, py, pm)) prev = monthAmount(s, py, pm) >= 400000 ? '40万円以上' : '40万円未満';
+  if (hasMonth(state.records, py, pm)) prev = monthSales(state.records, py, pm, s).total.amount >= 400000 ? '40万円以上' : '40万円未満';
   else if (s.prevSalesMonth === advanceKey(py, pm) && s.prevSalesLevel === 'over') prev = '40万円以上';
   else if (s.prevSalesMonth === advanceKey(py, pm) && s.prevSalesLevel === 'under') prev = '40万円未満';
   else prev = 'なし';
@@ -1383,9 +1356,9 @@ function advanceInfo(s, y, m, salesAmount) {
   const pd = new Date(y, m - 2, 1);
   const py = pd.getFullYear();
   const pm = pd.getMonth() + 1;
-  const prevSales = hasSalesMonth(s, py, pm) ? monthAmount(s, py, pm) : null;
+  const prevSales = hasMonth(state.records, py, pm) ? monthSales(state.records, py, pm, s).total.amount : null;
   const prevLevel = prevSales == null ? prevSalesLevel(s, y, m) : null;
-  const first = isFirstAdvanceMonth(s, y, m, (yy, mm) => monthAmount(s, yy, mm));
+  const first = isFirstAdvanceMonth(s, y, m);
   const total = advanceTotal(s, y, m);
   const lim = advanceLimit({ sales: salesAmount, advanced: total, prevSales, prevLevel, first, lease: s.leaseCar === 'yes' });
   return { ...lim, first, prevSales, prevLevel, pm, total, remaining: lim.target };
@@ -1474,13 +1447,12 @@ function renderSales() {
       </section>` : `
       <section class="card pad sales-total">
         <span class="muted">${thisMonth ? `${m}月1日〜今日（${Number(today.slice(8))}日）の売上` : `${m}月の売上`}</span>
-        <b class="oil-big">${yen(t.sales)}</b>
-        ${t.days || !t.trainingDays ? `<span class="small">稼働 ${t.days}日${sagawa ? `・宅配 ${t.takuhai}個・商業 ${t.shogyo}個・集荷 ${t.shuka}個` : ''}・${kmText(t.km)}</span>` : ''}
+        <b class="oil-big">${yen(t.amount)}</b>
+        <span class="small">稼働 ${t.days}日${sagawa ? `・宅配 ${t.takuhai}個・商業 ${t.shogyo}個・集荷 ${t.shuka}個` : ''}・${kmText(t.km)}</span>
         ${t.missing ? `<span class="small warn-text">個数・金額がまだの日が ${t.missing}日あります</span>` : ''}
-        ${t.trainingDays ? `<span class="small tr-line">内訳：記録 ${yen(t.amount)}＋事前研修 ${t.trainingDays}日 ${yen(t.training)}</span>` : ''}
         <span class="small muted">${e(salesSub(s, y, m))}</span>
       </section>
-      ${advanceSection(s, y, m, t.sales)}
+      ${advanceSection(s, y, m, t.amount)}
       <p class="info">前払いは<b>月初めからの売上</b>で計算します。乗務後点呼で選んだ案件の売上の合計を、その日の売上として数えます。日付を押すと内訳が見られ、個数もここで入れられます。</p>
       <button type="button" class="btn-primary" data-action="share-sales">PDFにしてLINEで送る</button>
       <button type="button" class="btn-text" data-action="preview-sales">プレビューで確認する</button>
@@ -1491,28 +1463,7 @@ function renderSales() {
 }
 
 // 送る売上表のページ：1枚目は1日の合計だけ。その月に案件を組み合わせていれば（2つ以上の案件で乗務していれば）、案件ごとの内訳のページを足す
-// その月に事前研修があれば、最後に「事前研修」の用紙（別紙）を足す
 function salesCanvases() {
-  return [...salesMainCanvases(), ...trainingCanvases()];
-}
-
-function trainingCanvases() {
-  const s = state.settings;
-  const { y, m } = salesContext();
-  const list = trainingsOf(s, y, m);
-  if (!list.length) return [];
-  const [ty, tm, td] = todayKey().split('-').map(Number);
-  const sum = (k) => list.reduce((t, x) => t + (num(x[k]) || 0), 0);
-  const cnt = (v) => (num(v) == null ? '' : num(v));
-  return renderTrainingSheet({
-    title: '事前研修', ym: `${y}年 ${m}月`, name: s.driverName, sub: hasSagawa(s) ? salesTitle(s) : '',
-    rows: list.map((t) => [`${Number(t.date.slice(8))}（${weekday(t.date)}）`, t.staff, t.start || t.end ? `${hm(t.start)}〜${hm(t.end)}` : '', cnt(t.takuhai), cnt(t.shogyo), cnt(t.shuka), yen(t.amount)]),
-    foot: ['合計', '', `${list.length}日`, sum('takuhai'), sum('shogyo'), sum('shuka'), yen(sum('amount'))],
-    note: [`作成日：${ty}年${tm}月${td}日`, 'ドライバーズサポート株式会社']
-  });
-}
-
-function salesMainCanvases() {
   const s = state.settings;
   const { y, m, data } = salesContext();
   const worked = data.rows.filter((x) => x.worked && x.inRange);
@@ -1552,10 +1503,7 @@ function salesCanvas() {
     { text: '金額', w: sagawa ? (nbCol ? 15 : 16) : 24, align: 'right' }
   ];
   const blank = Array(head.length - 4).fill('');
-  // 事前研修の日は「休み」ではなく「事前研修」と書く（売上は別紙）
-  const trDays = new Set(trainingsOf(s, y, m).map((x) => x.date));
   const rows = data.rows.map((r) => {
-    if (!r.worked && trDays.has(r.date)) return [r.day, r.week, '事前研修', '', ...blank];
     if (r.off) return [r.day, r.week, '休み', '', ...blank];
     if (!r.worked || !r.inRange) return [r.day, r.week, '', '', ...blank];
     return [r.day, r.week, hm(r.start), hm(r.end), ...(sagawa ? COUNT_KEYS.map(([k]) => r.counts[k] ?? '') : []), r.km != null ? kmText(r.km) : '',
@@ -1573,11 +1521,10 @@ function salesCanvas() {
     head,
     rows,
     foot,
-    summary: { label: `${thisMonth ? `${m}月1日〜${td}日の売上合計` : `${m}月の売上合計`}${t.trainingDays ? '（事前研修を含む）' : ''}`, value: yen(t.sales) },
+    summary: { label: thisMonth ? `${m}月1日〜${td}日の売上合計` : `${m}月の売上合計`, value: yen(t.amount) },
     paid: { label: '前払い済み', value: yen(advanceTotal(s, y, m)) },
     request: advanceOf(s, y, m) != null ? { label: '今回希望する前払い額', value: yen(advanceOf(s, y, m)) } : null,
     note: [
-      ...(t.trainingDays ? [`＊売上合計には事前研修（${t.trainingDays}日・${yen(t.training)}）を含みます（別紙）`] : []),
       ...(sagawa ? ['＊大型貨物料金は省略とさせていただきます'] : []),
       `作成日：${ty}年${tm}月${td}日`,
       `ドライバーズサポート株式会社`
@@ -2100,31 +2047,6 @@ app.addEventListener('click', async (ev) => {
     toast(`前払い ${yen(amount)} を記録しました`);
     const sy = window.scrollY;
     renderSales();
-    window.scrollTo(0, sy);
-  } else if (action === 'add-training') {
-    const val = (id) => document.getElementById(id)?.value ?? '';
-    const date = val('tr-date');
-    const staff = val('tr-staff').trim();
-    const amount = num(val('tr-amount'));
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) { toast('事前研修の日付を入れてください'); return; }
-    if (!staff) { toast('担当者の名前を入れてください'); return; }
-    if (!amount || amount <= 0) { toast('事前研修の金額を入れてください'); return; }
-    const s = state.settings;
-    const c = (id) => (num(val(id)) != null && num(val(id)) >= 0 ? num(val(id)) : '');
-    s.trainings = [...(s.trainings || []), { id: `tr-${Date.now().toString(36)}`, date, staff, start: val('tr-start'), end: val('tr-end'), takuhai: c('tr-takuhai'), shogyo: c('tr-shogyo'), shuka: c('tr-shuka'), amount }];
-    await db.putSettings(s);
-    toast(`事前研修 ${Number(date.slice(5, 7))}/${Number(date.slice(8))} ${yen(amount)} を記録しました`);
-    const sy = window.scrollY;
-    renderSettings();
-    window.scrollTo(0, sy);
-  } else if (action === 'delete-training') {
-    const s = state.settings;
-    const t = (s.trainings || []).find((x) => x.id === el.dataset.id);
-    if (!t || !(await ask(`事前研修（${Number(t.date.slice(5, 7))}/${Number(t.date.slice(8))}・${t.staff}・${yen(t.amount)}）を消します。`, '消す', true))) return;
-    s.trainings = s.trainings.filter((x) => x.id !== t.id);
-    await db.putSettings(s);
-    const sy = window.scrollY;
-    renderSettings();
     window.scrollTo(0, sy);
   } else if (action === 'delete-advance') {
     const s = state.settings;
